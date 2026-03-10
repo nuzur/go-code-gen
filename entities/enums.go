@@ -27,6 +27,14 @@ func generateEnum(ctx context.Context,
 	f *nemgen.Field,
 	pkg string) {
 
+	if f.TypeConfig == nil || f.TypeConfig.Enum == nil {
+		fmt.Printf("ERROR: Enum type config is nil for field %s in entity %s\n", f.Identifier, pkg)
+		return
+	}
+
+	if f.TypeConfig.Enum.EnumUuid == "" || f.TypeConfig.Enum.EnumUuid == "00000000-0000-0000-0000-000000000000" {
+		return
+	}
 	enum := project.GetEnum(f.TypeConfig.Enum.EnumUuid)
 	if enum == nil {
 		fmt.Printf("ERROR: Enum with uuid %s not found for field %s in entity %s\n", f.TypeConfig.Enum.EnumUuid, f.Identifier, pkg)
