@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/gertd/go-pluralize"
-	"github.com/nuzur/go-code-gen/helpers"
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -84,7 +84,7 @@ func (f FieldTemplate) SingularIdentifier() string {
 }
 
 func (f FieldTemplate) Name() string {
-	return strings.ReplaceAll(helpers.ToCamelCase(f.Identifier()), "Json", "JSON")
+	return strings.ReplaceAll(gcgstrings.ToCamelCase(f.Identifier()), "Json", "JSON")
 }
 
 func (f FieldTemplate) GolangType() string {
@@ -98,7 +98,7 @@ func (f FieldTemplate) GolangType() string {
 	case nemgen.FieldType_FIELD_TYPE_FLOAT:
 		return "float64"
 	case nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		return "decimal.Decimal"
+		return "float64"
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
 		return "bool"
 	case nemgen.FieldType_FIELD_TYPE_CHAR, nemgen.FieldType_FIELD_TYPE_VARCHAR, nemgen.FieldType_FIELD_TYPE_TEXT:
@@ -130,8 +130,21 @@ func (f FieldTemplate) GolangType() string {
 	case nemgen.FieldType_FIELD_TYPE_VIDEO:
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
-		return helpers.ToCamelCase(f.Entity.Identifier + "_" + f.Identifier())
+		// check if there is an enum defined for this field, if so return that, otherwise return int
+		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		if enum != nil {
+			return gcgstrings.ToCamelCase(f.Entity.Identifier + "_" + f.Identifier())
+		}
+		return "int"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
+		rel := f.Project.GetRelationshipFromField(f.Field)
+		if rel != nil {
+			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+			if dependantEntity != nil {
+				return gcgstrings.ToCamelCase(dependantEntity.Identifier)
+			}
+		}
+		return "RawMessage"
 		//return f.GenFieldType
 		// todo - if dependant entity, return that
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
@@ -149,7 +162,6 @@ func (f FieldTemplate) GolangType() string {
 	default:
 		return "interface{}"
 	}
-	return "interface{}"
 }
 
 func (f FieldTemplate) IsKey() bool {
@@ -211,6 +223,15 @@ func (f FieldTemplate) Import() *string {
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_JSON:
+		// if there is a relationship with this field to a dependant entity, import that entity
+		rel := f.Project.GetRelationshipFromField(f.Field)
+		if rel != nil {
+			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+			if dependantEntity != nil {
+				importPath := fmt.Sprintf("%s/%s/%s", f.Project.Module, f.Project.EntitiesDir, dependantEntity.Identifier)
+				return &importPath
+			}
+		}
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return nil
@@ -245,6 +266,12 @@ func (f FieldTemplate) JSONMany() bool {
 }
 
 func (f FieldTemplate) JSONIdentifier() string {
-	// get dependaant entity identifier
-	return ""
+	rel := f.Project.GetRelationshipFromField(f.Field)
+	if rel != nil {
+		dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+		if dependantEntity != nil {
+			return dependantEntity.Identifier
+		}
+	}
+	return "json"
 }

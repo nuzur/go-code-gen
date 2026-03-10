@@ -10,23 +10,27 @@ import (
 	"strings"
 
 	"github.com/nuzur/filetools"
-	"github.com/nuzur/go-code-gen/helpers"
+	"github.com/nuzur/go-code-gen/maps"
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
 //go:embed templates/**
 var templates embed.FS
 
-func GenerateEntities(ctx context.Context, params *project.ProjectParams, dirName string) error {
+func GenerateEntities(ctx context.Context, params *project.ProjectParams) error {
 
-	project := project.New(params)
+	project, err := project.New(params)
+	if err != nil {
+		return fmt.Errorf("%v", err)
+	}
 
-	fmt.Printf("--[GPG] Generating core entities\n")
+	fmt.Printf("--[GCG] Generating core entities\n")
 	projectDir := project.Dir()
-	entitiesDir := path.Join(projectDir, dirName)
+	entitiesDir := path.Join(projectDir, project.EntitiesDir)
 
-	err := os.RemoveAll(entitiesDir)
+	err = os.RemoveAll(entitiesDir)
 	if err != nil {
 		fmt.Printf("ERROR: Deleting entity directory\n")
 	}
@@ -35,7 +39,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams, dirNam
 	for _, e := range project.Entities() {
 		generateEnums(ctx, project, entitiesDir, e)
 
-		fmt.Printf("----[GPG] Generating entity: %s\n", e.Identifier)
+		fmt.Printf("----[GCG] Generating entity: %s\n", e.Identifier)
 		entityDir := path.Join(entitiesDir, e.Identifier)
 		entityTemplate, entityImports := resolveEntityTemplate(e, project)
 		for imp := range entityImports {
@@ -77,10 +81,10 @@ func resolveEntityTemplate(e *nemgen.Entity, project *project.Project) (EntityTe
 		Project: project,
 
 		Package:    e.Identifier,
-		EntityName: helpers.ToCamelCase(e.Identifier),
+		EntityName: gcgstrings.ToCamelCase(e.Identifier),
 		Identifier: e.Identifier,
 		Fields:     fields,
-		Imports:    helpers.MapKeys(imports),
+		Imports:    maps.MapKeys(imports),
 	}
 
 	return tpl, imports

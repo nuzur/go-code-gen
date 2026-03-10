@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/nuzur/filetools"
-	"github.com/nuzur/go-code-gen/helpers"
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -44,7 +44,7 @@ func generateEnum(ctx context.Context,
 		Enum:    enum,
 
 		Package:       pkg,
-		EnumName:      helpers.ToCamelCase(enum.Identifier),
+		EnumName:      gcgstrings.ToCamelCase(enum.Identifier),
 		EnumNameUpper: strings.ToUpper(enum.Identifier),
 		Values:        values,
 		Options:       enum.StaticValues,

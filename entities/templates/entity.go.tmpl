@@ -1,16 +1,14 @@
 package {{.Package}}
 
 import (
+    "fmt"
     "encoding/json"
+    
     {{$timeImport := false}}    
-    {{range $import := .Imports}} {{if eq $import "time"}} {{$timeImport = true}} {{end}}
+    {{range $import := .Imports}}
     "{{$import}}" {{end}}
     
-    "fmt"
-            
-    {{if eq $timeImport false}}
-    "time"
-    {{end}}        
+     
 )
 
 type {{.EntityName}} struct { {{range $field := .Fields}}

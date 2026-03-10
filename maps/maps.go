@@ -1,4 +1,4 @@
-package helpers
+package maps
 
 func MapKeys(in map[string]any) []string {
 
