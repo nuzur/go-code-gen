@@ -27,7 +27,7 @@ func (s *server) Create{{.Name}}(ctx context.Context, req *pb.Create{{.Name}}Req
 		return nil, err
 	}
 
-	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKey.Name}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKey.Name}}Request(res))
+	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res))
 	if err != nil {
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "create_{{.FinalIdentifier}}",

@@ -136,11 +136,20 @@ func (f FieldTemplate) ProtoToMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_UUID:
 		return fmt.Sprintf("e.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("int64(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
 		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		return fmt.Sprintf("e.%s", strcase.ToCamel(f.Identifier()))
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+		}
+		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
@@ -153,10 +162,9 @@ func (f FieldTemplate) ProtoToMapper() string {
 		nemgen.FieldType_FIELD_TYPE_COLOR,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
-			return fmt.Sprintf("StringPtrToString(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		} else {
-			return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
 		}
+		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
@@ -209,7 +217,10 @@ func (f FieldTemplate) ProtoFromMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
-		return fmt.Sprintf("uuid.FromStringOrNil(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		if !f.IsRequired() {
+			return fmt.Sprintf("StringToUUIDPtr(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
+		return fmt.Sprintf("StringToUUID(m.Get%s())", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
 		return fmt.Sprintf("int64(m.Get%s())", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
@@ -228,7 +239,7 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		nemgen.FieldType_FIELD_TYPE_COLOR,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
-			return fmt.Sprintf("&m.%s", strcase.ToCamel(f.Identifier()))
+			return fmt.Sprintf("null.StringFrom(m.%s)", strcase.ToCamel(f.Identifier()))
 		} else {
 			return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 		}
@@ -247,7 +258,7 @@ func (f FieldTemplate) ProtoFromMapper() string {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), strcase.ToCamel(f.Identifier()))
 			}
-			return fmt.Sprintf("main_entity.%s(m.Get%s())", pl.Singular(gcgstrings.ToCamelCase(f.Identifier())), strcase.ToCamel(f.Identifier()))
+			return fmt.Sprintf("enum.%s(m.Get%s())", pl.Singular(gcgstrings.ToCamelCase(enum.Identifier)), strcase.ToCamel(f.Identifier()))
 		}
 		return fmt.Sprintf("int64(m.Get%s())", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:

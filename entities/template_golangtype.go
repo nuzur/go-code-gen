@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"strings"
+
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
@@ -34,52 +36,18 @@ func (f FieldTemplate) GolangType() string {
 			return "null.Bool"
 		}
 		return "bool"
-	case nemgen.FieldType_FIELD_TYPE_CHAR, nemgen.FieldType_FIELD_TYPE_VARCHAR, nemgen.FieldType_FIELD_TYPE_TEXT:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_ENCRYPTED:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_EMAIL:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_PHONE:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_URL:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_LOCATION:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_COLOR:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_RICHTEXT:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_CODE:
-		if !f.IsRequired() {
-			return "null.String"
-		}
-		return "string"
-	case nemgen.FieldType_FIELD_TYPE_MARKDOWN:
+	case nemgen.FieldType_FIELD_TYPE_CHAR,
+		nemgen.FieldType_FIELD_TYPE_VARCHAR,
+		nemgen.FieldType_FIELD_TYPE_TEXT,
+		nemgen.FieldType_FIELD_TYPE_ENCRYPTED,
+		nemgen.FieldType_FIELD_TYPE_EMAIL,
+		nemgen.FieldType_FIELD_TYPE_PHONE,
+		nemgen.FieldType_FIELD_TYPE_URL,
+		nemgen.FieldType_FIELD_TYPE_LOCATION,
+		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
 			return "null.String"
 		}
@@ -118,17 +86,9 @@ func (f FieldTemplate) GolangType() string {
 		return "RawMessage"
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return f.ArrayGolangType()
-	case nemgen.FieldType_FIELD_TYPE_DATE:
-		if !f.IsRequired() {
-			return "null.Time"
-		}
-		return "time.Time"
-	case nemgen.FieldType_FIELD_TYPE_DATETIME:
-		if !f.IsRequired() {
-			return "null.Time"
-		}
-		return "time.Time"
-	case nemgen.FieldType_FIELD_TYPE_TIME:
+	case nemgen.FieldType_FIELD_TYPE_DATE,
+		nemgen.FieldType_FIELD_TYPE_DATETIME,
+		nemgen.FieldType_FIELD_TYPE_TIME:
 		if !f.IsRequired() {
 			return "null.Time"
 		}
@@ -176,4 +136,8 @@ func (f FieldTemplate) ArrayGolangType() string {
 	default:
 		return "[]interface{}"
 	}
+}
+
+func (f FieldTemplate) IsNullable() bool {
+	return strings.Contains(f.GolangType(), "null.")
 }

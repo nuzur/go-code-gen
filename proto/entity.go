@@ -71,6 +71,7 @@ func generateEntityProtoFile(
 			hasVersionField = true
 		}
 		protoEntityTemplate = &ProtoEntityTemplate{
+			Entity:                e,
 			ProjectIdentifier:     project.Identifier,
 			ProjectModule:         project.Module,
 			OriginalIdentifier:    e.Identifier,
@@ -78,6 +79,7 @@ func generateEntityProtoFile(
 			FinalIdentifierPlural: pl.Plural(finalIdentifier),
 			Name:                  gcgstrings.ToCamelCase(finalIdentifier),
 			NamePlural:            pl.Plural(gcgstrings.ToCamelCase(finalIdentifier)),
+			Type:                  gcgstrings.ToCamelCase(finalIdentifier),
 			Fields:                fields,
 			PrimaryKeys:           primaryKeys,
 			Search:                true, // needs validation

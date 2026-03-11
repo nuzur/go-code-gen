@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
@@ -34,6 +35,18 @@ type ProtoEntityTemplate struct {
 	Imports               map[string]interface{}
 	Declarations          []ProtoEntityDeclaration
 	HasVersionField       bool
+}
+
+func (et ProtoEntityTemplate) PrimaryKeysName() string {
+	if len(et.PrimaryKeys) == 1 {
+		return et.PrimaryKeys[0].Name()
+	} else {
+		names := []string{}
+		for _, pk := range et.PrimaryKeys {
+			names = append(names, pk.Name())
+		}
+		return strings.Join(names, "And")
+	}
 }
 
 type ProtoEntityDeclaration struct {

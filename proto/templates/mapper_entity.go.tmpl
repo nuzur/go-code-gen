@@ -2,15 +2,21 @@ package mapper
 
 {{$timestampImport := false}}
 {{$uuidImport := false}}
+{{$enumImport := false}}
+{{$nullImport := false}}
+{{$projectModule := .ProjectModule}}
 
 import (
-    main_entity "{{.ProjectModule}}/core/entity/{{.OriginalIdentifier}}"
+    main_entity "{{.ProjectModule}}/entity/{{.OriginalIdentifier}}"
     pb "{{.ProjectModule}}/idl/gen"
     {{range $field := .Fields}}{{if and (eq $field.GolangType "time.Time") (eq $timestampImport false)}}
-    "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}    
-    {{if and (eq $field.GolangType "uuid.UUID") (eq $uuidImport false)}}
-    "github.com/gofrs/uuid" {{$uuidImport = true}}{{end}}
-    {{end}}
+    "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        
+    {{if and (eq $field.Enum true) (eq $enumImport false)}}
+    "{{$projectModule}}/enum" {{$enumImport = true}}{{end}}
+    {{if and (eq $field.IsNullable true) (eq $nullImport false)}}
+    "github.com/guregu/null/v6" {{$nullImport = true}}{{end}}    
+    {{end}}    
+    
 )
 
 func {{.Name}}ToProto(e main_entity.{{.Type}}) *pb.{{.Name}} {

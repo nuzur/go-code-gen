@@ -24,6 +24,18 @@ func StringToJSONRaw(s string) json.RawMessage {
 	return r
 }
 
+func StringToUUID(s string) uuid.UUID {
+    return uuid.FromStringOrNil(s)    
+}
+
+func StringToUUIDPtr(s string) *uuid.UUID {
+    parsed := uuid.FromStringOrNil(s)
+    if parsed == uuid.Nil {
+        return nil
+    }
+    return &pared
+}
+
 func UUIDSliceToStringSlice(uuids []uuid.UUID) []string {
     res := []string{}
     for _, u := range uuids {

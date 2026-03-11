@@ -13,9 +13,12 @@ import (
 
 func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Request) (*pb.{{.Name}}, error) {
 
-	if req.{{.Name}}.{{.PrimaryKey.ProtoGenName}} == "" {
-		return nil, errors.New("please provide a valid {{.PrimaryKey.Name}} to update")
+	{{$entityName := .Name}}
+	{{range $primaryKey := .PrimaryKeys}}
+	if req.{{$entityName}}.{{$primaryKey.ProtoGenName}} == "" {
+		return nil, errors.New("please provide a valid {{$primaryKey.Name}} to update")
 	}
+	{{end}}
 
 	{{if eq .HasVersionField true}}
 		if req.{{.Name}}.Version == 0 {
@@ -41,10 +44,13 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 
 	isFull := fieldmask.IsFullReplacement(req.UpdateMask)
 
+	{{$finalIdentifier := .FinalIdentifier}}
 	if !isFull && req.UpdateMask != nil {
-		if !strings.Contains(req.UpdateMask.String(), "{{.FinalIdentifier}}.{{.PrimaryKey.Identifier}}") {
-			req.UpdateMask.Append(req, "{{.FinalIdentifier}}.{{.PrimaryKey.Identifier}}")
-		}
+		{{range $primaryKey := .PrimaryKeys}}
+		if !strings.Contains(req.UpdateMask.String(), "{{$finalIdentifier}}.{{$primaryKey.Identifier}}") {
+			req.UpdateMask.Append(req, "{{$finalIdentifier}}.{{$primaryKey.Identifier}}")
+		}		
+		{{end}}
 		{{if eq .HasVersionField true}}
 		if !strings.Contains(req.UpdateMask.String(), "{{.FinalIdentifier}}.version") {
 			req.UpdateMask.Append(req, "{{.FinalIdentifier}}.version")
@@ -72,7 +78,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 		return nil, err
 	}
 
-	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKey.Name}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKey.Name}}Request(res))
+	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res))
 	if err != nil {
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "update_{{.FinalIdentifier}}",
