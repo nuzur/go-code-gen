@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/nuzur/filetools"
+	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/maps"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
@@ -30,23 +31,25 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	projectDir := project.Dir()
 	entitiesDir := path.Join(projectDir, project.EntitiesDir)
 
+	// remove existing
 	err = os.RemoveAll(entitiesDir)
 	if err != nil {
 		fmt.Printf("ERROR: Deleting entity directory\n")
 	}
 
+	generateEnums(ctx, project)
+
 	allImports := map[string]any{}
 	for _, e := range project.Entities() {
-		generateEnums(ctx, project, entitiesDir, e)
 
 		fmt.Printf("----[GCG] Generating entity: %s\n", e.Identifier)
 		entityDir := path.Join(entitiesDir, e.Identifier)
-		entityTemplate, entityImports := resolveEntityTemplate(e, project)
+		entityTemplate, entityImports := ResolveEntityTemplate(e, project)
 		for imp := range entityImports {
 			allImports[imp] = struct{}{}
 		}
 
-		templateBytes, err := GetTemplateBytes("entity")
+		templateBytes, err := files.GetTemplateBytes(templates, "entity")
 		if err != nil {
 			fmt.Printf("ERROR: Getting template bytes for entity: %s\n", e.Identifier)
 			continue
@@ -73,7 +76,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	return nil
 }
 
-func resolveEntityTemplate(e *nemgen.Entity, project *project.Project) (EntityTemplate, map[string]any) {
+func ResolveEntityTemplate(e *nemgen.Entity, project *project.Project) (EntityTemplate, map[string]any) {
 	fields, imports := ResolveFieldsAndImports(project, e.Fields, e, nil)
 
 	tpl := EntityTemplate{
@@ -88,12 +91,4 @@ func resolveEntityTemplate(e *nemgen.Entity, project *project.Project) (EntityTe
 	}
 
 	return tpl, imports
-}
-
-func GetTemplateBytes(fileName string) ([]byte, error) {
-	tmplBytes, err := templates.ReadFile(fmt.Sprintf("templates/%s.go.tmpl", fileName))
-	if err != nil {
-		return nil, err
-	}
-	return tmplBytes, nil
 }

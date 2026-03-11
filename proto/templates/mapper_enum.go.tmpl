@@ -1,0 +1,23 @@
+package mapper
+
+import (
+    "{{.ProjectModule}}/enum"
+    pb "{{.ProjectModule}}/idl/gen"    
+)
+
+{{range $enum := .Enums}}
+func {{$enum.ProtoType}}SliceToProto(s []{{$enum.GolangType}}) []pb.{{$enum.ProtoType}}{
+    res := []pb.{{$enum.ProtoType}}{}
+    for _, e := range s {
+        res = append(res, pb.{{$enum.ProtoType}}(e))
+    }
+    return res
+}
+func {{$enum.ProtoType}}SliceFromProto(s []pb.{{$enum.ProtoType}}) []{{$enum.GolangType}}{
+    res := []{{$enum.GolangType}}{}
+    for _, e := range s {
+        res = append(res, {{$enum.GolangType}}(e))
+    }
+    return res
+}
+{{end}}

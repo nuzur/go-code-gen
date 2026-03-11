@@ -10,6 +10,7 @@ func (f FieldTemplate) Import() *string {
 	timeImp := "time"
 	uuidImp := "github.com/gofrs/uuid"
 	nullImp := "github.com/guregu/null/v6"
+	enumsImp := f.Project.Module + "/enum"
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return nil
@@ -103,6 +104,8 @@ func (f FieldTemplate) Import() *string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if !f.IsRequired() && enum == nil {
 			return &nullImp
+		} else if enum != nil {
+			return &enumsImp
 		}
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_JSON:

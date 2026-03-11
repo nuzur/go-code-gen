@@ -17,6 +17,7 @@ type Project struct {
 	Project        *nemgen.Project
 	ProjectVersion *nemgen.ProjectVersion
 	EntitiesDir    string
+	ProtoDir       string
 }
 
 type ProjectParams struct {
@@ -26,6 +27,7 @@ type ProjectParams struct {
 	Project        *nemgen.Project
 	ProjectVersion *nemgen.ProjectVersion
 	EntitiesDir    string
+	ProtoDir       string
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -46,7 +48,11 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	if params.EntitiesDir == "" {
-		params.EntitiesDir = "entities"
+		params.EntitiesDir = "entity"
+	}
+
+	if params.ProtoDir == "" {
+		params.ProtoDir = "idl"
 	}
 
 	// check for go module in root path, if not present, add it
@@ -75,11 +81,16 @@ func New(params *ProjectParams) (*Project, error) {
 		Project:        params.Project,
 		ProjectVersion: params.ProjectVersion,
 		EntitiesDir:    params.EntitiesDir,
+		ProtoDir:       params.ProtoDir,
 	}, nil
 }
 
 func (p *Project) Entities() []*nemgen.Entity {
 	return p.ProjectVersion.Entities
+}
+
+func (p *Project) Enums() []*nemgen.Enum {
+	return p.ProjectVersion.Enums
 }
 
 func (p *Project) Dir() string {
@@ -111,4 +122,9 @@ func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relation
 		}
 	}
 	return nil
+}
+
+func (p *Project) AuthImport() string {
+	authImport := fmt.Sprintf("%s/auth", p.Module)
+	return authImport
 }

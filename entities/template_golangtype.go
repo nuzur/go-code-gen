@@ -16,9 +16,9 @@ func (f FieldTemplate) GolangType() string {
 		return "uuid.UUID"
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
 		if !f.IsRequired() {
-			return "null.Int"
+			return "null.Int64"
 		}
-		return "int"
+		return "int64"
 	case nemgen.FieldType_FIELD_TYPE_FLOAT:
 		if !f.IsRequired() {
 			return "null.Float"
@@ -101,7 +101,10 @@ func (f FieldTemplate) GolangType() string {
 		// check if there is an enum defined for this field, if so return that, otherwise return int
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
-			return gcgstrings.ToCamelCase(enum.Identifier)
+			if f.Field.TypeConfig.Enum.AllowMultiple {
+				return "[] enum." + gcgstrings.ToCamelCase(enum.Identifier)
+			}
+			return "enum." + gcgstrings.ToCamelCase(enum.Identifier)
 		}
 		return "int"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -113,8 +116,6 @@ func (f FieldTemplate) GolangType() string {
 			}
 		}
 		return "RawMessage"
-		//return f.GenFieldType
-		// todo - if dependant entity, return that
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return f.ArrayGolangType()
 	case nemgen.FieldType_FIELD_TYPE_DATE:

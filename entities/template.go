@@ -22,6 +22,25 @@ type EntityTemplate struct {
 	JSONField  FieldTemplate
 }
 
+func (e EntityTemplate) PrimaryKeys() []FieldTemplate {
+	var primaryKeys []FieldTemplate
+	for _, f := range e.Fields {
+		if f.IsKey() {
+			primaryKeys = append(primaryKeys, f)
+		}
+	}
+	return primaryKeys
+}
+
+func (e EntityTemplate) VersionField() *FieldTemplate {
+	for _, f := range e.Fields {
+		if f.Identifier() == "version" {
+			return &f
+		}
+	}
+	return nil
+}
+
 type EnumTemplate struct {
 	Project *project.Project
 	Enum    *nemgen.Enum

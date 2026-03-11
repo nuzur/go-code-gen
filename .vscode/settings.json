@@ -3,6 +3,10 @@
         "filetools",
         "gcgstrings",
         "nemgen",
-        "Unmarshal"
+        "strcase",
+        "templatefuncs",
+        "tmpl",
+        "Unmarshal",
+        "VARCHAR"
     ]
 }

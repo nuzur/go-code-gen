@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+option go_package = "{{.Identifier}}/idl/gen";
+option java_multiple_files = true;
+option java_package = "{{.Module}}";
+option java_outer_classname = "{{.Name}}";
+
+package {{.Identifier}};
+
+import "google/protobuf/field_mask.proto";
+{{range $entity := .Entities}}
+import "{{$entity.FinalIdentifier}}.proto";
+{{end}}
+
+service {{.Name}} {    
+    {{range $entity := .Entities}}
+    // {{$entity.OriginalIdentifier}} start
+    rpc List{{$entity.NamePlural}}(List{{$entity.NamePlural}}Request) returns (List{{$entity.NamePlural}}Response){}
+    rpc Create{{$entity.Name}}(Create{{$entity.Name}}Request) returns ({{$entity.Name}}) {}
+    rpc Update{{$entity.Name}}(Update{{$entity.Name}}Request) returns ({{$entity.Name}}) {}
+    // {{$entity.OriginalIdentifier}} end
+    {{end}}
+}
+
+{{range $entity := .Entities}}
+// {{$entity.OriginalIdentifier}} start
+message List{{$entity.NamePlural}}Request {
+    // The maximum number of records to return. The service may return fewer than
+    // this value.
+    int32 page_size = 1;
+
+    // A page token, received from a previous call.
+    // Provide this to retrieve the subsequent page.    
+    string page_token = 2;
+
+    // https://google.aip.dev/160
+    // https://pkg.go.dev/go.einride.tech/aip@v0.67.1
+    // https://github.com/einride/aip-go    
+    string filter = 3;
+    string order_by = 4;    
+}
+
+message List{{$entity.NamePlural}}Response {
+    repeated {{$entity.Name}} {{$entity.FinalIdentifierPlural}} = 1;
+
+    // A token that can be sent as `page_token` to retrieve the next page.
+    // If this field is omitted, there are no subsequent pages.
+    string next_page_token = 2;
+}
+
+message Create{{$entity.Name}}Request {
+    {{$entity.Name}} {{$entity.FinalIdentifier}} = 1;
+}
+
+message Update{{$entity.Name}}Request {
+   
+    {{$entity.Name}} {{$entity.FinalIdentifier}} = 1;
+  
+    // The list of fields to update.
+    google.protobuf.FieldMask update_mask = 2;
+}
+// {{$entity.OriginalIdentifier}} end
+{{end}}

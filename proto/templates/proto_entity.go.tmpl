@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "{{.ProjectIdentifier}}/idl/gen";
+option java_multiple_files = true;
+option java_package = "{{.ProjectModule}}";
+option java_outer_classname = "{{.Name}}";
+
+package {{.ProjectIdentifier}};
+
+{{range $imp, $empty := .Imports}}
+import "{{$imp}}";{{end}}
+
+message {{.Name}} {  {{range $index, $field := .Fields}}
+    {{if or (eq $field.EnumMany true) (eq $field.JSONMany true)}}repeated {{end}}{{$field.ProtoType}} {{$field.ProtoName}} = {{Inc $index}};{{end}}    
+}
