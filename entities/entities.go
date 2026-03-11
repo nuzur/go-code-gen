@@ -77,7 +77,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 }
 
 func ResolveEntityTemplate(e *nemgen.Entity, project *project.Project) (EntityTemplate, map[string]any) {
-	fields, imports := ResolveFieldsAndImports(project, e.Fields, e, nil)
+	fields, imports := ResolveFieldsAndImports(project, e.Fields, e)
 
 	tpl := EntityTemplate{
 		Entity:  e,

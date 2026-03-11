@@ -1,0 +1,193 @@
+package {{.EntityIdentifier}}
+
+import (
+	"context"
+	"fmt"
+	main_entity "{{.ProjectModule}}/core/entity/{{.EntityIdentifier}}"
+	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+	repogen "{{.ProjectModule}}/core/repository/gen"
+	"{{.ProjectModule}}/monitoring" 
+	"slices"
+	
+)
+
+func (m *module) List(ctx context.Context,
+	request types.ListRequest,
+	opts ...Option) (types.ListResponse, error) {
+
+	optConfig := applyAllOptions(opts)
+	query, err := m.repository.BuildListEntityQuery(
+		ctx, 
+		request, 
+		main_entity.{{.EntityName}}{}, 
+		false,
+		optConfig.ListIncludeColumns,
+		optConfig.ListExcludeColumns,)
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_query",
+			Message: "error in building query for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			Error: err,
+		})
+		return types.ListResponse{}, err
+	}
+
+	// increase sort buffer size 
+	// TODO make this configurable 
+	txn, _ := m.repository.DB.Begin()
+	defer txn.Commit()
+	bufferRows, err := txn.QueryContext(ctx, "SET sort_buffer_size=5000000")
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_sort_buffer",
+			Message: "error in setting sort buffer for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			Error: err,
+		})
+		return types.ListResponse{}, err
+	}
+	bufferRows.Close()
+	rows, err := txn.QueryContext(ctx, query)
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_db",
+			Message: "error in executing query for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			ExtraData: map[string]string{"query":query},
+			Error: err,
+		})
+		fmt.Printf("error in executing query for List{{.EntityName}}: %v \n %v\n", query, err)
+		return types.ListResponse{}, err
+	}	
+	defer rows.Close()
+	var items []repogen.{{.EntityName}}
+	for rows.Next() {
+		var i repogen.{{.EntityName}}
+		fields := []any{}
+		{{range $field := .Fields}}
+		if len(optConfig.ListIncludeColumns) > 0 {
+			if slices.Contains(optConfig.ListIncludeColumns, "{{$field.Identifier}}") {
+				fields = append(fields, &i.{{$field.Name}})				
+			} 
+		} else if len(optConfig.ListExcludeColumns) > 0 {
+			if !slices.Contains(optConfig.ListExcludeColumns, "{{$field.Identifier}}") {				
+				fields = append(fields, &i.{{$field.Name}})				
+			} 
+		} else {
+			fields = append(fields, &i.{{$field.Name}})
+		}
+		{{end}}
+		if err := rows.Scan(fields...); err != nil {
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "list_{{.EntityIdentifier}}_scan",
+				Message: "error in scanning rows for List{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer: monitoring.ModuleServiceLayer,
+				Type: monitoring.EmitTypeError,
+				Data: request,
+				ExtraData: map[string]string{"query":query},
+				Error: err,
+			})
+			return types.ListResponse{}, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_rows",
+			Message: "error closing rows for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			ExtraData: map[string]string{"query":query},
+			Error: err,
+		})
+		return types.ListResponse{}, err
+	}
+	if err := rows.Err(); err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_rows",
+			Message: "error in rows for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			ExtraData: map[string]string{"query":query},
+			Error: err,
+		})
+		return types.ListResponse{}, err
+	}
+
+	hasNextPage, err := m.listHasNextPage(ctx, request, opts...)
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "list_{{.EntityIdentifier}}_next",
+			Message: "error determining if list has next page for List{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: request,
+			ExtraData: map[string]string{"query":query},
+			Error: err,
+		})
+		return types.ListResponse{}, err
+	}
+
+	m.monitoring.Emit(monitoring.EmitRequest{
+		ActionIdentifier: "list_{{.EntityIdentifier}}",
+		Message: "successfully handled List{{.EntityName}}",
+		EntityIdentifier: "{{.EntityIdentifier}}",
+		Layer: monitoring.ModuleServiceLayer,
+		Type: monitoring.EmitTypeSuccess,
+		Data: request,
+		ExtraData: map[string]string{"query":query},		
+	})
+	return types.ListResponse{
+		{{.EntityNamePlural}}: mapModelsToEntities(items),
+		HasNextPage: hasNextPage,
+	}, nil	
+}
+
+func (m *module) ListCount(ctx context.Context,
+	request types.ListRequest,
+	opts ...Option) (int64, error) {
+	query, err := m.repository.BuildListEntityQuery(ctx, request, main_entity.{{.EntityName}}{}, true, nil, nil)
+	if err != nil {
+		return -1, err
+	}
+
+	//fmt.Printf("query count: %s \n", query)
+	
+	var count int64
+	err = m.repository.DB.QueryRow(query).Scan(&count)
+	if err != nil {
+		return -1, err
+	}
+
+	return count, nil
+}
+
+func (m *module) listHasNextPage(ctx context.Context,
+	request types.ListRequest,
+	opts ...Option) (bool, error) {
+		count, err := m.ListCount(ctx, request, opts...)
+		if err != nil {
+			return false, err
+		}
+
+		if request.GetOffset() + int64(request.GetPageSize()) < count {
+			return true, nil
+		}
+		return false, nil
+}

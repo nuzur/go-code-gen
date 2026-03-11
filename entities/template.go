@@ -41,6 +41,34 @@ func (e EntityTemplate) VersionField() *FieldTemplate {
 	return nil
 }
 
+func (e EntityTemplate) IndexOnField(field *nemgen.Field) *nemgen.Index {
+	if e.Entity.Type != nemgen.EntityType_ENTITY_TYPE_STANDALONE {
+		return nil
+	}
+
+	if e.Entity.TypeConfig == nil || e.Entity.TypeConfig.Standalone == nil {
+		return nil
+	}
+	indexes := e.Entity.TypeConfig.Standalone.Indexes
+	for _, index := range indexes {
+		for _, indexField := range index.Fields {
+			if indexField.FieldUuid == field.Uuid {
+				return index
+			}
+		}
+	}
+	return nil
+}
+
+func (e EntityTemplate) GetFieldTemplate(field *nemgen.Field) *FieldTemplate {
+	for _, f := range e.Fields {
+		if f.Field.Uuid == field.Uuid {
+			return &f
+		}
+	}
+	return nil
+}
+
 type EnumTemplate struct {
 	Project *project.Project
 	Enum    *nemgen.Enum
@@ -111,4 +139,24 @@ func (f FieldTemplate) IsKey() bool {
 
 func (f FieldTemplate) IsRequired() bool {
 	return f.Field.Required
+}
+
+func (f FieldTemplate) IsSearchable() bool {
+	// check if field type is string
+	if f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_CHAR ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_VARCHAR ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_TEXT ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_ENCRYPTED ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_EMAIL ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_PHONE ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_URL ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_LOCATION ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_COLOR ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_MARKDOWN ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_SLUG ||
+		f.Field.Type == nemgen.FieldType_FIELD_TYPE_JSON {
+		return true
+	}
+	return false
 }

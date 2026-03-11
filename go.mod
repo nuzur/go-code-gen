@@ -10,8 +10,15 @@ require (
 )
 
 require (
+	github.com/otiai10/mint v1.6.3 // indirect
+	golang.org/x/sync v0.16.0 // indirect
+)
+
+require (
 	github.com/gertd/go-pluralize v0.2.1
 	github.com/nuzur/extension-sdk v0.0.67
+	github.com/nuzur/sql-gen v1.0.62
+	github.com/otiai10/copy v1.14.1
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.26.0 // indirect

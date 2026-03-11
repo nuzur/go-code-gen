@@ -1,0 +1,111 @@
+package core
+
+import (	
+	"database/sql"
+	"errors"
+	"fmt"
+	"context"
+
+	_ "github.com/go-sql-driver/mysql"
+	"go.uber.org/config"
+	"go.uber.org/fx"	
+	{{.Identifier}}config "{{.Module}}/config"
+	coretypes "{{.Module}}/core/types"
+    {{$projectIdentifier := .Module}}
+    {{range $entity := .Entities}}
+    "{{$projectIdentifier}}/core/module/{{$entity.Identifier}}"	
+    {{end}}	
+	"{{.Module}}/core/repository"
+	"{{.Module}}/monitoring"
+	{{if eq .Events.Enabled true}}
+	"{{.Module}}/core/events"
+	{{end}}
+	
+)
+
+type Implementation struct {
+	db 			   *sql.DB
+	repository     *repository.Implementation
+    {{range $entity := .Entities}}
+    {{$entity.Identifier}}       {{$entity.Identifier}}.Module
+    {{end}}	
+	monitoring *monitoring.Implementation
+	{{if eq .Events.Enabled true}}
+	events *events.Implementation
+	{{end}}
+}
+
+type Params struct {
+	fx.In
+	Provider config.Provider
+	Lifecycle fx.Lifecycle	
+	Monitoring *monitoring.Implementation
+	{{if eq .Events.Enabled true}}
+	Events *events.Implementation
+	{{end}}
+}
+
+func New(params Params) (*Implementation, error) {
+
+	var dbs {{.Identifier}}config.DBs
+	if err := params.Provider.Get("db").Populate(&dbs); err != nil {
+		return nil, err
+	}
+
+	if len(dbs) == 0 {
+		return nil, errors.New("db configuration not found")
+	}
+
+	dbconfig := dbs[0]
+	db, err := sql.Open(dbconfig.Driver, dbconfig.Path())
+	if err != nil {
+		return nil, fmt.Errorf("error connecting to DB: %v", err)
+	}	
+	db.SetConnMaxLifetime(0)
+	db.SetMaxIdleConns(10)
+	db.SetMaxOpenConns(0)
+	repository := repository.New(db)
+
+	if params.Lifecycle != nil {
+		params.Lifecycle.Append(fx.Hook{
+			OnStop: func(ctx context.Context) error {
+				db.Close()
+				return nil
+			},
+		})
+	}
+
+	return &Implementation{
+		db: db,
+		repository: repository,
+		monitoring: params.Monitoring,
+		{{if eq .Events.Enabled true}}
+		events: params.Events,
+		{{end}}
+	}, nil
+}
+
+
+func (i *Implementation) Destroy() {
+	i.db.Close()
+}
+
+func (i *Implementation) DB() *sql.DB{
+	return i.db
+}
+
+{{$events := .Events}}
+{{range $entity := .Entities}}
+func (i Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identifier}}.Module {
+	if i.{{$entity.Identifier}} == nil {
+		i.{{$entity.Identifier}} = {{$entity.Identifier}}.New(coretypes.ModuleParams{
+		 Repository:i.repository,
+		 Monitoring: i.monitoring,
+		 {{if eq $events.Enabled true}}
+		 Events: i.events,
+		 {{end}}
+		})
+	}
+	return i.{{$entity.Identifier}}
+}
+{{end}}

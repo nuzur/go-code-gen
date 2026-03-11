@@ -74,7 +74,7 @@ func (f FieldTemplate) GolangType() string {
 			}
 			return "enum." + gcgstrings.ToCamelCase(enum.Identifier)
 		}
-		return "int"
+		return "int64"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
 		rel := f.Project.GetRelationshipFromField(f.Field)
 		if rel != nil {

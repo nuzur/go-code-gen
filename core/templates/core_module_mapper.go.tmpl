@@ -1,0 +1,25 @@
+package {{.Package}}
+
+import (    
+    main_entity "{{.ProjectModule}}/core/entity/{{.Package}}"
+    {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"  
+	{{if or (eq .HasArrayField true) (eq .HasNullString true) (eq .HasNullUUID true)}}
+		"{{.ProjectModule}}/core/entity/mapper"
+	{{end}}
+	{{range $import := .Imports}} {{if ne $import "time"}} 
+    "{{$import}}" {{end}}{{end}}
+)
+
+func mapModelsToEntities(models []{{.ProjectIdentifier}}db.{{.EntityName}}) []main_entity.{{.EntityName}} {
+	result := []main_entity.{{.EntityName}}{}
+	for _, p := range models {
+		result = append(result, mapModelToEntity(p))
+	}
+	return result
+}
+
+func mapModelToEntity(model {{.ProjectIdentifier}}db.{{.EntityName}}) main_entity.{{.EntityName}} {	
+	return main_entity.{{.EntityName}}{ {{range $field := .Fields}}
+        {{$field.Name}}: {{$field.RepoFromMapper}},{{end}}	
+	}
+}

@@ -1,0 +1,208 @@
+package {{.Package}}
+
+{{ $projectModule := .ProjectModule}}
+import (
+	"context"    
+    
+    "{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+    {{if ne .Select.IsPrimary true}}
+    "errors"
+    {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"{{end}}        
+    "{{.ProjectModule}}/monitoring"  
+
+    {{ $firstMapper := true}}
+    {{range $field := .Select.Fields}}
+    {{ if and (eq $firstMapper true) (or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.GenFieldType "RawJSONFieldType") (and (eq $field.Field.Required false) (eq $field.Field.Type "*string")) (and (eq $field.Field.Required false) (eq $field.Field.Type "uuid.UUID")))}}  
+        {{$firstMapper = false}}
+        "{{$projectModule}}/core/entity/mapper"
+    {{end}}
+    {{end}}
+)
+
+func (m *module) Fetch{{.Select.Name}}(
+    ctx context.Context, 
+    req types.Fetch{{.Select.Name}}Request, 
+    opts ...Option,
+) (types.Fetch{{.Select.Name}}Response, error) {
+    {{if eq .Select.IsPrimary true}}
+    models, err := m.repository.Queries.Fetch{{.Select.Name}}(
+        ctx,{{range $field := .Select.Fields}}
+        req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},{{end}}
+    )
+    if err != nil {  
+        m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "fetch_{{.Select.Identifier}}",
+			Message: "error in Fetch{{.Select.Name}}",
+			EntityIdentifier: "{{.Select.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})      
+        return types.Fetch{{.Select.Name}}Response{}, err
+    }
+    return types.Fetch{{.Select.Name}}Response{
+        Results: mapModelsToEntities(models),
+    }, nil
+            
+    {{else}}
+    if req.OrderBy == "" {
+        models, err := m.repository.Queries.Fetch{{.Select.Name}}(
+            ctx,
+            {{.ProjectIdentifier}}db.Fetch{{.Select.Name}}Params{ {{range $field := .Select.Fields}}
+                {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.GenFieldType "RawJSONFieldType") (and (eq $field.Field.Required false) (eq $field.Field.Type "*string")) (and (eq $field.Field.Required false) (eq $field.Field.Type "uuid.UUID"))}}
+                    {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
+                {{ else }}
+                    {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
+                {{end}}
+                {{end}}
+                Offset: req.Offset,
+                Limit: req.Limit,            
+            },
+        )
+        
+        if err != nil {
+            m.monitoring.Emit(monitoring.EmitRequest{
+                ActionIdentifier: "fetch_{{.Select.Identifier}}",
+                Message: "error in Fetch{{.Select.Name}} no order",
+                EntityIdentifier: "{{.Select.EntityIdentifier}}",
+                Layer: monitoring.RepositoryServiceLayer,
+                Type: monitoring.EmitTypeError,
+                Data: req,
+                Error: err,
+            })
+            return types.Fetch{{.Select.Name}}Response{}, err
+        }
+        return types.Fetch{{.Select.Name}}Response{
+            Results: mapModelsToEntities(models),
+        }, nil
+    }	
+
+    {{ $length := len .Select.TimeFields }} 
+    {{ if and (ne $length 0) (eq .Select.SortSupported true) }}
+    timeFields := []string{ 
+        {{range $timeField := .Select.TimeFields}} "{{$timeField.Identifier}}", {{end}} 
+    }
+
+    orderByFieldFound := false
+    for _, tf := range timeFields {
+        if tf == req.OrderBy {
+            orderByFieldFound = true
+            break 
+        }
+    }
+
+    if !orderByFieldFound {
+        err := errors.New("order by field not found")
+        m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "fetch_{{.Select.Identifier}}",
+			Message: "error in Fetch{{.Select.Name}} - order by field not found",
+			EntityIdentifier: "{{.Select.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+        return types.Fetch{{.Select.Name}}Response{}, err
+    }
+
+    sort := "ASC"
+    if req.Sort != "" {
+        if req.Sort == "ASC" || req.Sort == "DESC" {
+            sort = req.Sort
+        } else {
+            err := errors.New("invalid sort value only ASC or DESC are valid")
+            m.monitoring.Emit(monitoring.EmitRequest{
+                ActionIdentifier: "fetch_{{.Select.Identifier}}",
+                Message: "error in Fetch{{.Select.Name}} - invalid sort value only ASC or DESC are valid",
+                EntityIdentifier: "{{.Select.EntityIdentifier}}",
+                Layer: monitoring.ModuleServiceLayer,
+                Type: monitoring.EmitTypeError,
+                Data: req,
+                Error: err,
+            })
+            return types.Fetch{{.Select.Name}}Response{}, err
+        }
+    }
+
+    {{$select := .Select}}
+    {{$projectIdentifier := .ProjectIdentifier}}
+    switch req.OrderBy {
+        {{range $timeField := .Select.TimeFields}}
+        case "{{$timeField.Identifier}}":
+            if sort == "ASC" {
+                models, err := m.repository.Queries.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}ASC(
+                    ctx,
+                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}ASCParams{ {{range $field := $select.Fields}}
+                        {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.GenFieldType "RawJSONFieldType") (and (eq $field.Field.Required false) (eq $field.Field.Type "*string")) (and (eq $field.Field.Required false) (eq $field.Field.Type "uuid.UUID"))}}
+                            {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
+                        {{ else }}
+                            {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
+                        {{end}}
+                        {{end}}
+                        Offset: req.Offset,
+                        Limit: req.Limit,            
+                    },
+                )
+                if err != nil {
+                    m.monitoring.Emit(monitoring.EmitRequest{
+                        ActionIdentifier: "fetch_{{$select.Identifier}}",
+                        Message: "error in Fetch{{$select.Name}} - ordered asc",
+                        EntityIdentifier: "{{$select.EntityIdentifier}}",
+                        Layer: monitoring.RepositoryServiceLayer,
+                        Type: monitoring.EmitTypeError,
+                        Data: req,
+                        Error: err,
+                    })
+                    return types.Fetch{{$select.Name}}Response{}, err
+                }
+                return types.Fetch{{$select.Name}}Response{
+                    Results: mapModelsToEntities(models),
+                }, nil
+            } else {
+                models, err := m.repository.Queries.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}DESC(
+                    ctx,
+                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}DESCParams{ {{range $field := $select.Fields}}
+                        {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.GenFieldType "RawJSONFieldType") (and (eq $field.Field.Required false) (eq $field.Field.Type "*string")) (and (eq $field.Field.Required false) (eq $field.Field.Type "uuid.UUID"))}}
+                            {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
+                        {{ else }}
+                            {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
+                        {{end}}
+                        {{end}}
+                        Offset: req.Offset,
+                        Limit: req.Limit,            
+                    },
+                )
+                if err != nil {
+                    m.monitoring.Emit(monitoring.EmitRequest{
+                        ActionIdentifier: "fetch_{{$select.Identifier}}",
+                        Message: "error in Fetch{{$select.Name}} - ordered desc",
+                        EntityIdentifier: "{{$select.EntityIdentifier}}",
+                        Layer: monitoring.RepositoryServiceLayer,
+                        Type: monitoring.EmitTypeError,
+                        Data: req,
+                        Error: err,
+                    })
+                    return types.Fetch{{$select.Name}}Response{}, err
+                }
+                return types.Fetch{{$select.Name}}Response{
+                    Results: mapModelsToEntities(models),
+                }, nil
+            }            
+        {{end}}
+    }
+    {{end}} 
+
+    err := errors.New("could not process request")
+    m.monitoring.Emit(monitoring.EmitRequest{
+        ActionIdentifier: "fetch_{{.Select.Identifier}}_invalid",
+        Message: "error in Fetch{{.Select.Name}} - invalid request",
+        EntityIdentifier: "{{.Select.EntityIdentifier}}",
+        Layer: monitoring.ModuleServiceLayer,
+        Type: monitoring.EmitTypeError,
+        Data: req,
+        Error: err,
+    })
+    return types.Fetch{{.Select.Name}}Response{}, err
+    {{end}}
+}

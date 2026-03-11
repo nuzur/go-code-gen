@@ -173,7 +173,13 @@ func (f FieldTemplate) ProtoToMapper() string {
 			// todo: implement this
 		}
 		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+			if !f.IsRequired() {
+				return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+			}
 			return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		}
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
@@ -192,9 +198,9 @@ func (f FieldTemplate) ProtoToMapper() string {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
 				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
-					return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))
+					return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 				}
-				return fmt.Sprintf("%sToProto(e.%s)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("%sToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 		}
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
@@ -203,8 +209,14 @@ func (f FieldTemplate) ProtoToMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
+		if !f.IsRequired() {
+			return fmt.Sprintf("timestamppb.New(e.%s.ValueOrZero())", gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("timestamppb.New(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	default:
 		return ""
@@ -212,7 +224,6 @@ func (f FieldTemplate) ProtoToMapper() string {
 }
 
 func (f FieldTemplate) ProtoFromMapper() string {
-	pl := pluralize.NewClient()
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return ""
@@ -222,11 +233,20 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		}
 		return fmt.Sprintf("StringToUUID(m.Get%s())", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.IntFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
 		return fmt.Sprintf("int64(m.Get%s())", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
 		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		return fmt.Sprintf("m.%s", strcase.ToCamel(f.Identifier()))
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.FloatFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
+		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.BoolFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
@@ -243,12 +263,21 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		} else {
 			return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 		}
-	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
+	case nemgen.FieldType_FIELD_TYPE_FILE,
+		nemgen.FieldType_FIELD_TYPE_IMAGE,
+		nemgen.FieldType_FIELD_TYPE_AUDIO,
+		nemgen.FieldType_FIELD_TYPE_VIDEO:
 		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			return "repeated bytes"
+			// todo: implement this
 		}
 		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+			if !f.IsRequired() {
+				return fmt.Sprintf("null.StringFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
+			}
 			return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
+		}
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.StringFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
 		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
@@ -258,18 +287,18 @@ func (f FieldTemplate) ProtoFromMapper() string {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), strcase.ToCamel(f.Identifier()))
 			}
-			return fmt.Sprintf("enum.%s(m.Get%s())", pl.Singular(gcgstrings.ToCamelCase(enum.Identifier)), strcase.ToCamel(f.Identifier()))
+			return fmt.Sprintf("enum.%s(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
 		}
-		return fmt.Sprintf("int64(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:
 		rel := f.Project.GetRelationshipFromField(f.Field)
 		if rel != nil {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
 				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
-					return fmt.Sprintf("%sSliceFromProto(m.Get%s())", gcgstrings.ToCamelCase(f.Identifier()), strcase.ToCamel(f.Identifier()))
+					return fmt.Sprintf("%sSliceFromProto(m.Get%s())", gcgstrings.ToCamelCase(dependantEntity.Identifier), strcase.ToCamel(f.Identifier()))
 				}
-				return fmt.Sprintf("%sFromProto(m.Get%s())", gcgstrings.ToCamelCase(f.Identifier()), strcase.ToCamel(f.Identifier()))
+				return fmt.Sprintf("%sFromProto(m.Get%s())", gcgstrings.ToCamelCase(dependantEntity.Identifier), strcase.ToCamel(f.Identifier()))
 			}
 		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
@@ -278,8 +307,14 @@ func (f FieldTemplate) ProtoFromMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.TimeFrom(m.Get%s().AsTime())", strcase.ToCamel(f.Identifier()))
+		}
 		return fmt.Sprintf("m.Get%s().AsTime()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.StringFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	default:
 		return ""

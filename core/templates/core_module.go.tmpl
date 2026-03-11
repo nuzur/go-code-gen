@@ -1,0 +1,50 @@
+package {{.Package}}
+
+import (
+	"context"
+    "sync"
+	"{{.ProjectModule}}/core/repository"
+	coretypes "{{.ProjectModule}}/core/types"
+	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+	"{{.ProjectModule}}/monitoring"
+	{{if eq .Project.Events.Enabled true}}
+	"{{.ProjectModule}}/core/events"
+	{{end}}
+)
+
+type Module interface {
+    {{range $select := .SelectStatements}}
+    Fetch{{$select.Name}}(ctx context.Context, req types.Fetch{{$select.Name}}Request, opts ...Option) (types.Fetch{{$select.Name}}Response, error){{end}}	
+
+	List(ctx context.Context, req types.ListRequest, opts ...Option) (types.ListResponse, error)
+	
+	Upsert(ctx context.Context, req types.UpsertRequest, partial bool, opts ...Option) (types.UpsertResponse, error)
+	Insert(ctx context.Context, req types.UpsertRequest, opts ...Option) (types.UpsertResponse, error)
+	Update(ctx context.Context, req types.UpsertRequest, partial bool, opts ...Option) (types.UpsertResponse, error)
+
+	{{if ne (len .SearchFields) 0}}
+	Search(ctx context.Context, query string, limit int32, offset int32) (types.Search{{.EntityName}}Response, error)
+	{{end}}	
+	{{range $cq := .CustomQueries}}
+	{{$cq.Name}}(ctx context.Context, req types.{{$cq.Name}}Request, opts ...Option) (types.{{$cq.Name}}Response, error)
+	{{end}}
+}
+
+type module struct {
+	mu sync.Mutex
+	repository *repository.Implementation    
+	monitoring *monitoring.Implementation
+	{{if eq .Project.Events.Enabled true}}
+	events     *events.Implementation
+	{{end}}
+}
+
+func New(params coretypes.ModuleParams) Module {
+	return &module{
+		repository: params.Repository,
+		monitoring: params.Monitoring,
+		{{if eq .Project.Events.Enabled true}}
+		events: params.Events,
+		{{end}}
+	}
+}

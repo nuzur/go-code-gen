@@ -1,0 +1,24 @@
+package {{.Package}}
+
+{{$entityName := .EntityName}}
+{{$entityIdenfier := .EntityIdentifier}}
+import (
+	"context"    
+	
+	"github.com/gofrs/uuid"	
+	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"		
+)
+
+func (m *module) Upsert(
+	ctx context.Context, 
+	req types.UpsertRequest, 
+	partial bool, 
+	opts ...Option,
+) (types.UpsertResponse, error) {
+	if req.{{.EntityName}}.{{.PrimaryKey.Name}} == uuid.Nil {		
+		return m.Insert(ctx, req, opts...)
+	}
+
+	return m.Update(ctx, req, partial, opts...)
+}
+

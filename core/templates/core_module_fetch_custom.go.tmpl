@@ -1,0 +1,51 @@
+package {{.Package}}
+
+import (
+	"context"    
+    
+    "{{.ProjectModule}}/monitoring"
+    "{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+    {{if ne .Select.IsPrimary true}}    
+    {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"{{end}}    
+)
+
+func (m *module) {{.CustomQuery.Name}}(
+    ctx context.Context, 
+    req types.{{.CustomQuery.Name}}Request, 
+    opts ...Option,
+) (types.{{.CustomQuery.Name}}Response, error) {
+    
+    models, err := m.repository.Queries.{{.CustomQuery.Name}}(
+        ctx,
+        {{.ProjectIdentifier}}db.{{.CustomQuery.Name}}Params{ {{range $field := (.CustomQuery | Fields )}}
+            {{$inputField := ($field | MapToInput ) }}
+            {{$field.Name}}: req.{{$inputField.Name}}{{$inputField.RepoToMapper}},{{end}}
+            Offset: req.Offset,
+            Limit: req.Limit,            
+        },
+    )
+    if err != nil {
+        m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "custom_{{.CustomQuery.Name}}",
+			Message: "error calling repository for Custom{{.CustomQuery.Name}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+        return types.{{.CustomQuery.Name}}Response{}, err
+    }
+
+    m.monitoring.Emit(monitoring.EmitRequest{
+		ActionIdentifier: "custom_{{.CustomQuery.Name}}",
+		Message: "successfully handled Custom{{.CustomQuery.Name}}",
+		EntityIdentifier: "{{.EntityIdentifier}}",
+		Layer: monitoring.ModuleServiceLayer,
+		Type: monitoring.EmitTypeSuccess,
+		Data: req,			
+	})
+    return types.{{.CustomQuery.Name}}Response{
+        Results: mapModelsToEntities(models),
+    }, nil
+}

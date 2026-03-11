@@ -7,6 +7,7 @@ import (
 
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/strings"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -18,6 +19,7 @@ type Project struct {
 	ProjectVersion *nemgen.ProjectVersion
 	EntitiesDir    string
 	ProtoDir       string
+	Core           Core
 }
 
 type ProjectParams struct {
@@ -28,6 +30,7 @@ type ProjectParams struct {
 	ProjectVersion *nemgen.ProjectVersion
 	EntitiesDir    string
 	ProtoDir       string
+	Core           Core
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -53,6 +56,18 @@ func New(params *ProjectParams) (*Project, error) {
 
 	if params.ProtoDir == "" {
 		params.ProtoDir = "idl"
+	}
+
+	if params.Core.CoreDir == "" {
+		params.Core.CoreDir = "core"
+	}
+
+	if params.Core.RepoDir == "" {
+		params.Core.RepoDir = "repo"
+	}
+
+	if params.Core.Events.Dir == "" {
+		params.Core.Events.Dir = "event"
 	}
 
 	// check for go module in root path, if not present, add it
@@ -82,6 +97,7 @@ func New(params *ProjectParams) (*Project, error) {
 		ProjectVersion: params.ProjectVersion,
 		EntitiesDir:    params.EntitiesDir,
 		ProtoDir:       params.ProtoDir,
+		Core:           params.Core,
 	}, nil
 }
 
@@ -127,4 +143,17 @@ func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relation
 func (p *Project) AuthImport() string {
 	authImport := fmt.Sprintf("%s/auth", p.Module)
 	return authImport
+}
+
+func (p *Project) FieldsToCamelCase() map[string]string {
+	res := map[string]string{}
+	for _, e := range p.Entities() {
+		for _, f := range e.Fields {
+			_, found := res[f.Identifier]
+			if !found {
+				res[f.Identifier] = gcgstrings.ToCamelCase(f.Identifier)
+			}
+		}
+	}
+	return res
 }

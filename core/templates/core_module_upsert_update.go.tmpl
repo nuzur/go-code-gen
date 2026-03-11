@@ -1,0 +1,255 @@
+package {{.Package}}
+
+{{$entityName := .EntityName}}
+{{$projectIdentifier := .ProjectIdentifier}}
+{{$projectModule := .ProjectModule}}
+{{$entityIdenfier := .EntityIdentifier}}
+{{$imports := .Imports}}
+import (
+	"context"
+    "errors"
+		
+	"{{.ProjectModule}}/monitoring"
+	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"	
+	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"   
+	{{$firstGen := true}}
+	{{$firstJSON := true}}
+	{{$firstEnumMany := true}}
+	{{range $field := .Fields}}	
+		{{if eq $firstGen true}}
+			{{ if eq $field.GeneratedUpdateCustom true}}
+				"{{$projectModule}}/custom"
+				{{$firstGen = false}}				
+			{{end}}			
+		{{end}}		
+		{{if eq $firstJSON true}}
+			{{if eq $field.JSON true}}
+				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 
+    			"{{$import}}" {{end}}{{end}}
+				{{$firstJSON = false}}
+			{{end}}
+		{{end}}
+		{{if eq $firstEnumMany true}}
+			{{if eq $field.EnumMany true}}
+				main_entity "{{$projectModule}}/core/entity/{{$entityIdenfier}}"
+				{{$firstEnumMany = false}}
+			{{end}}
+		{{end}}
+	{{end}}
+	{{if eq .HasVersionField true}}
+	"time"
+	{{end}}
+	{{if or (eq .HasArrayField true) (eq .HasNullString true) (eq .HasNullUUID true)}}
+	"{{.ProjectModule}}/core/entity/mapper"
+	{{end}}
+	
+)
+
+func (m *module) Update(
+	ctx context.Context, 
+	req types.UpsertRequest, 
+	partial bool, 
+	opts ...Option,
+) (types.UpsertResponse, error) {
+	optConfig := applyAllOptions(opts)
+
+	tx := optConfig.SQLTx
+	createdTx := false
+	if tx == nil {
+		ntx, err := m.repository.DB.Begin()
+		if err != nil {
+			return types.UpsertResponse{}, err
+		}
+		tx = ntx
+		defer tx.Rollback()
+		createdTx = true
+	}
+
+	qtx := m.repository.Queries.WithTx(tx)
+	existing, err := qtx.Fetch{{.EntityName}}By{{.PrimaryKey.Name}}ForUpdate(ctx, req.{{.EntityName}}.{{.PrimaryKey.Name}}.String())
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "error fetching existing record for Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		return types.UpsertResponse{}, err
+	}
+
+	if len(existing) == 0 {
+		err := errors.New("entity not found")
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "not found existing record for Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		return types.UpsertResponse{}, err
+	}
+
+	{{if eq .HasVersionField true}}
+	if existing[0].Version != req.{{.EntityName}}.Version {
+		err := errors.New("upsert version conflict")
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "version conflict Upsert{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		return types.UpsertResponse{}, err
+	}
+
+	req.{{.EntityName}}.Version = time.Now().Unix()
+	{{end}}
+
+
+	params := mapUpsertRequestToUpdateParams(req, existing[0], partial)
+	err = qtx.Update{{.EntityName}}(
+		ctx,
+		params,
+	)
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "error calling repository for Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})			
+		return types.UpsertResponse{}, err
+	}
+
+	{{if eq .ShouldPublishEvents true}}
+	err = m.publishUpdateEvent(ctx, req, qtx, req.{{.EntityName}}.{{.PrimaryKey.Name}}.String(), existing)
+	if err != nil {
+		return types.UpsertResponse{}, err
+	}
+	{{end}}
+
+	if createdTx {
+		err := tx.Commit()
+		if err != nil {
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+				Message:          "error commiting for Upsert{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer:            monitoring.RepositoryServiceLayer,
+				Type:             monitoring.EmitTypeError,
+				Data:             req,
+				Error:            err,
+			})
+			return types.UpsertResponse{}, err
+		}
+	}
+	
+	m.monitoring.Emit(monitoring.EmitRequest{
+		ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+		Message: "successfully handled Upsert{{.EntityName}} - with uuid",
+		EntityIdentifier: "{{.EntityIdentifier}}",
+		Layer: monitoring.ModuleServiceLayer,
+		Type: monitoring.EmitTypeSuccess,
+		Data: req,			
+	})
+	return types.UpsertResponse{
+		{{.PrimaryKey.Name}}: req.{{.EntityName}}.{{.PrimaryKey.Name}},
+	}, nil
+}
+
+func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.ProjectIdentifier}}db.{{.EntityName}}, partial bool) {{.ProjectIdentifier}}db.Update{{.EntityName}}Params {	
+	if !partial {
+		return {{.ProjectIdentifier}}db.Update{{.EntityName}}Params{ {{range $field := .Fields}}
+			{{ if eq $field.Generated true}} 
+			{{$field.Name}}: {{$field.GeneratedFuncUpdate}}{{$field.RepoToMapper}},
+			{{else}}
+			{{ if or (eq $field.JSON true) (eq $field.Array true) (eq $field.EnumMany true) (eq $field.GenFieldType "RawJSONFieldType") (and (eq $field.Required false) (eq $field.Type "*string")) (and (eq $field.Required false) (eq $field.Type "uuid.UUID"))}}
+				{{$field.Name}}: {{$field.RepoToMapper}}, 
+			{{ else }}
+				{{$field.Name}}: req.{{$entityName}}.{{$field.Name}}{{$field.RepoToMapper}}, 
+			{{end}}
+			{{end}}	
+			{{end}}
+		}
+	}
+
+	res := {{.ProjectIdentifier}}db.Update{{.EntityName}}Params{}
+	
+	{{range $field := .Fields}}				
+		{{ if eq $field.Generated true}} 
+		res.{{$field.Name}} = {{$field.GeneratedFuncUpdate}}{{$field.RepoToMapper}}
+		{{else}}
+		{{ if or (eq $field.JSON true) (eq $field.Array true) (eq $field.EnumMany true) (eq $field.GenFieldType "RawJSONFieldType") (and (eq $field.Required false) (eq $field.Type "*string")) (and (eq $field.Required false) (eq $field.Type "uuid.UUID"))}}
+		res.{{$field.Name}} = {{$field.RepoToMapper}}	
+			{{if eq $field.GenFieldType "RawJSONFieldType"}}	
+				if string(res.{{$field.Name}}) == "" {
+					res.{{$field.Name}} = []byte(`{}`)
+				}
+			{{end}}
+		{{ else }}
+		res.{{$field.Name}} = req.{{$entityName}}.{{$field.Name}}{{$field.RepoToMapper}} 
+		{{end}}			
+		{{end}}
+		
+	{{end}}
+
+	return res
+
+}
+
+
+{{if eq .ShouldPublishEvents true}}
+func (m *module) publishUpdateEvent(ctx context.Context, 
+		req types.UpsertRequest, 
+		qtx *{{.ProjectIdentifier}}db.Queries,
+		id string,
+		existing []{{.ProjectIdentifier}}db.{{.EntityName}}) error {
+
+	if m.events == nil {
+		return nil
+	}
+	fetched, err := qtx.Fetch{{.EntityName}}By{{.PrimaryKey.Name}}(ctx, id)
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "error fetching after Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		return err
+	}
+	
+	fetchedEntities := mapModelsToEntities(fetched)
+	if len(fetchedEntities) != 1 {
+		return errors.New("error mapping to entity")
+	}	
+	existingEntities := mapModelsToEntities(existing)	
+	err = m.events.ProduceEntityUpdated(fetchedEntities[0], existingEntities[0])
+	if err != nil {
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "error producing insert event for Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		return err
+	}
+	return nil
+}
+{{end}}

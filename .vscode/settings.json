@@ -1,11 +1,14 @@
 {
     "cSpell.words": [
+        "Configvalues",
         "filetools",
         "gcgstrings",
+        "MYSQLDB",
         "nemgen",
         "strcase",
         "templatefuncs",
         "tmpl",
+        "tosql",
         "Unmarshal",
         "VARCHAR"
     ]

@@ -77,7 +77,13 @@ type ProtoServiceTemplate struct {
 	AuthImport string
 }
 
-func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
+type GenerateProtoParams struct {
+	Protoc bool
+	Mappers bool
+	Server  bool
+}
+
+func GenerateProto(ctx context.Context, params *project.ProjectParams, genParams GenerateProtoParams) error {
 	fmt.Printf("--[GCG][Proto] Generating Directory\n")
 	project, err := project.New(params)
 	if err != nil {
@@ -101,22 +107,28 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 	if err != nil {
 		return err
 	}
+	if genParams.Protoc {
+		// generate base go code with protoc
+		err = generateProtoc(ctx, protoDir, project, entityTemplates)
+		if err != nil {
+			return err
+		}
 
-	// generate base go code with protoc
-	err = generateProtoc(ctx, protoDir, project, entityTemplates)
-	if err != nil {
-		return err
-	}
+		if genParams.Mappers {
+			// generate mappers to/from entity/proto
+			err = generateMappers(ctx, protoDir, project, entityTemplates)
+			if err != nil {
+				return err
+			}
 
-	// generate mappers to/from entity/proto
-	err = generateMappers(ctx, protoDir, project, entityTemplates)
-	if err != nil {
-		return err
-	}
-
-	err = generateServer(ctx, protoDir, project, entityTemplates)
-	if err != nil {
-		return err
+			if genParams.Server {
+				// generate server 
+				err = generateServer(ctx, protoDir, project, entityTemplates)
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	return err

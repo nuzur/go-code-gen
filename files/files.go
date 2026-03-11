@@ -19,3 +19,11 @@ func CreateDir(dirPath string) error {
 	}
 	return nil
 }
+
+func DeleteDir(dirPath string) error {
+	err := os.RemoveAll(dirPath)
+	if err != nil {
+		return fmt.Errorf("failed to delete directory: %w", err)
+	}
+	return nil
+}

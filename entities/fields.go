@@ -5,7 +5,7 @@ import (
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
-func ResolveFieldsAndImports(project *project.Project, fields []*nemgen.Field, e *nemgen.Entity, dependantEntity *EntityTemplate) ([]FieldTemplate, map[string]any) {
+func ResolveFieldsAndImports(project *project.Project, fields []*nemgen.Field, e *nemgen.Entity) ([]FieldTemplate, map[string]any) {
 	fieldTemplates := make([]FieldTemplate, len(fields))
 	imports := map[string]any{}
 	for i, f := range fields {

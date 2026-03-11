@@ -1,0 +1,17 @@
+package types 
+
+import (
+    "{{.Module}}/core/repository"
+    {{if eq .Events.Enabled true}}
+    "{{.Module}}/core/events"
+    {{end}}
+    "{{.Module}}/monitoring"
+)
+
+type ModuleParams struct {    
+    Repository *repository.Implementation
+    Monitoring *monitoring.Implementation
+    {{if eq .Events.Enabled true}}
+    Events     *events.Implementation
+    {{end}}
+}
