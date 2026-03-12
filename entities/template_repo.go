@@ -13,24 +13,15 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
 		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.UUIDPtrToSqlNullString(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("mapper.UUIDPtrToNullString(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("req.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullInt64FromNullInt(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
 		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFloat64FromNullFloat(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullBoolFromNullBool(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
@@ -42,9 +33,6 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFromNull(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
@@ -92,9 +80,6 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		nemgen.FieldType_FIELD_TYPE_TIME:
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFromNull(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	default:
 		return ""
@@ -108,24 +93,15 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
 		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.UUIDPtrToSqlNullString(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("mapper.UUIDPtrToNullString(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("req.%s.%s.String()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullInt64FromNullInt(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
 		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFloat64FromNullFloat(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullBoolFromNullBool(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
@@ -137,9 +113,6 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFromNull(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
@@ -149,13 +122,7 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 			// todo: implement this
 		}
 		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			if !f.IsRequired() {
-				return fmt.Sprintf("req.%s.%s.ValueOrZero()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-			}
-			return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
-		}
-		if !f.IsRequired() {
-			return fmt.Sprintf("req.%s.%s.ValueOrZero()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
@@ -166,7 +133,7 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 				// todo support
 			}
 			if !f.IsRequired() {
-				return fmt.Sprintf("req.%s.%s.ToSQLNullInt()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("req.%s.%s.ToNullInt()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			return fmt.Sprintf("req.%s.%s.ToInt64()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
@@ -177,9 +144,17 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
 				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
-					return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+					return fmt.Sprintf("%s.%sSliceToJSON(req.%s.%s)",
+						dependantEntity.Identifier,
+						gcgstrings.ToCamelCase(dependantEntity.Identifier),
+						gcgstrings.ToCamelCase(entity.Identifier),
+						gcgstrings.ToCamelCase(f.Identifier()))
 				}
-				return fmt.Sprintf("%sToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("%s.%sToJSON(req.%s.%s)",
+					dependantEntity.Identifier,
+					gcgstrings.ToCamelCase(dependantEntity.Identifier),
+					gcgstrings.ToCamelCase(entity.Identifier),
+					gcgstrings.ToCamelCase(f.Identifier()))
 			}
 		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
@@ -264,7 +239,7 @@ func (f FieldTemplate) RepoFromMapper() string {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			if !f.IsRequired() {
-				return fmt.Sprintf("enum.%s(m.%s.Int32)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("enum.%s(m.%s.Int64)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			return fmt.Sprintf("enum.%s(m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}

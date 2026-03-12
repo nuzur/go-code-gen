@@ -12,6 +12,7 @@ import (
 	"github.com/nuzur/go-code-gen/maps"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
+	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
 type fetchModuleTemplate struct {
@@ -36,7 +37,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 			if f.Field.Import() != nil {
 				importsTypes[*f.Field.Import()] = struct{}{}
 			}
-			if f.Field.IsNullable() {
+			if f.Field.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID && !f.Field.IsRequired() {
 				importsFetch[fmt.Sprintf("%s/entity/mapper", req.Project.Module)] = struct{}{}
 			}
 		}

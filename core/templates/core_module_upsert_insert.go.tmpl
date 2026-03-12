@@ -10,20 +10,20 @@ import (
     {{if eq .ShouldPublishEvents true}}
     "errors"
     {{end}}
-		
-	"github.com/gofrs/uuid"
+			
 	{{if eq .Project.Monitoring.Enabled true}}
 	"{{.ProjectModule}}/monitoring"
 	{{end}}
+
 	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"	
-	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"   	
+	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"  
+		
 	{{$firstJSON := true}}
 	{{$firstEnumMany := true}}
-	{{range $field := .Fields}}	
-			
+	{{range $field := .Fields}}				
 		{{if eq $firstJSON true}}
 			{{if eq $field.JSON true }}
-				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 
+				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid") (ne $import (printf "%s/enum" $projectModule)) (ne $import "github.com/guregu/null/v6")}} 
     			"{{$import}}" {{end}}{{end}}
 				{{$firstJSON = false}}
 			{{end}}
@@ -38,7 +38,7 @@ import (
 	{{if eq .HasVersionField true}}
 	"time"
 	{{end}}
-	{{if or (eq .HasArrayField true) (eq .HasNullString true) (eq .HasNullUUID true)}}
+	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
 	"{{.ProjectModule}}/entity/mapper"
 	{{end}}	
 )
@@ -151,7 +151,9 @@ func (m *module) publishInsertEvent(ctx context.Context,
 		return nil
 	}
 
-	fetched, err := qtx.Fetch{{.EntityName}}By{{.PrimaryKeysName}}(ctx, id)
+	fetched, err := qtx.Fetch{{.EntityName}}By{{.PrimaryKeysName}}(ctx, 
+		{{range $pk := .PrimaryKeys}}{{$pk.RepoToMapperUpsert}}, {{end}}
+	)
 	if err != nil {
 		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{

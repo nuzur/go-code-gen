@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gertd/go-pluralize"
+	"github.com/iancoleman/strcase"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
@@ -35,7 +36,7 @@ func (e EntityTemplate) PrimaryKeys() []FieldTemplate {
 func (e EntityTemplate) PrimaryKeysName() string {
 	var primaryKeyNames []string
 	for _, pk := range e.PrimaryKeys() {
-		primaryKeyNames = append(primaryKeyNames, gcgstrings.ToCamelCase(pk.Identifier()))
+		primaryKeyNames = append(primaryKeyNames, strcase.ToCamel(pk.Identifier()))
 	}
 	return strings.Join(primaryKeyNames, "And")
 }

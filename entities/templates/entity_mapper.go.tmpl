@@ -132,7 +132,7 @@ func StringToStringPtr(s string) *string {
 	return &s
 }
 
-func StringToUUIDPtr(in sql.NullString) *uuid.UUID {
+func StringToUUIDPtr(in null.String) *uuid.UUID {
 	if !in.Valid {
 		return nil
 	}
@@ -145,54 +145,11 @@ func StringToUUID(s string) uuid.UUID {
 	return uuid.FromStringOrNil(s)
 }
 
-func SQLNullFromNull(s null.String) sql.NullString {
-	if s.Valid {
-		return sql.NullString{
-			String: s.String,
-			Valid:  true,
-		}
-	}
-	return sql.NullString{}
-}
-
-func SQLNullInt64FromNullInt(s null.Int) sql.NullInt64 {
-	if s.Valid {
-		return sql.NullInt64{
-			Int64: s.Int64,
-			Valid: true,
-		}
-	}
-	return sql.NullInt64{}
-}
-
-func SQLNullFloat64FromNullFloat(s null.Float) sql.NullFloat64 {
-	if s.Valid {
-		return sql.NullFloat64{
-			Float64: s.Float64,
-			Valid: true,
-		}
-	}
-	return sql.NullFloat64{}
-}
-
-func SQLNullBoolFromNullBool(s null.Bool) sql.NullBool {
-	if s.Valid {
-		return sql.NullBool{
-			Bool: s.Bool,
-			Valid: true,
-		}
-	}
-	return sql.NullBool{}
-}
-
-func UUIDPtrToSqlNullString(u *uuid.UUID) sql.NullString {
+func UUIDPtrToNullString(u *uuid.UUID) null.String {
 	if u == nil || u == &uuid.Nil {
-		return sql.NullString{}
+		return null.String{}
 	}
-	return sql.NullString{
-		String: u.String(),
-		Valid:  true,
-	}
+	return null.NewString(u.String(), true)
 }
 
 
