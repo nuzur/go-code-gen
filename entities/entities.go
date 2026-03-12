@@ -5,7 +5,6 @@ import (
 	"embed"
 	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"strings"
 
@@ -64,14 +63,36 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 
 	for imp := range allImports {
 		if !strings.Contains(imp, fmt.Sprintf("%s/", project.Identifier)) {
-			cmd := exec.Command("go", "get", imp)
-			cmd.Dir = projectDir
-			err := cmd.Run()
+			err = project.InstallDependency(imp)
 			if err != nil {
 				fmt.Printf("error running go get %s\n", imp)
 			}
 		}
 	}
+
+	entityTypesDir := path.Join(entitiesDir, "types")
+	typeTmplBytes, err := files.GetTemplateBytes(templates, "entity_types")
+	if err != nil {
+		return err
+	}
+	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		OutputPath:    path.Join(entityTypesDir, "types.go"),
+		TemplateBytes: typeTmplBytes,
+	})
+	if err != nil {
+		return err
+	}
+
+	entityMapperDir := path.Join(entitiesDir, "mapper")
+	mapperTmplBytes, err := files.GetTemplateBytes(templates, "entity_mapper")
+	if err != nil {
+		return err
+	}
+	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		OutputPath:    path.Join(entityMapperDir, "mapper.go"),
+		TemplateBytes: mapperTmplBytes,
+		Data:          project,
+	})
 
 	return nil
 }

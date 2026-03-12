@@ -30,7 +30,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 	for _, sel := range req.Selects {
 		imports := map[string]any{}
 		for _, f := range sel.Fields {
-			if f.Field.Import != nil {
+			if f.Field.Import() != nil {
 				imports[*f.Field.Import()] = struct{}{}
 			}
 		}

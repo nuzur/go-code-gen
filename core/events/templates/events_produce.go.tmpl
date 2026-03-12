@@ -3,19 +3,24 @@ package events
 import (
     {{if eq .KafkaEnabled true}}
 	saramafx "github.com/mklfarha/sarama-fx"
+    "golang.org/x/sync/errgroup" 
 	{{end}}
 
-    "golang.org/x/sync/errgroup"     
+    
+    {{if eq .Monitoring.Enabled true}}    
     "{{.Module}}/monitoring"  
-    "fmt" 
+    "fmt"
+    {{end}}
+     
 )
 
 func (i *Implementation) Produce(message []byte, entityIdentifier string, action string) error {
     if i.provider.Get("events.enabled").String() == "false" {
         return nil
     }
-	eg := errgroup.Group{}
+	
     {{if eq .KafkaEnabled true}}
+    eg := errgroup.Group{}
         {{range $t := .KafkaConfig.Topics}}  
             eg.Go(func() error {
                 return i.produceToKafkaTopic("{{$t}}", message, entityIdentifier, action)
@@ -38,6 +43,7 @@ func (i *Implementation) produceToKafkaTopic(topic string, message []byte, entit
 		Message: message,
 	})
 
+    {{if eq .Monitoring.Enabled true}}
     if err != nil {
         i.monitoring.Emit(monitoring.EmitRequest{
             ActionIdentifier: fmt.Sprintf("event_produce_%s", action),
@@ -60,6 +66,11 @@ func (i *Implementation) produceToKafkaTopic(topic string, message []byte, entit
         Type: monitoring.EmitTypeSuccess,
         ExtraData: map[string]string{"message":string(message),"topic":topic},            
     })
+    {{end}}
+    {{if eq .Monitoring.Enabled true}}
     return nil
+    {{else}}
+    return err
+    {{end}}
 }
 {{end}}

@@ -39,94 +39,38 @@ func ResolveSelectStatements(project *project.Project, e *nemgen.Entity) []Schem
 		SortSupported:    false,
 	})
 
-	indexes := []string{}
-	indexFields := map[string]*nemgen.Field{}
-
-	indexesIDs := []string{}
-	indexIDsFields := map[string]*nemgen.Field{}
-	timeFields := []entities.FieldTemplate{}
-	for _, f := range entityTemplate.Fields {
-		if entityTemplate.IndexOnField(f.Field) != nil &&
-			f.Field.Type != nemgen.FieldType_FIELD_TYPE_DATETIME &&
-			f.Field.Type != nemgen.FieldType_FIELD_TYPE_DATE &&
-			f.Field.Type != nemgen.FieldType_FIELD_TYPE_UUID {
-			indexes = append(indexes, f.Identifier())
-			indexFields[f.Identifier()] = f.Field
+	for _, f := range e.Fields {
+		if f.Key {
+			continue
 		}
-
-		if entityTemplate.IndexOnField(f.Field) != nil &&
-			f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID {
-			indexesIDs = append(indexesIDs, f.Identifier())
-			indexIDsFields[f.Identifier()] = f.Field
-		}
-
-		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_DATETIME ||
-			f.Field.Type == nemgen.FieldType_FIELD_TYPE_DATE {
-			timeFields = append(timeFields, f)
-		}
-	}
-
-	if len(indexes) == 0 {
-		return selects
-	}
-
-	combinations := Combinations(indexes)
-	for _, combination := range combinations {
-		name := fmt.Sprintf("%sBy", gcgstrings.ToCamelCase(e.Identifier))
-		fields := []SchemaSelectStatementField{}
-		first := true
-		for i, f := range combination {
-			isLast := true
-			if i < len(combination)-1 {
-				isLast = false
+		index := entityTemplate.IndexOnField(f)
+		if index != nil {
+			indexFields := []SchemaSelectStatementField{}
+			indexFieldNames := []string{}
+			for i, indexField := range index.Fields {
+				indexFieldTemplate := entityTemplate.GetFieldTemplateById(indexField.FieldUuid)
+				if indexFieldTemplate == nil {
+					continue
+				}
+				isLast := i == len(index.Fields)-1
+				indexFields = append(indexFields, SchemaSelectStatementField{
+					Name:   indexFieldTemplate.Identifier(),
+					Field:  indexFieldTemplate,
+					IsLast: isLast,
+				})
+				indexFieldNames = append(indexFieldNames, gcgstrings.ToCamelCase(indexFieldTemplate.Identifier()))
 			}
-			//resolvedField := field.ResolveFieldType(indexFields[f], e, nil)
-			resolvedField := entityTemplate.GetFieldTemplate(indexFields[f])
-			fields = append(fields, SchemaSelectStatementField{
-				Name:   f,
-				Field:  resolvedField,
-				IsLast: isLast,
+			nameByID := fmt.Sprintf("%sBy%s", gcgstrings.ToCamelCase(e.Identifier), strings.Join(indexFieldNames, "And"))
+			selects = append(selects, SchemaSelectStatement{
+				Name:             nameByID,
+				Identifier:       strcase.ToSnake(nameByID),
+				EntityIdentifier: e.Identifier,
+				Fields:           indexFields,
+				IsPrimary:        false,
+				SortSupported:    false,
 			})
-			if first {
-				first = false
-				name = fmt.Sprintf("%s%s", name, gcgstrings.ToCamelCase(f))
-			} else {
-				name = fmt.Sprintf("%sAnd%s", name, gcgstrings.ToCamelCase(f))
-			}
 		}
-
-		selects = append(selects, SchemaSelectStatement{
-			Name:             name,
-			Identifier:       strcase.ToSnake(name),
-			EntityIdentifier: e.Identifier,
-			Fields:           fields,
-			TimeFields:       timeFields,
-			SortSupported:    true,
-		})
 	}
 
 	return selects
-
-}
-
-func Combinations(set []string) (subsets [][]string) {
-	length := uint(len(set))
-
-	// Go through all possible combinations of objects
-	// from 1 (only first object in subset) to 2^length (all objects in subset)
-	for subsetBits := 1; subsetBits < (1 << length); subsetBits++ {
-		var subset []string
-
-		for object := uint(0); object < length; object++ {
-			// checks if object is contained in subset
-			// by checking if bit 'object' is set in subsetBits
-			if (subsetBits>>object)&1 == 1 {
-				// add object to subset
-				subset = append(subset, set[object])
-			}
-		}
-		// add subset to subsets
-		subsets = append(subsets, subset)
-	}
-	return subsets
 }

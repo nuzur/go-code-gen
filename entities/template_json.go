@@ -32,3 +32,19 @@ func (f FieldTemplate) JSONIdentifier() string {
 func (f FieldTemplate) Tags() string {
 	return fmt.Sprintf("`json:\"%s\"`", f.Identifier())
 }
+
+func (f FieldTemplate) IsRawJSON() bool {
+	if !f.JSON() {
+		return false
+	}
+	// check if there is a relationship with this field to a dependant entity, if not then this is a raw json field
+	rel := f.Project.GetRelationshipFromField(f.Field)
+	if rel != nil {
+		dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+		if dependantEntity != nil {
+			return false
+		}
+	}
+
+	return true
+}

@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"path"
 
@@ -22,6 +23,12 @@ func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir
 			entityUUIDs = append(entityUUIDs, e.Uuid)
 		}
 	}
+
+	// make a copy of the project version
+	// with only the standalone entities to optimize the SQL generation
+	marshalledPv, _ := json.Marshal(project.ProjectVersion)
+	var projectVersionCopy nemgen.ProjectVersion
+	json.Unmarshal(marshalledPv, &projectVersionCopy)
 	req := tosql.GenerateRequest{
 		ExecutionUUID: uuid.Must(uuid.NewV4()).String(),
 		Configvalues: &tosql.ConfigValues{
@@ -38,7 +45,7 @@ func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir
 				tosql.SelectForIndexedCombinedAction,
 			},
 		},
-		ProjectVersion: project.ProjectVersion,
+		ProjectVersion: &projectVersionCopy,
 	}
 	res, err := tosql.GenerateSQL(context.Background(), req)
 	if err != nil {
@@ -52,15 +59,35 @@ func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir
 	src := path.Join("executions", execID)
 	dst := sqlDir
 
-	err = copy.Copy(src, dst)
+	err = copy.Copy(path.Join(src, "create.sql"), path.Join(dst, "schema", "create.sql"))
 	if err != nil {
 		return err
 	}
 
+	// rest of the files
+	fileNames := []string{"delete.sql",
+		"insert.sql",
+		"update.sql",
+		"select_simple.sql",
+		"select_indexed_simple.sql",
+	}
+	for _, fileName := range fileNames {
+		err = copy.Copy(path.Join(src, fileName), path.Join(dst, "queries", fileName))
+		if err != nil {
+			return err
+		}
+	}
+
 	// delete the execution files
-	err = files.DeleteDir(src)
+	err = files.DeleteDir(path.Join("executions", execID))
 	if err != nil {
 		log.Printf("Error deleting execution files: %v", err)
+	}
+
+	// delete zip file if exists
+	err = files.DeleteFile(path.Join("executions", execID+".zip"))
+	if err != nil {
+		log.Printf("Error deleting execution zip file: %v", err)
 	}
 
 	return nil

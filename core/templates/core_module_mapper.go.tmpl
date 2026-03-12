@@ -1,12 +1,12 @@
 package {{.Package}}
 
 import (    
-    main_entity "{{.ProjectModule}}/core/entity/{{.Package}}"
+    main_entity "{{.ProjectModule}}/entity/{{.Package}}"
     {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"  
-	{{if or (eq .HasArrayField true) (eq .HasNullString true) (eq .HasNullUUID true)}}
-		"{{.ProjectModule}}/core/entity/mapper"
+	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
+		"{{.ProjectModule}}/entity/mapper"
 	{{end}}
-	{{range $import := .Imports}} {{if ne $import "time"}} 
+	{{range $import := .Imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 
     "{{$import}}" {{end}}{{end}}
 )
 
@@ -18,7 +18,7 @@ func mapModelsToEntities(models []{{.ProjectIdentifier}}db.{{.EntityName}}) []ma
 	return result
 }
 
-func mapModelToEntity(model {{.ProjectIdentifier}}db.{{.EntityName}}) main_entity.{{.EntityName}} {	
+func mapModelToEntity(m {{.ProjectIdentifier}}db.{{.EntityName}}) main_entity.{{.EntityName}} {	
 	return main_entity.{{.EntityName}}{ {{range $field := .Fields}}
         {{$field.Name}}: {{$field.RepoFromMapper}},{{end}}	
 	}

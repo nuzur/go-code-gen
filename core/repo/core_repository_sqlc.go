@@ -1,7 +1,6 @@
 package repo
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os/exec"
@@ -45,19 +44,15 @@ func generateRepositorySQLCode(ctx context.Context, repoDir string, project *pro
 		return err
 	}
 
-	fmt.Printf("----[GCG] SQLC Generate\n")
+	fmt.Printf("----[GCG] SQLC Generate: %v\n", repoDir)
 	cmd := exec.Command("go", "run", "github.com/sqlc-dev/sqlc/cmd/sqlc", "generate")
 	cmd.Dir = repoDir
-	var out bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err = cmd.Run()
+	res, err := cmd.Output()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
-		fmt.Println("SQLC Result: " + out.String())
+		fmt.Printf("error running sqlc generate: %v\n", err)
 		return err
 	}
+	fmt.Printf("----[GCG] SQLC Generate completed! %s\n", string(res))
 
 	return nil
 }

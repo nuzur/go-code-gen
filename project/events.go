@@ -25,3 +25,22 @@ type KafkaTransportConfig struct {
 	Brokers []string `json:"brokers"`
 	Topics  []string `json:"topics"`
 }
+
+func (p Project) KafkaEnabled() bool {
+	if !p.Core.Events.Enabled {
+		return false
+	}
+
+	if p.Core.Events.Transport == KafkaEventTransport && p.Core.Events.TransportConfig.Kafka != nil {
+		return true
+	}
+
+	return false
+}
+
+func (p Project) KafkaConfig() *KafkaTransportConfig {
+	if p.KafkaEnabled() {
+		return p.Core.Events.TransportConfig.Kafka
+	}
+	return nil
+}

@@ -7,7 +7,9 @@ import (
 	saramafx "github.com/mklfarha/sarama-fx"
 	{{end}}
 
+    {{if eq .Monitoring.Enabled true}}
     "{{.Module}}/monitoring"
+    {{end}}
     "time"
     "go.uber.org/config"
 )
@@ -16,7 +18,9 @@ type Implementation struct {
     {{if eq .KafkaEnabled true}}
     client *saramafx.Client
     {{end}}
+    {{if eq .Monitoring.Enabled true}}
     monitoring *monitoring.Implementation
+    {{end}}
     provider config.Provider
 }
 
@@ -26,7 +30,9 @@ type Params struct {
     {{if eq .KafkaEnabled true}}
     Client *saramafx.Client
     {{end}}
+    {{if eq .Monitoring.Enabled true}}
     Monitoring *monitoring.Implementation
+    {{end}}
     Provider config.Provider
 }
 

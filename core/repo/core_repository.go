@@ -18,13 +18,19 @@ var templates embed.FS
 func GenerateCoreRepository(ctx context.Context, project *project.Project) error {
 	fmt.Printf("--[GCG] Generating core repository\n")
 	projectDir := project.Dir()
-	repoDir := path.Join(projectDir, project.Core.RepoDir)
+	repoDir := path.Join(projectDir, project.Core.CoreDir, project.Core.RepoDir)
 
 	sqlDir := path.Join(repoDir, "sql")
 
 	err := os.RemoveAll(repoDir)
 	if err != nil {
 		fmt.Printf("ERROR: Deleting repo directory\n")
+	}
+
+	// install sqlc
+	err = project.InstallDependency("github.com/sqlc-dev/sqlc/cmd/sqlc")
+	if err != nil {
+		fmt.Printf("error running go install sqlc: %v", err)
 	}
 
 	// generate sql files

@@ -1,7 +1,9 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
+	"os/exec"
 	"path"
 	"slices"
 
@@ -20,6 +22,7 @@ type Project struct {
 	EntitiesDir    string
 	ProtoDir       string
 	Core           Core
+	Monitoring     Monitoring
 }
 
 type ProjectParams struct {
@@ -31,6 +34,7 @@ type ProjectParams struct {
 	EntitiesDir    string
 	ProtoDir       string
 	Core           Core
+	Monitoring     Monitoring
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -63,7 +67,7 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	if params.Core.RepoDir == "" {
-		params.Core.RepoDir = "repo"
+		params.Core.RepoDir = "repository"
 	}
 
 	if params.Core.Events.Dir == "" {
@@ -98,6 +102,7 @@ func New(params *ProjectParams) (*Project, error) {
 		EntitiesDir:    params.EntitiesDir,
 		ProtoDir:       params.ProtoDir,
 		Core:           params.Core,
+		Monitoring:     params.Monitoring,
 	}, nil
 }
 
@@ -122,9 +127,9 @@ func (p *Project) GetEnum(uuid string) *nemgen.Enum {
 	return nil
 }
 
-func (p *Project) GetEntity(uuid string) *nemgen.Entity {
+func (p *Project) GetEntity(id string) *nemgen.Entity {
 	for _, e := range p.ProjectVersion.Entities {
-		if e.Uuid == uuid {
+		if e.Uuid == id {
 			return e
 		}
 	}
@@ -156,4 +161,21 @@ func (p *Project) FieldsToCamelCase() map[string]string {
 		}
 	}
 	return res
+}
+
+func (p *Project) InstallDependency(dep string) error {
+	var out bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.Command("go", "get", dep)
+	cmd.Dir = p.Dir()
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("error running go install %s: %v | %v | %v\n", dep, err, out.String(), stderr.String())
+	}
+	if stderr.Len() > 0 {
+		fmt.Printf("error installing dependency %s: %s\n", dep, stderr.String())
+	}
+	return err
 }

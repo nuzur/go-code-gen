@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"strings"
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/entities"
@@ -29,18 +28,13 @@ type mapperModuleTemplate struct {
 func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 	fmt.Printf("--[GCG] Generating core module mapper: %s\n", req.Entity.Identifier)
 	hasArrayField := false
-	hasNullString := false
 	hasNullUUID := false
 	for _, f := range req.Fields {
 		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
 			hasArrayField = true
 		}
 
-		if strings.Contains(f.GolangType(), "null.") {
-			hasNullString = true
-		}
-
-		if !f.IsRequired() && f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID {
+		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID {
 			hasNullUUID = true
 		}
 	}
@@ -52,7 +46,6 @@ func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 		Fields:            req.Fields,
 		Imports:           maps.MapKeys(req.Imports),
 		HasArrayField:     hasArrayField,
-		HasNullString:     hasNullString,
 		HasNullUUID:       hasNullUUID,
 	}
 

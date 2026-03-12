@@ -78,7 +78,7 @@ type ProtoServiceTemplate struct {
 }
 
 type GenerateProtoParams struct {
-	Protoc bool
+	Protoc  bool
 	Mappers bool
 	Server  bool
 }
@@ -122,7 +122,7 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams, genParams
 			}
 
 			if genParams.Server {
-				// generate server 
+				// generate server
 				err = generateServer(ctx, protoDir, project, entityTemplates)
 				if err != nil {
 					return err
@@ -130,6 +130,5 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams, genParams
 			}
 		}
 	}
-
 	return err
 }

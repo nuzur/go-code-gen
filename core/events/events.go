@@ -25,7 +25,7 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 	}
 
 	projectDir := project.Dir()
-	eventsDir := path.Join(projectDir, project.Core.Events.Dir)
+	eventsDir := path.Join(projectDir, project.Core.CoreDir, project.Core.Events.Dir)
 
 	err := os.RemoveAll(eventsDir)
 	if err != nil {

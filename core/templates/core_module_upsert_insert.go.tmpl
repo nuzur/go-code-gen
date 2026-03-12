@@ -34,7 +34,7 @@ import (
 		{{end}}
 		{{if eq $firstEnumMany true}}
 			{{if eq $field.EnumMany true}}
-				main_entity "{{$projectModule}}/core/entity/{{$entityIdenfier}}"
+				main_entity "{{$projectModule}}/entity/{{$entityIdenfier}}"
 				{{$firstEnumMany = false}}
 			{{end}}
 		{{end}}
@@ -43,7 +43,7 @@ import (
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullString true) (eq .HasNullUUID true)}}
-	"{{.ProjectModule}}/core/entity/mapper"
+	"{{.ProjectModule}}/entity/mapper"
 	{{end}}	
 )
 

@@ -1,14 +1,14 @@
 package types
 
 import (
-    main_entity "{{.ProjectModule}}/core/entity/{{.Package}}"
+    main_entity "{{.ProjectModule}}/entity/{{.Package}}"
 	{{range $import := .Imports}}
     "{{$import}}" {{end}}	
     "go.uber.org/zap/zapcore"
 )
 
 type Fetch{{.Select.Name}}Request struct { {{range $field := .Select.Fields}} 
-    {{$field.Field.Name}} {{if eq $field.Field.Custom true}}main_entity.{{end}}{{$field.Field.Type}}{{end}}    
+    {{$field.Field.Name}} {{$field.Field.GolangType}}{{end}}    
     {{if ne .Select.IsPrimary true}}
     Offset int32
     Limit int32
@@ -19,7 +19,7 @@ type Fetch{{.Select.Name}}Request struct { {{range $field := .Select.Fields}}
 
 func (r Fetch{{.Select.Name}}Request) MarshalLogObject(e zapcore.ObjectEncoder) error {
      {{range $field := .Select.Fields}} 
-        {{if eq $field.Field.Type "uuid.UUID"}}
+        {{if eq $field.Field.GolangType "uuid.UUID"}}
         e.AddString("{{$field.Field.Identifier}}", r.{{$field.Field.Name}}.String())
         {{end}}
      {{end}}

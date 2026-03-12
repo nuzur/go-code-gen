@@ -10,7 +10,7 @@ import (
     "{{.ProjectModule}}/monitoring"
     {{range $field := .SearchFields}}
         {{- if and (eq $field.Type "*string") (eq $firstMapperImport false) }} {{$firstMapperImport = true}}
-            "{{$projectModule}}/core/entity/mapper"
+            "{{$projectModule}}/entity/mapper"
         {{end -}}
     {{end}}
 )

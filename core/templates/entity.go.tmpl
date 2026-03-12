@@ -8,10 +8,7 @@ import (
     
     "fmt"
     
-    "{{.ProjectModule}}/core/entity/types"
-    {{ if and (ne (len .Fields) 0) (eq .UsesRandomValues true) }}
-    "{{.ProjectModule}}/core/randomvalues"
-    {{ end }}
+    "{{.ProjectModule}}/entity/types"    
     "math/rand"
     {{if eq $timeImport false}}
     "time"

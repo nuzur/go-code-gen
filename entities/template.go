@@ -69,6 +69,15 @@ func (e EntityTemplate) GetFieldTemplate(field *nemgen.Field) *FieldTemplate {
 	return nil
 }
 
+func (e EntityTemplate) GetFieldTemplateById(id string) *FieldTemplate {
+	for _, f := range e.Fields {
+		if f.Field.Uuid == id {
+			return &f
+		}
+	}
+	return nil
+}
+
 type EnumTemplate struct {
 	Project *project.Project
 	Enum    *nemgen.Enum
@@ -159,4 +168,8 @@ func (f FieldTemplate) IsSearchable() bool {
 		return true
 	}
 	return false
+}
+
+func (f FieldTemplate) Array() bool {
+	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY
 }

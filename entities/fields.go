@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"fmt"
+
 	"github.com/nuzur/go-code-gen/project"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
@@ -21,10 +23,17 @@ func ResolveFieldsAndImports(project *project.Project, fields []*nemgen.Field, e
 		fieldTemplate.Project = project
 		fieldTemplates[i] = fieldTemplate
 
-		/*if f.Type == entity.JSONFieldType && (f.JSONConfig.Reuse || len(f.JSONConfig.Fields) > 0) {
-			nestedEntityImport := fmt.Sprintf("%s/core/entity/%s", project.Module, f.JSONConfig.Identifier)
-			imports[nestedEntityImport] = struct{}{}
-		}*/
+		if f.Type == nemgen.FieldType_FIELD_TYPE_JSON {
+			rel := project.GetRelationshipFromField(f)
+			if rel != nil {
+				dependantEntity := project.GetEntity(rel.To.TypeConfig.Entity.EntityUuid)
+				if dependantEntity != nil {
+					nestedEntityImport := fmt.Sprintf("%s/entity/%s", project.Module, dependantEntity.Identifier)
+					imports[nestedEntityImport] = struct{}{}
+				}
+			}
+
+		}
 	}
 	return fieldTemplates, imports
 }

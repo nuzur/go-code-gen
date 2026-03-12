@@ -6,8 +6,10 @@ import (
 	"{{.ProjectModule}}/core/repository"
 	coretypes "{{.ProjectModule}}/core/types"
 	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+	{{if eq .Project.Monitoring.Enabled true}}
 	"{{.ProjectModule}}/monitoring"
-	{{if eq .Project.Events.Enabled true}}
+	{{end}}
+	{{if eq .Project.Core.Events.Enabled true}}
 	"{{.ProjectModule}}/core/events"
 	{{end}}
 )
@@ -24,17 +26,16 @@ type Module interface {
 
 	{{if ne (len .SearchFields) 0}}
 	Search(ctx context.Context, query string, limit int32, offset int32) (types.Search{{.EntityName}}Response, error)
-	{{end}}	
-	{{range $cq := .CustomQueries}}
-	{{$cq.Name}}(ctx context.Context, req types.{{$cq.Name}}Request, opts ...Option) (types.{{$cq.Name}}Response, error)
-	{{end}}
+	{{end}}		
 }
 
 type module struct {
 	mu sync.Mutex
 	repository *repository.Implementation    
+	{{if eq .Project.Monitoring.Enabled true}}
 	monitoring *monitoring.Implementation
-	{{if eq .Project.Events.Enabled true}}
+	{{end}}
+	{{if eq .Project.Core.Events.Enabled true}}
 	events     *events.Implementation
 	{{end}}
 }
@@ -42,8 +43,10 @@ type module struct {
 func New(params coretypes.ModuleParams) Module {
 	return &module{
 		repository: params.Repository,
+		{{if eq .Project.Monitoring.Enabled true}}
 		monitoring: params.Monitoring,
-		{{if eq .Project.Events.Enabled true}}
+		{{end}}
+		{{if eq .Project.Core.Events.Enabled true}}
 		events: params.Events,
 		{{end}}
 	}
