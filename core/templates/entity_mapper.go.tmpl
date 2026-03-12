@@ -7,7 +7,6 @@ import (
 
 	"github.com/gofrs/uuid"
 	"database/sql"
-	"github.com/guregu/null/v6"
 )
 
 func JSONToStringSlice(data json.RawMessage) []string {
@@ -130,69 +129,6 @@ func StringPtrToString(s *string) string {
 
 func StringToStringPtr(s string) *string {
 	return &s
-}
-
-func StringToUUIDPtr(in sql.NullString) *uuid.UUID {
-	if !in.Valid {
-		return nil
-	}
-	s := in.String
-	uid := uuid.FromStringOrNil(s)
-	return &uid	
-}
-
-func StringToUUID(s string) uuid.UUID {
-	return uuid.FromStringOrNil(s)
-}
-
-func SQLNullFromNull(s null.String) sql.NullString {
-	if s.Valid {
-		return sql.NullString{
-			String: s.String,
-			Valid:  true,
-		}
-	}
-	return sql.NullString{}
-}
-
-func SQLNullInt64FromNullInt(s null.Int) sql.NullInt64 {
-	if s.Valid {
-		return sql.NullInt64{
-			Int64: s.Int64,
-			Valid: true,
-		}
-	}
-	return sql.NullInt64{}
-}
-
-func SQLNullFloat64FromNullFloat(s null.Float) sql.NullFloat64 {
-	if s.Valid {
-		return sql.NullFloat64{
-			Float64: s.Float64,
-			Valid: true,
-		}
-	}
-	return sql.NullFloat64{}
-}
-
-func SQLNullBoolFromNullBool(s null.Bool) sql.NullBool {
-	if s.Valid {
-		return sql.NullBool{
-			Bool: s.Bool,
-			Valid: true,
-		}
-	}
-	return sql.NullBool{}
-}
-
-func UUIDPtrToSqlNullString(u *uuid.UUID) sql.NullString {
-	if u == nil || u == &uuid.Nil {
-		return sql.NullString{}
-	}
-	return sql.NullString{
-		String: u.String(),
-		Valid:  true,
-	}
 }
 
 

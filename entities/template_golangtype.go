@@ -139,5 +139,5 @@ func (f FieldTemplate) ArrayGolangType() string {
 }
 
 func (f FieldTemplate) IsNullable() bool {
-	return strings.Contains(f.GolangType(), "null.")
+	return strings.Contains(f.GolangType(), "null.") || strings.HasPrefix(f.GolangType(), "*")
 }

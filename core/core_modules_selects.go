@@ -30,12 +30,17 @@ type fetchModuleTemplate struct {
 func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 	fmt.Printf("--[GPG] Generating core module selects: %s\n", req.Entity.Identifier)
 	for _, sel := range req.Selects {
-		imports := map[string]any{}
+		importsTypes := map[string]any{}
+		importsFetch := map[string]any{}
 		for _, f := range sel.Fields {
 			if f.Field.Import() != nil {
-				imports[*f.Field.Import()] = struct{}{}
+				importsTypes[*f.Field.Import()] = struct{}{}
+			}
+			if f.Field.IsNullable() {
+				importsFetch[fmt.Sprintf("%s/entity/mapper", req.Project.Module)] = struct{}{}
 			}
 		}
+
 		fetchTemplate := fetchModuleTemplate{
 			Package:           req.Entity.Identifier,
 			ProjectIdentifier: req.Project.Identifier,
@@ -43,7 +48,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 			EntityIdentifier:  req.Entity.Identifier,
 			EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
 			Select:            sel,
-			Imports:           maps.MapKeys(imports),
+			Imports:           maps.MapKeys(importsTypes),
 			Project:           req.Project,
 		}
 
@@ -64,6 +69,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 		if err != nil {
 			return err
 		}
+		fetchTemplate.Imports = maps.MapKeys(importsFetch)
 		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, fmt.Sprintf("fetch_%s.go", gcgstrings.ToSnakeCase(sel.Name))),
 			TemplateBytes: fetchTmplBytes,

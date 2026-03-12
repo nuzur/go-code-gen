@@ -43,7 +43,7 @@ func ResolveSelectStatements(project *project.Project, e *nemgen.Entity) []Schem
 			continue
 		}
 		index := entityTemplate.IndexOnField(f)
-		if index != nil {
+		if index != nil && (index.Type == nemgen.IndexType_INDEX_TYPE_INDEX) {
 			indexFields := []SchemaSelectStatementField{}
 			indexFieldNames := []string{}
 			for i, indexField := range index.Fields {

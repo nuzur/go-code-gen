@@ -12,13 +12,11 @@ import (
     "{{.ProjectModule}}/monitoring"  
     {{ end }}
 
-    {{ $firstMapper := true}}
-    {{range $field := .Select.Fields}}
-    {{ if and (eq $firstMapper true) (or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.IsRawJSON true) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "*string")) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "uuid.UUID")))}}  
-        {{$firstMapper = false}}
-        "{{$projectModule}}/entity/mapper"
-    {{end}}
-    {{end}}
+    {{ range $import := .Imports }}
+    {{ if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}}
+    "{{$import}}"
+    {{ end }}
+    {{ end }}
 )
 
 func (m *module) Fetch{{.Select.Name}}(
