@@ -6,7 +6,9 @@ import (
 	main_entity "{{.ProjectModule}}/entity/{{.EntityIdentifier}}"
 	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
 	repogen "{{.ProjectModule}}/core/repository/gen"
+	{{if eq .Project.Monitoring.Enabled true}}
 	"{{.ProjectModule}}/monitoring" 
+	{{end}}
 	"slices"
 	
 )
@@ -24,6 +26,7 @@ func (m *module) List(ctx context.Context,
 		optConfig.ListIncludeColumns,
 		optConfig.ListExcludeColumns,)
 	if err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_query",
 			Message: "error in building query for List{{.EntityName}}",
@@ -33,6 +36,7 @@ func (m *module) List(ctx context.Context,
 			Data: request,
 			Error: err,
 		})
+		{{end}}
 		return types.ListResponse{}, err
 	}
 
@@ -42,6 +46,7 @@ func (m *module) List(ctx context.Context,
 	defer txn.Commit()
 	bufferRows, err := txn.QueryContext(ctx, "SET sort_buffer_size=5000000")
 	if err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_sort_buffer",
 			Message: "error in setting sort buffer for List{{.EntityName}}",
@@ -51,11 +56,13 @@ func (m *module) List(ctx context.Context,
 			Data: request,
 			Error: err,
 		})
+		{{end}}
 		return types.ListResponse{}, err
 	}
 	bufferRows.Close()
 	rows, err := txn.QueryContext(ctx, query)
 	if err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_db",
 			Message: "error in executing query for List{{.EntityName}}",
@@ -66,6 +73,7 @@ func (m *module) List(ctx context.Context,
 			ExtraData: map[string]string{"query":query},
 			Error: err,
 		})
+		{{end}}
 		fmt.Printf("error in executing query for List{{.EntityName}}: %v \n %v\n", query, err)
 		return types.ListResponse{}, err
 	}	
@@ -88,6 +96,7 @@ func (m *module) List(ctx context.Context,
 		}
 		{{end}}
 		if err := rows.Scan(fields...); err != nil {
+			{{if eq .Project.Monitoring.Enabled true}}
 			m.monitoring.Emit(monitoring.EmitRequest{
 				ActionIdentifier: "list_{{.EntityIdentifier}}_scan",
 				Message: "error in scanning rows for List{{.EntityName}}",
@@ -98,11 +107,13 @@ func (m *module) List(ctx context.Context,
 				ExtraData: map[string]string{"query":query},
 				Error: err,
 			})
+			{{end}}
 			return types.ListResponse{}, err
 		}
 		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_rows",
 			Message: "error closing rows for List{{.EntityName}}",
@@ -113,9 +124,11 @@ func (m *module) List(ctx context.Context,
 			ExtraData: map[string]string{"query":query},
 			Error: err,
 		})
+		{{end}}
 		return types.ListResponse{}, err
 	}
 	if err := rows.Err(); err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_rows",
 			Message: "error in rows for List{{.EntityName}}",
@@ -126,11 +139,13 @@ func (m *module) List(ctx context.Context,
 			ExtraData: map[string]string{"query":query},
 			Error: err,
 		})
+		{{end}}
 		return types.ListResponse{}, err
 	}
 
 	hasNextPage, err := m.listHasNextPage(ctx, request, opts...)
 	if err != nil {
+		{{if eq .Project.Monitoring.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.EntityIdentifier}}_next",
 			Message: "error determining if list has next page for List{{.EntityName}}",
@@ -141,9 +156,11 @@ func (m *module) List(ctx context.Context,
 			ExtraData: map[string]string{"query":query},
 			Error: err,
 		})
+		{{end}}
 		return types.ListResponse{}, err
 	}
 
+	{{if eq .Project.Monitoring.Enabled true}}
 	m.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "list_{{.EntityIdentifier}}",
 		Message: "successfully handled List{{.EntityName}}",
@@ -153,6 +170,7 @@ func (m *module) List(ctx context.Context,
 		Data: request,
 		ExtraData: map[string]string{"query":query},		
 	})
+	{{end}}
 	return types.ListResponse{
 		{{.EntityNamePlural}}: mapModelsToEntities(items),
 		HasNextPage: hasNextPage,

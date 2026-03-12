@@ -10,6 +10,7 @@ import (
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
+	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 )
 
@@ -20,6 +21,7 @@ type listData struct {
 	EntityName        string
 	EntityNamePlural  string
 	Fields            []entities.FieldTemplate
+	Project           *project.Project
 }
 
 func generateList(ctx context.Context, req coreSubModuleRequest) error {
@@ -32,6 +34,7 @@ func generateList(ctx context.Context, req coreSubModuleRequest) error {
 		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
 		EntityNamePlural:  pl.Plural(gcgstrings.ToCamelCase(req.Entity.Identifier)),
 		Fields:            req.Fields,
+		Project:           req.Project,
 	}
 
 	typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_list_types")

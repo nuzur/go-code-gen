@@ -95,12 +95,12 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 		if err != nil {
 			return err
 		}
-		/*
-			// list
-			err = generateList(ctx, req)
-			if err != nil {
-				return err
-			}*/
+
+		// list
+		err = generateList(ctx, req)
+		if err != nil {
+			return err
+		}
 	}
 
 	/*
