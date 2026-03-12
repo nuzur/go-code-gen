@@ -8,7 +8,9 @@ import (
     {{if ne .Select.IsPrimary true}}
     "errors"
     {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"{{end}}        
+    {{ if .Project.Monitoring.Enabled }}
     "{{.ProjectModule}}/monitoring"  
+    {{ end }}
 
     {{ $firstMapper := true}}
     {{range $field := .Select.Fields}}
@@ -27,9 +29,10 @@ func (m *module) Fetch{{.Select.Name}}(
     {{if eq .Select.IsPrimary true}}
     models, err := m.repository.Queries.Fetch{{.Select.Name}}(
         ctx,{{range $field := .Select.Fields}}
-        req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},{{end}}
+        {{$field.Field.RepoToMapperFetch}},{{end}}
     )
     if err != nil {  
+        {{ if .Project.Monitoring.Enabled }}
         m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "fetch_{{.Select.Identifier}}",
 			Message: "error in Fetch{{.Select.Name}}",
@@ -38,7 +41,8 @@ func (m *module) Fetch{{.Select.Name}}(
 			Type: monitoring.EmitTypeError,
 			Data: req,
 			Error: err,
-		})      
+		})  
+        {{ end }}    
         return types.Fetch{{.Select.Name}}Response{}, err
     }
     return types.Fetch{{.Select.Name}}Response{
@@ -49,12 +53,8 @@ func (m *module) Fetch{{.Select.Name}}(
     if req.OrderBy == "" {
         models, err := m.repository.Queries.Fetch{{.Select.Name}}(
             ctx,
-            {{.ProjectIdentifier}}db.Fetch{{.Select.Name}}Params{ {{range $field := .Select.Fields}}
-                {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.IsRawJSON true) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "*string")) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "uuid.UUID"))}}
-                    {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
-                {{ else }}
-                    {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
-                {{end}}
+            {{.ProjectIdentifier}}db.Fetch{{.Select.Name}}Params{ {{range $field := .Select.Fields}}                
+                {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}},                                            
                 {{end}}
                 Offset: req.Offset,
                 Limit: req.Limit,            
@@ -62,6 +62,7 @@ func (m *module) Fetch{{.Select.Name}}(
         )
         
         if err != nil {
+            {{ if .Project.Monitoring.Enabled }}
             m.monitoring.Emit(monitoring.EmitRequest{
                 ActionIdentifier: "fetch_{{.Select.Identifier}}",
                 Message: "error in Fetch{{.Select.Name}} no order",
@@ -71,6 +72,7 @@ func (m *module) Fetch{{.Select.Name}}(
                 Data: req,
                 Error: err,
             })
+            {{ end }}
             return types.Fetch{{.Select.Name}}Response{}, err
         }
         return types.Fetch{{.Select.Name}}Response{
@@ -94,6 +96,7 @@ func (m *module) Fetch{{.Select.Name}}(
 
     if !orderByFieldFound {
         err := errors.New("order by field not found")
+        {{ if .Project.Monitoring.Enabled }}
         m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "fetch_{{.Select.Identifier}}",
 			Message: "error in Fetch{{.Select.Name}} - order by field not found",
@@ -103,6 +106,7 @@ func (m *module) Fetch{{.Select.Name}}(
 			Data: req,
 			Error: err,
 		})
+        {{ end }}
         return types.Fetch{{.Select.Name}}Response{}, err
     }
 
@@ -112,6 +116,7 @@ func (m *module) Fetch{{.Select.Name}}(
             sort = req.Sort
         } else {
             err := errors.New("invalid sort value only ASC or DESC are valid")
+            {{ if .Project.Monitoring.Enabled }}
             m.monitoring.Emit(monitoring.EmitRequest{
                 ActionIdentifier: "fetch_{{.Select.Identifier}}",
                 Message: "error in Fetch{{.Select.Name}} - invalid sort value only ASC or DESC are valid",
@@ -121,6 +126,7 @@ func (m *module) Fetch{{.Select.Name}}(
                 Data: req,
                 Error: err,
             })
+            {{ end }}
             return types.Fetch{{.Select.Name}}Response{}, err
         }
     }
@@ -133,18 +139,15 @@ func (m *module) Fetch{{.Select.Name}}(
             if sort == "ASC" {
                 models, err := m.repository.Queries.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}ASC(
                     ctx,
-                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}ASCParams{ {{range $field := $select.Fields}}
-                        {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.IsRawJSON true) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "*string")) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "uuid.UUID"))}}
-                            {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
-                        {{ else }}
-                            {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
-                        {{end}}
+                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}ASCParams{ {{range $field := $select.Fields}}                        
+                        {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}},                        
                         {{end}}
                         Offset: req.Offset,
                         Limit: req.Limit,            
                     },
                 )
                 if err != nil {
+                    {{ if .Project.Monitoring.Enabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered asc",
@@ -154,6 +157,7 @@ func (m *module) Fetch{{.Select.Name}}(
                         Data: req,
                         Error: err,
                     })
+                    {{ end }}
                     return types.Fetch{{$select.Name}}Response{}, err
                 }
                 return types.Fetch{{$select.Name}}Response{
@@ -162,18 +166,15 @@ func (m *module) Fetch{{.Select.Name}}(
             } else {
                 models, err := m.repository.Queries.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}DESC(
                     ctx,
-                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}DESCParams{ {{range $field := $select.Fields}}
-                        {{ if or (eq $field.Field.JSON true) (eq $field.Field.Array true) (eq $field.Field.EnumMany true) (eq $field.Field.IsRawJSON true) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "*string")) (and (eq $field.Field.IsRequired false) (eq $field.Field.GolangType "uuid.UUID"))}}
-                            {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}}, 
-                        {{ else }}
-                            {{$field.Field.Name}}: req.{{$field.Field.Name}}{{$field.Field.RepoToMapper}},
-                        {{end}}
+                    {{$projectIdentifier}}db.Fetch{{$select.Name}}OrderedBy{{$timeField.Name}}DESCParams{ {{range $field := $select.Fields}}                        
+                        {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}},                        
                         {{end}}
                         Offset: req.Offset,
                         Limit: req.Limit,            
                     },
                 )
                 if err != nil {
+                    {{ if .Project.Monitoring.Enabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered desc",
@@ -183,6 +184,7 @@ func (m *module) Fetch{{.Select.Name}}(
                         Data: req,
                         Error: err,
                     })
+                    {{ end }}
                     return types.Fetch{{$select.Name}}Response{}, err
                 }
                 return types.Fetch{{$select.Name}}Response{
@@ -194,6 +196,7 @@ func (m *module) Fetch{{.Select.Name}}(
     {{end}} 
 
     err := errors.New("could not process request")
+    {{ if .Project.Monitoring.Enabled }}
     m.monitoring.Emit(monitoring.EmitRequest{
         ActionIdentifier: "fetch_{{.Select.Identifier}}_invalid",
         Message: "error in Fetch{{.Select.Name}} - invalid request",
@@ -203,6 +206,7 @@ func (m *module) Fetch{{.Select.Name}}(
         Data: req,
         Error: err,
     })
+    {{ end }}
     return types.Fetch{{.Select.Name}}Response{}, err
     {{end}}
 }

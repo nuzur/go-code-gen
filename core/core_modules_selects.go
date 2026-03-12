@@ -10,6 +10,7 @@ import (
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/maps"
+	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 )
 
@@ -23,6 +24,7 @@ type fetchModuleTemplate struct {
 	Fields            []entities.FieldTemplate
 	Imports           []string
 	SearchFields      []entities.FieldTemplate
+	Project           *project.Project
 }
 
 func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
@@ -42,6 +44,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 			EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
 			Select:            sel,
 			Imports:           maps.MapKeys(imports),
+			Project:           req.Project,
 		}
 
 		typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_fetch_types")

@@ -8,29 +8,24 @@ import (
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
-func (f FieldTemplate) RepoToMapper() string {
+func (f FieldTemplate) RepoToMapperFetch() string {
 	pl := pluralize.NewClient()
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
-		return fmt.Sprintf("e.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_INTEGER:
 		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+			e := f.Entity
+			return fmt.Sprintf("mapper.StringToSqlNullString(req.%s.%s.String())", gcgstrings.ToCamelCase(e.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
-		return fmt.Sprintf("int64(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		return fmt.Sprintf("req.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
+	case nemgen.FieldType_FIELD_TYPE_INTEGER:
+		return ""
 	case nemgen.FieldType_FIELD_TYPE_FLOAT,
 		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
-		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return ""
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
-		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
-		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return ""
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
 		nemgen.FieldType_FIELD_TYPE_TEXT,
@@ -42,9 +37,9 @@ func (f FieldTemplate) RepoToMapper() string {
 		nemgen.FieldType_FIELD_TYPE_COLOR,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("mapper.SQLNullFromNull(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
@@ -89,15 +84,13 @@ func (f FieldTemplate) RepoToMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
-		if !f.IsRequired() {
-			return fmt.Sprintf("timestamppb.New(e.%s.ValueOrZero())", gcgstrings.ToCamelCase(f.Identifier()))
-		}
-		return fmt.Sprintf("timestamppb.New(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		return ""
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
 		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+			e := f.Entity
+			return fmt.Sprintf("mapper.StringPtrToSqlNullString(req.%s.%s)", gcgstrings.ToCamelCase(e.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return ""
 	default:
 		return ""
 	}
@@ -192,6 +185,7 @@ func (f FieldTemplate) RepoFromMapper() string {
 		}
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
+		// todo
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
