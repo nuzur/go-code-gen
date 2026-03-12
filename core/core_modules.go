@@ -15,13 +15,12 @@ import (
 )
 
 type coreSubModuleRequest struct {
-	Project      *project.Project
-	Entity       *nemgen.Entity
-	ModuleDir    string
-	Fields       []entities.FieldTemplate
-	Imports      map[string]any
-	Selects      []repo.SchemaSelectStatement
-	SearchFields []entities.FieldTemplate
+	Project   *project.Project
+	Entity    *nemgen.Entity
+	ModuleDir string
+	Fields    []entities.FieldTemplate
+	Imports   map[string]any
+	Selects   []repo.SchemaSelectStatement
 }
 
 //go:embed templates/**
@@ -59,20 +58,18 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 			continue
 		}
 		selects := repo.ResolveSelectStatements(project, e)
-		searchFields := GetSearchFields(project, e)
 		fields, imports := entities.ResolveFieldsAndImports(project, e.Fields, e)
 		// remove uuid import if not needed
 		if imports["github.com/gofrs/uuid"] == true {
 			delete(imports, "github.com/gofrs/uuid")
 		}
 		req := coreSubModuleRequest{
-			Project:      project,
-			Entity:       e,
-			ModuleDir:    moduleDir,
-			Fields:       fields,
-			Imports:      imports,
-			Selects:      selects,
-			SearchFields: searchFields,
+			Project:   project,
+			Entity:    e,
+			ModuleDir: moduleDir,
+			Fields:    fields,
+			Imports:   imports,
+			Selects:   selects,
 		}
 
 		// generate base files for entities, module and options
@@ -92,19 +89,13 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 		if err != nil {
 			return err
 		}
+
+		// upsert
+		err = generateUpsert(ctx, req)
+		if err != nil {
+			return err
+		}
 		/*
-			// search
-			err = generateSearch(ctx, req)
-			if err != nil {
-				return err
-			}
-
-			// upsert
-			err = generateUpsert(ctx, req)
-			if err != nil {
-				return err
-			}
-
 			// list
 			err = generateList(ctx, req)
 			if err != nil {

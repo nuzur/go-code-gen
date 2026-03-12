@@ -7,7 +7,6 @@ import (
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/core/repo"
-	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
@@ -21,7 +20,6 @@ type coreModuleTemplate struct {
 	EntityIdentifier  string
 	EntityName        string
 	SelectStatements  []repo.SchemaSelectStatement
-	SearchFields      []entities.FieldTemplate
 }
 
 func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error {
@@ -34,7 +32,6 @@ func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error
 		EntityIdentifier:  req.Entity.Identifier,
 		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
 		SelectStatements:  req.Selects,
-		SearchFields:      req.SearchFields,
 	}
 
 	coreTmplBytes, err := files.GetTemplateBytes(templates, "core_module")

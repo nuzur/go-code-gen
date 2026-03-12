@@ -15,7 +15,15 @@ func (m *module) Upsert(
 	partial bool, 
 	opts ...Option,
 ) (types.UpsertResponse, error) {
-	if req.{{.EntityName}}.{{.PrimaryKey.Name}} == uuid.Nil {		
+	// check if primary keys are set to determine if this is an insert or update	
+	isInsert := true
+	{{range $pk := .PrimaryKeys}}
+	if req.{{$.EntityName}}.{{$pk.Name}} != {{$pk.ZeroValue}} {		
+		isInsert = false
+	}
+	{{end}}
+
+	if isInsert {		
 		return m.Insert(ctx, req, opts...)
 	}
 

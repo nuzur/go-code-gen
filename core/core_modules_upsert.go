@@ -11,6 +11,7 @@ import (
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/maps"
+	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
@@ -22,6 +23,7 @@ type upsertModuleTemplate struct {
 	ProjectIdentifier   string
 	ProjectModule       string
 	PrimaryKeys         []entities.FieldTemplate
+	PrimaryKeysName     string
 	Fields              []entities.FieldTemplate
 	Imports             []string
 	HasVersionField     bool
@@ -30,6 +32,7 @@ type upsertModuleTemplate struct {
 	HasArrayField       bool
 	HasNullString       bool
 	HasNullUUID         bool
+	Project             *project.Project
 }
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
@@ -37,6 +40,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 
 	entityTemplate, _ := entities.ResolveEntityTemplate(req.Entity, req.Project)
 	primaryKeys := entityTemplate.PrimaryKeys()
+	primaryKeysName := entityTemplate.PrimaryKeysName()
 
 	hasArrayField := false
 	hasNullString := false
@@ -61,12 +65,14 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		EntityIdentifier:    req.Entity.Identifier,
 		EntityName:          gcgstrings.ToCamelCase(req.Entity.Identifier),
 		PrimaryKeys:         primaryKeys,
+		PrimaryKeysName:     primaryKeysName,
 		Fields:              req.Fields,
 		Imports:             maps.MapKeys(req.Imports),
 		ShouldPublishEvents: events.ShouldPublishEvents(req.Project, req.Entity.Identifier),
 		HasArrayField:       hasArrayField,
 		HasNullString:       hasNullString,
 		HasNullUUID:         hasNullUUID,
+		Project:             req.Project,
 	}
 
 	versionField := VersionField(req.Fields)

@@ -32,6 +32,14 @@ func (e EntityTemplate) PrimaryKeys() []FieldTemplate {
 	return primaryKeys
 }
 
+func (e EntityTemplate) PrimaryKeysName() string {
+	var primaryKeyNames []string
+	for _, pk := range e.PrimaryKeys() {
+		primaryKeyNames = append(primaryKeyNames, gcgstrings.ToCamelCase(pk.Identifier()))
+	}
+	return strings.Join(primaryKeyNames, "And")
+}
+
 func (e EntityTemplate) VersionField() *FieldTemplate {
 	for _, f := range e.Fields {
 		if f.Identifier() == "version" {

@@ -12,5 +12,7 @@ type UpsertRequest struct {
 }
 
 type UpsertResponse struct {
-	{{.PrimaryKey.Name}} uuid.UUID
+    {{range $pk := .PrimaryKeys}}
+    {{$pk.Name}} {{$pk.GolangType}}
+    {{end}}
 }

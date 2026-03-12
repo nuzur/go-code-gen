@@ -24,9 +24,6 @@ type Module interface {
 	Insert(ctx context.Context, req types.UpsertRequest, opts ...Option) (types.UpsertResponse, error)
 	Update(ctx context.Context, req types.UpsertRequest, partial bool, opts ...Option) (types.UpsertResponse, error)
 
-	{{if ne (len .SearchFields) 0}}
-	Search(ctx context.Context, query string, limit int32, offset int32) (types.Search{{.EntityName}}Response, error)
-	{{end}}		
 }
 
 type module struct {
