@@ -1,0 +1,44 @@
+
+ports:  
+  grpc: {{.API.GRPCPort}}
+
+auth: {{if eq .HasBasicAuth true}} 
+  basic:
+    username: {{ .BasicAuth.Config.Basic.Username }}
+    password: {{ .BasicAuth.Config.Basic.Password }}{{end}}
+  {{if eq .HasJWTAuth true}}jwt:
+    key: {{ .JWTAuth.Config.JWT.Key }}{{end}}
+  {{if eq .HasKeycloakAuth true}}keycloak:
+    hostname: {{ .KeycloakAuth.Config.Keycloak.Hostname }}
+    realm: {{ .KeycloakAuth.Config.Keycloak.Realm }}
+    client_id: {{ .KeycloakAuth.Config.Keycloak.ClientID }}
+    client_secret: {{ .KeycloakAuth.Config.Keycloak.ClientSecret }}{{end}}
+
+{{if eq .KafkaEnabled true}}
+events:
+  enabled: true
+kafka:  
+  version: {{.KafkaConfig.Version}} 
+  brokers: {{range $b := .KafkaConfig.Brokers}}  
+    - {{$b}} {{end}}    
+  topics: {{range $t := .KafkaConfig.Topics}}  
+    - {{$t}} {{end}}
+{{end}}
+
+db:
+  - name: << Database Name Here>>
+    host: << Database Host Here>>
+    port: << Database Port Here>>
+    user: << Database User Here>>
+    pswd: << Database Password Here>>
+    params: << Database Params Here>>
+    driver: "<< Database Driver Here >>"
+
+aws:
+  - region: << AWS Region Here>>
+    key_id: << AWS Key ID Here>>
+    secret: << AWS Secret Here>>
+    bucket: << AWS Bucket Here>>
+
+monitoring:
+  enabled: {{.Monitoring.Enabled}}

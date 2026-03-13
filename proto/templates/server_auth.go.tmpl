@@ -2,8 +2,11 @@ package server
 
 import (
     "context"
+	
+	{{ if .Project.Auth.Enabled }}
 	"fmt"
     "{{.Module}}/auth"
+	{{ end }}
 	{{ if .Project.Monitoring.Enabled }}
     "{{.Module}}/monitoring"
 	{{end}}
@@ -17,10 +20,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-{{ if .Project.Monitoring.Enabled }}
+{{ if and .Project.Monitoring.Enabled .Project.Auth.Enabled }}
 func AuthUnaryServerInterceptor(auth auth.Interface, m *monitoring.Implementation, exceptions []string) grpc.UnaryServerInterceptor {
-{{else}}
+{{else if .Project.Auth.Enabled }}
 func AuthUnaryServerInterceptor(auth auth.Interface, exceptions []string) grpc.UnaryServerInterceptor {
+{{else}}
+func AuthUnaryServerInterceptor(exceptions []string) grpc.UnaryServerInterceptor {
 {{end}}
     return grpc.UnaryServerInterceptor(func (ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error){
 
@@ -31,7 +36,8 @@ func AuthUnaryServerInterceptor(auth auth.Interface, exceptions []string) grpc.U
 		finalExceptions = append(exceptions, finalExceptions...)
 		if slices.Contains(finalExceptions, info.FullMethod) {
 			return handler(ctx, req)
-		}		
+		}	
+		{{ if .Project.Auth.Enabled }}	
 		token, err := GetAuthorizationToken(ctx)       
         if err != nil {
 			{{ if .Project.Monitoring.Enabled }}
@@ -60,7 +66,8 @@ func AuthUnaryServerInterceptor(auth auth.Interface, exceptions []string) grpc.U
 			})
 			{{end}}
             return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("invalid token %v", err))
-        }        
+        }       
+		{{end}} 
         return handler(ctx, req)
     })
 }

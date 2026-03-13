@@ -9,6 +9,7 @@ import (
 	"path"
 
 	"github.com/nuzur/filetools"
+	"github.com/nuzur/go-code-gen/config"
 	"github.com/nuzur/go-code-gen/core/events"
 	"github.com/nuzur/go-code-gen/core/repo"
 	"github.com/nuzur/go-code-gen/entities"
@@ -138,5 +139,8 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 			"ToCamelCase": gcgstrings.ToCamelCase,
 		},
 	})
+
+	// generate config module
+	err = config.GenerateConfig(ctx, project)
 	return err
 }

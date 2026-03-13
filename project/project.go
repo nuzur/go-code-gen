@@ -23,6 +23,8 @@ type Project struct {
 	ProtoDir       string
 	Core           Core
 	Monitoring     Monitoring
+	Auth           Auth
+	API            API
 }
 
 type ProjectParams struct {
@@ -35,6 +37,8 @@ type ProjectParams struct {
 	ProtoDir       string
 	Core           Core
 	Monitoring     Monitoring
+	Auth           Auth
+	API            API
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -74,6 +78,10 @@ func New(params *ProjectParams) (*Project, error) {
 		params.Core.Events.Dir = "event"
 	}
 
+	if params.API.GRPCPort == "" {
+		params.API.GRPCPort = "50051"
+	}
+
 	// check for go module in root path, if not present, add it
 	// read go.mod if exists and check if module name matches, if not, return error
 	// if go.mod does not exist, create one with the module name
@@ -103,6 +111,8 @@ func New(params *ProjectParams) (*Project, error) {
 		ProtoDir:       params.ProtoDir,
 		Core:           params.Core,
 		Monitoring:     params.Monitoring,
+		Auth:           params.Auth,
+		API:            params.API,
 	}, nil
 }
 
@@ -156,6 +166,9 @@ func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relation
 }
 
 func (p *Project) AuthImport() string {
+	if !p.Auth.Enabled {
+		return ""
+	}
 	authImport := fmt.Sprintf("%s/auth", p.Module)
 	return authImport
 }

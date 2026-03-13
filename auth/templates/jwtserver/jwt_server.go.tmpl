@@ -1,0 +1,49 @@
+package jwtserver
+
+import (
+	"{{.Identifier}}/core"
+	base "{{.Identifier}}/auth"
+	"net/http"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+	"go.uber.org/config"
+)
+
+
+type Interface interface {
+	SignIn(w http.ResponseWriter, r *http.Request)
+	Validate(w http.ResponseWriter, r *http.Request)
+	Refresh(w http.ResponseWriter, r *http.Request)
+	ClaimsFromHeader(w http.ResponseWriter, r *http.Request) (*Claims, error)
+	HandleHTTP(w http.ResponseWriter, r *http.Request) error
+}
+
+type Implementation struct {
+	core *core.Implementation
+	logger *zap.Logger
+	key string 
+}
+
+type Params struct {
+	fx.In
+	Core *core.Implementation
+	Logger *zap.Logger	
+	Config config.Provider
+}
+
+func New(params Params) (base.Interface, error) {
+	key := params.Config.Get("auth.jwt.key").String()
+	i := Implementation{
+		core: params.Core,
+		logger: params.Logger,
+		key: key,
+	}
+
+	http.HandleFunc("/signin", i.SignIn)
+	http.HandleFunc("/validate", i.Validate)
+	http.HandleFunc("/refresh", i.Refresh)
+
+	log := params.Logger
+	log.Info(`Serving JWT AUTH HTTP: /signin, /refresh, /validate`)
+	return &i, nil
+}
