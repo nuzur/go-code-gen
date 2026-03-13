@@ -4,15 +4,15 @@ ports:
 
 auth: {{if eq .HasBasicAuth true}} 
   basic:
-    username: {{ .BasicAuth.Config.Basic.Username }}
-    password: {{ .BasicAuth.Config.Basic.Password }}{{end}}
+    username: {{ .Auth.Config.Basic.Username }}
+    password: {{ .Auth.Config.Basic.Password }}{{end}}
   {{if eq .HasJWTAuth true}}jwt:
-    key: {{ .JWTAuth.Config.JWT.Key }}{{end}}
+    key: {{ .Auth.Config.JWT.Key }}{{end}}
   {{if eq .HasKeycloakAuth true}}keycloak:
-    hostname: {{ .KeycloakAuth.Config.Keycloak.Hostname }}
-    realm: {{ .KeycloakAuth.Config.Keycloak.Realm }}
-    client_id: {{ .KeycloakAuth.Config.Keycloak.ClientID }}
-    client_secret: {{ .KeycloakAuth.Config.Keycloak.ClientSecret }}{{end}}
+    hostname: {{ .Auth.Config.Keycloak.Hostname }}
+    realm: {{ .Auth.Config.Keycloak.Realm }}
+    client_id: {{ .Auth.Config.Keycloak.ClientID }}
+    client_secret: {{ .Auth.Config.Keycloak.ClientSecret }}{{end}}
 
 {{if eq .KafkaEnabled true}}
 events:
