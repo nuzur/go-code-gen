@@ -12,13 +12,15 @@ import (
 	{{.Identifier}}config "{{.Module}}/config"
 	coretypes "{{.Module}}/core/types"
     {{$projectIdentifier := .Module}}
-    {{range $entity := .Entities}}
+    {{range $entity := .StandaloneEntities}}
     "{{$projectIdentifier}}/core/module/{{$entity.Identifier}}"	
     {{end}}	
 	"{{.Module}}/core/repository"
+	{{if eq .Monitoring.Enabled true}}
 	"{{.Module}}/monitoring"
-	{{if eq .Events.Enabled true}}
-	"{{.Module}}/core/events"
+	{{end}}
+	{{if eq .Core.Events.Enabled true}}
+	"{{.Module}}/core/event"
 	{{end}}
 	
 )
@@ -26,11 +28,13 @@ import (
 type Implementation struct {
 	db 			   *sql.DB
 	repository     *repository.Implementation
-    {{range $entity := .Entities}}
+    {{range $entity := .StandaloneEntities}}
     {{$entity.Identifier}}       {{$entity.Identifier}}.Module
     {{end}}	
+	{{if eq .Monitoring.Enabled true}}
 	monitoring *monitoring.Implementation
-	{{if eq .Events.Enabled true}}
+	{{end}}
+	{{if eq .Core.Events.Enabled true}}
 	events *events.Implementation
 	{{end}}
 }
@@ -39,8 +43,10 @@ type Params struct {
 	fx.In
 	Provider config.Provider
 	Lifecycle fx.Lifecycle	
+	{{if eq .Monitoring.Enabled true}}
 	Monitoring *monitoring.Implementation
-	{{if eq .Events.Enabled true}}
+	{{end}}
+	{{if eq .Core.Events.Enabled true}}
 	Events *events.Implementation
 	{{end}}
 }
@@ -78,8 +84,10 @@ func New(params Params) (*Implementation, error) {
 	return &Implementation{
 		db: db,
 		repository: repository,
+		{{if eq .Monitoring.Enabled true}}
 		monitoring: params.Monitoring,
-		{{if eq .Events.Enabled true}}
+		{{end}}
+		{{if eq .Core.Events.Enabled true}}
 		events: params.Events,
 		{{end}}
 	}, nil
@@ -94,13 +102,16 @@ func (i *Implementation) DB() *sql.DB{
 	return i.db
 }
 
-{{$events := .Events}}
-{{range $entity := .Entities}}
+{{$events := .Core.Events}}
+{{$monitoring := .Monitoring}}
+{{range $entity := .StandaloneEntities}}
 func (i Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identifier}}.Module {
 	if i.{{$entity.Identifier}} == nil {
 		i.{{$entity.Identifier}} = {{$entity.Identifier}}.New(coretypes.ModuleParams{
 		 Repository:i.repository,
+		 {{if eq $monitoring.Enabled true}}
 		 Monitoring: i.monitoring,
+		 {{end}}
 		 {{if eq $events.Enabled true}}
 		 Events: i.events,
 		 {{end}}

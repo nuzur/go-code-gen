@@ -72,6 +72,7 @@ func generateEntityProtoFile(
 		}
 		protoEntityTemplate = &ProtoEntityTemplate{
 			Entity:                e,
+			Project:               project,
 			ProjectIdentifier:     project.Identifier,
 			ProjectModule:         project.Module,
 			OriginalIdentifier:    e.Identifier,
@@ -177,6 +178,7 @@ func generateProtoFiles(ctx context.Context, protoDir string, project *project.P
 			Module:     project.Module,
 			Name:       gcgstrings.ToCamelCase(project.Identifier),
 			Entities:   entityTemplates,
+			Project:    project,
 		},
 		DisableGoFormat: true,
 		Funcs: template.FuncMap{

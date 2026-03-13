@@ -29,6 +29,17 @@ func (f FieldTemplate) JSONIdentifier() string {
 	return "json"
 }
 
+func (f FieldTemplate) DependantEntity() *nemgen.Entity {
+	rel := f.Project.GetRelationshipFromField(f.Field)
+	if rel != nil {
+		dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+		if dependantEntity != nil {
+			return dependantEntity
+		}
+	}
+	return nil
+}
+
 func (f FieldTemplate) Tags() string {
 	return fmt.Sprintf("`json:\"%s\"`", f.Identifier())
 }

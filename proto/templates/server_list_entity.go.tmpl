@@ -7,7 +7,9 @@ import (
 	
 	"{{.ProjectModule}}/core/module/{{.FinalIdentifier}}/types"
 	pb "{{.ProjectModule}}/idl/gen"
+	{{ if .Project.Monitoring.Enabled }}
 	"{{.ProjectModule}}/monitoring"
+	{{end}}
 	pbmapper "{{.ProjectModule}}/idl/mapper"
 
 	"go.einride.tech/aip/filtering"
@@ -68,6 +70,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 	
 	req, pageToken, err := BuildList{{.NamePlural}}Request(ctx, request)
 	if err != nil {
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.FinalIdentifier}}_request",
 			Message: "error building List{{.NamePlural}} request",
@@ -78,12 +81,14 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 			Data: request,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
 	// Query the storage.
 	result, err := s.core.{{.Name}}().List(ctx, req)
 	if err != nil {
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.FinalIdentifier}}",
 			Message: "error calling core in List{{.NamePlural}}",
@@ -94,6 +99,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 			Data: request,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
@@ -106,6 +112,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 		response.NextPageToken = pageToken.Next(request).String()
 	}
 
+	{{ if .Project.Monitoring.Enabled }}
 	s.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "list_{{.FinalIdentifier}}",
 		Message: "successfully handled List{{.NamePlural}}",
@@ -115,6 +122,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 		Type: monitoring.EmitTypeSuccess,
 		Data: request,				
 	})
+	{{end}}
 	// Respond.
 	return response, nil
 }

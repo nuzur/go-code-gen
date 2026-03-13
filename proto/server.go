@@ -26,6 +26,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 			Module:     project.Module,
 			Name:       gcgstrings.ToCamelCase(project.Identifier),
 			AuthImport: project.AuthImport(),
+			Project:    project,
 		},
 		DisableGoFormat: false,
 	})
@@ -46,6 +47,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 			Module:     project.Module,
 			Name:       gcgstrings.ToCamelCase(project.Identifier),
 			AuthImport: project.AuthImport(),
+			Project:    project,
 		},
 		DisableGoFormat: false,
 	})
@@ -54,6 +56,9 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 	}
 
 	for _, se := range entityTemplates {
+		if se.Entity.Type == nemgen.EntityType_ENTITY_TYPE_DEPENDENT {
+			continue
+		}
 		fmt.Printf("--[GCG][Proto] Generating create: %v\n", se.FinalIdentifier)
 		tmplBytesCreate, err := files.GetTemplateBytes(templates, "server_create_entity")
 		if err != nil {
@@ -165,7 +170,7 @@ func getEntityDeclarations(e *ProtoEntityTemplate, allEntities []*ProtoEntityTem
 			// check if there is an enum defined for this field, if so return that, otherwise return int
 			enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 			if enum != nil {
-				enumType := f.ProtoType
+				enumType := gcgstrings.ToCamelCase(enum.Identifier)
 				entityRes.Fields = append(entityRes.Fields, ProtoFieldDeclaration{
 					Name:      finalIdentifier,
 					Filtering: fmt.Sprintf("pb.%s(0).Type()", enumType),

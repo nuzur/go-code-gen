@@ -110,6 +110,16 @@ func (p *Project) Entities() []*nemgen.Entity {
 	return p.ProjectVersion.Entities
 }
 
+func (p *Project) StandaloneEntities() []*nemgen.Entity {
+	var res []*nemgen.Entity
+	for _, e := range p.ProjectVersion.Entities {
+		if e.Type == nemgen.EntityType_ENTITY_TYPE_STANDALONE {
+			res = append(res, e)
+		}
+	}
+	return res
+}
+
 func (p *Project) Enums() []*nemgen.Enum {
 	return p.ProjectVersion.Enums
 }

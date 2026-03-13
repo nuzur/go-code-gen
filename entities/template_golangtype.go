@@ -237,3 +237,73 @@ func (f FieldTemplate) ZeroValue() string {
 		return "interface{}"
 	}
 }
+
+func (f FieldTemplate) ListType() string {
+	switch f.Field.Type {
+	case nemgen.FieldType_FIELD_TYPE_INVALID:
+		return "interface{}"
+	case nemgen.FieldType_FIELD_TYPE_UUID:
+		return "StringFieldType"
+	case nemgen.FieldType_FIELD_TYPE_INTEGER:
+		return "IntFieldType"
+	case nemgen.FieldType_FIELD_TYPE_FLOAT, nemgen.FieldType_FIELD_TYPE_DECIMAL:
+		return "FloatFieldType"
+	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
+		return "BooleanFieldType"
+	case nemgen.FieldType_FIELD_TYPE_CHAR,
+		nemgen.FieldType_FIELD_TYPE_VARCHAR,
+		nemgen.FieldType_FIELD_TYPE_TEXT,
+		nemgen.FieldType_FIELD_TYPE_ENCRYPTED,
+		nemgen.FieldType_FIELD_TYPE_EMAIL,
+		nemgen.FieldType_FIELD_TYPE_PHONE,
+		nemgen.FieldType_FIELD_TYPE_URL,
+		nemgen.FieldType_FIELD_TYPE_LOCATION,
+		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
+		return "StringFieldType"
+	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
+		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+			return "[]byte"
+		}
+
+		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+			return "[]string"
+		}
+
+		return "StringFieldType"
+	case nemgen.FieldType_FIELD_TYPE_ENUM:
+		// check if there is an enum defined for this field, if so return that, otherwise return int
+		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		if enum != nil {
+			if f.Field.TypeConfig.Enum.AllowMultiple {
+				return "MultiEnumFieldType"
+			}
+			return "SingleEnumFieldType"
+		}
+		return "IntFieldType"
+	case nemgen.FieldType_FIELD_TYPE_JSON:
+		rel := f.Project.GetRelationshipFromField(f.Field)
+		if rel != nil {
+			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+			if dependantEntity != nil {
+				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
+					return "SingleDependantEntityFieldType"
+				}
+				return "MultiDependantEntityFieldType"
+			}
+		}
+		return "RawJSONFieldType"
+	case nemgen.FieldType_FIELD_TYPE_ARRAY:
+		return f.ArrayGolangType()
+	case nemgen.FieldType_FIELD_TYPE_DATE,
+		nemgen.FieldType_FIELD_TYPE_DATETIME,
+		nemgen.FieldType_FIELD_TYPE_TIME:
+		return "TimestampFieldType"
+	case nemgen.FieldType_FIELD_TYPE_SLUG:
+		return "StringFieldType"
+	default:
+		return "interface{}"
+	}
+}

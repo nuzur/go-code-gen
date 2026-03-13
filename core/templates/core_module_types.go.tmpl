@@ -2,16 +2,20 @@ package types
 
 import (
     "{{.Module}}/core/repository"
-    {{if eq .Events.Enabled true}}
-    "{{.Module}}/core/events"
+    {{if eq .Core.Events.Enabled true}}
+    "{{.Module}}/core/event"
     {{end}}
+    {{if eq .Monitoring.Enabled true}}
     "{{.Module}}/monitoring"
+    {{end}}
 )
 
 type ModuleParams struct {    
     Repository *repository.Implementation
+    {{if eq .Monitoring.Enabled true}}
     Monitoring *monitoring.Implementation
-    {{if eq .Events.Enabled true}}
+    {{end}}
+    {{if eq .Core.Events.Enabled true}}
     Events     *events.Implementation
     {{end}}
 }

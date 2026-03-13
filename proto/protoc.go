@@ -29,6 +29,7 @@ func generateProtoc(ctx context.Context, protoDir string, project *project.Proje
 			Module:     project.Module,
 			Name:       gcgstrings.ToCamelCase(project.Identifier),
 			Entities:   entityTemplates,
+			Project:    project,
 		},
 		DisableGoFormat: true,
 	})

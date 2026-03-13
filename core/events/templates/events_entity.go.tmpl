@@ -1,6 +1,7 @@
 package events 
 
 import(
+    "strings"
     "time"
     "encoding/json"
 )
@@ -9,7 +10,7 @@ func (i *Implementation) ProduceEntityInserted(e EventEntity) error {
     event := Event{
         Type: "entity",
         Identifier: e.EntityIdentifier(),
-        SubIdentifier: e.PrimaryKeyValue(),
+        SubIdentifier: strings.Join(e.PrimaryKeyValues(),"::"),
         Action:"create",
         NewData: e.String(),    
         Timestamp: time.Now(),
@@ -27,7 +28,7 @@ func (i *Implementation) ProduceEntityUpdated(new EventEntity, old EventEntity) 
     event := Event{
         Type: "entity",
         Identifier: new.EntityIdentifier(),
-        SubIdentifier: new.PrimaryKeyValue(),
+        SubIdentifier: strings.Join(new.PrimaryKeyValues(),"::"),
         Action:"update",
         NewData: new.String(),  
         OldData: old.String(),  

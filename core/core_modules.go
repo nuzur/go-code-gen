@@ -4,13 +4,17 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"html/template"
 	"os"
 	"path"
 
+	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/core/events"
 	"github.com/nuzur/go-code-gen/core/repo"
 	"github.com/nuzur/go-code-gen/entities"
+	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -33,7 +37,8 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	}
 
 	projectDir := project.Dir()
-	moduleDir := path.Join(projectDir, project.Core.CoreDir, "module")
+	coreDir := path.Join(projectDir, project.Core.CoreDir)
+	moduleDir := path.Join(coreDir, "module")
 
 	err = os.RemoveAll(moduleDir)
 	if err != nil {
@@ -103,37 +108,35 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 		}
 	}
 
-	/*
-		// generate module types
-		typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_types")
-		if err != nil {
-			return fmt.Errorf("getting template bytes for core module types: %v", err)
-		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
-			OutputPath:    path.Join(moduleDir, "types", "types.go"),
-			TemplateBytes: typeTmplBytes,
-			Data:          project,
-			Funcs: template.FuncMap{
-				"ToCamelCase": gcgstrings.ToCamelCase,
-			},
-		})
-		if err != nil {
-			return err
-		}
+	// generate module types
+	typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_types")
+	if err != nil {
+		return fmt.Errorf("getting template bytes for core module types: %v", err)
+	}
+	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		OutputPath:    path.Join(coreDir, "types", "types.go"),
+		TemplateBytes: typeTmplBytes,
+		Data:          project,
+		Funcs: template.FuncMap{
+			"ToCamelCase": gcgstrings.ToCamelCase,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
-		// generate main module
-		coreTmplBytes, err := files.GetTemplateBytes(templates, "core_main")
-		if err != nil {
-			return fmt.Errorf("getting template bytes for core module types: %v", err)
-		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
-			OutputPath:    path.Join(moduleDir, "core.go"),
-			TemplateBytes: coreTmplBytes,
-			Data:          project,
-			Funcs: template.FuncMap{
-				"ToCamelCase": gcgstrings.ToCamelCase,
-			},
-		})*/
-
+	// generate main module
+	coreTmplBytes, err := files.GetTemplateBytes(templates, "core_main")
+	if err != nil {
+		return fmt.Errorf("getting template bytes for core module types: %v", err)
+	}
+	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		OutputPath:    path.Join(coreDir, "core.go"),
+		TemplateBytes: coreTmplBytes,
+		Data:          project,
+		Funcs: template.FuncMap{
+			"ToCamelCase": gcgstrings.ToCamelCase,
+		},
+	})
 	return err
 }

@@ -3,8 +3,7 @@ package {{.Package}}
 import (
     "fmt"
     "encoding/json"
-    
-    {{$timeImport := false}}    
+         
     {{range $import := .Imports}}
     "{{$import}}" {{end}}
     
@@ -20,16 +19,11 @@ func (e {{.EntityName}}) String() string {
     return string(res)
 }
 
-func (e {{.EntityName}}) EntityIdentifier() string {    
-    return "{{.Identifier}}"
-}
-
-func (e {{.EntityName}}) OrderedFieldIdentifiers() []string {
-    res := []string{}
-    {{range $field := .Fields -}}
-    res = append(res, "{{$field.Identifier}}")
+func (e {{.EntityName}}) PrimaryKeyValues() []string {  
+    return []string{
+    {{range $pk := .PrimaryKeys}}e.{{$pk.Name}}.String(),
     {{end}}
-    return res
+    }    
 }
 
 func {{.EntityName}}FromJSON(data json.RawMessage) {{.EntityName}} {

@@ -1,11 +1,17 @@
 {
     "cSpell.words": [
         "Configvalues",
+        "einride",
+        "entitytypes",
         "filetools",
         "gcgstrings",
+        "genproto",
         "gofrs",
         "MYSQLDB",
         "nemgen",
+        "Println",
+        "protoreflect",
+        "Sprintf",
         "SQLC",
         "strcase",
         "templatefuncs",

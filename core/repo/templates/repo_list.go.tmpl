@@ -20,8 +20,6 @@ func New() *Implementation {
 	}
 }
 
-
-
 func (i *Implementation) BuildListEntityQuery(
 	ctx context.Context,
 	request ListRequest,
@@ -37,7 +35,7 @@ func (i *Implementation) BuildListEntityQuery(
 	}
 	if len(includeColumns) > 0 {
 		columns := []string{}
-		fieldMap := entity.FieldIdentfierToTypeMap()
+		fieldMap := entity.FieldIdentifierToTypeMap()
 		for _, c := range includeColumns {
 			if _, found := fieldMap[c]; found {
 				columns = append(columns, fmt.Sprintf("%s.%s", entity.EntityIdentifier(), c))
@@ -96,10 +94,20 @@ func (i *Implementation) BuildListEntityQuery(
 			finalWhereClause = fmt.Sprintf("%s AND (%s)", whereClause, request.GetJoinParams().JoinWhereClauses)
 		}
 		if onlyCount {
-			return fmt.Sprintf(
-				"SELECT DISTINCT count(%s.%s) FROM %s %s %s WHERE %s",
-				entity.EntityIdentifier(),
-				entity.PrimaryKeyIdentifier(),
+			pks := entity.PrimaryKeyIdentifiers()
+			if (len(pks) == 1){
+				return fmt.Sprintf(
+					"SELECT DISTINCT count(%s.%s) FROM %s %s %s WHERE %s",
+					entity.EntityIdentifier(),
+					pks[0],
+					entity.EntityIdentifier(),
+					request.GetJoinParams().JoinStatement,
+					jsonTablesFinal,
+					finalWhereClause,
+				), nil
+			}
+			 return fmt.Sprintf(
+				"SELECT DISTINCT count(*) FROM %s %s %s WHERE %s",
 				entity.EntityIdentifier(),
 				request.GetJoinParams().JoinStatement,
 				jsonTablesFinal,
@@ -118,13 +126,22 @@ func (i *Implementation) BuildListEntityQuery(
 		), nil
 	}
 	if onlyCount {
-		return fmt.Sprintf(
-			"SELECT DISTINCT count(%s.%s) FROM %s %s WHERE %s",
-			entity.EntityIdentifier(),
-			entity.PrimaryKeyIdentifier(),
+		pks := entity.PrimaryKeyIdentifiers()
+		if (len(pks) == 1){
+			return fmt.Sprintf(
+				"SELECT DISTINCT count(%s.%s) FROM %s %s WHERE %s",
+				entity.EntityIdentifier(),
+				pks[0],
+				entity.EntityIdentifier(),
+				jsonTablesFinal,
+				whereClause,			
+			), nil
+		}
+		 return fmt.Sprintf(
+			"SELECT DISTINCT count(*) FROM %s %s WHERE %s",
 			entity.EntityIdentifier(),
 			jsonTablesFinal,
-			whereClause,			
+			whereClause,
 		), nil
 	}
 	return fmt.Sprintf(
@@ -197,11 +214,11 @@ func buildSingleClause(cex *expr.Expr_Call, entity ListEntity, declarations *fil
 		declarations:            declarations,
 		fieldIdentifier:         fieldIdentifier,
 		isDependant:             isDependant,
-		dependantFieldIdentifer: dependantField,
+		dependantFieldIdentifier: dependantField,
 		entity:                  entity,
 	}
 
-	fieldMap := entity.FieldIdentfierToTypeMap()
+	fieldMap := entity.FieldIdentifierToTypeMap()
 	fieldType := fieldMap[fieldIdentifier]
 	return handleClauseByType(request, entity, fieldType)
 }
@@ -243,18 +260,18 @@ func buildOrderByClause(request ListRequest, entity ListEntity, jsonTables map[s
 				/* 
 				json_table_name, json_table := resolveJSONTable(SingleClauseRequest{
 					fieldIdentifier:         f.fieldIdentifier,
-					dependantFieldIdentifer: f.dependantFieldIdentifer,
+					dependantFieldIdentifier: f.dependantFieldIdentifier,
 					isDependant:             f.isDependant,
 					isDependantMulti:        f.isDependantMulti,
 				}, entitytypes.FieldTypeToSQL(f.fieldType))
 				jsonTables[json_table_name] = json_table
-				orderByPairs = append(orderByPairs, fmt.Sprintf("%s.%s %s", json_table_name, f.dependantFieldIdentifer, order))
+				orderByPairs = append(orderByPairs, fmt.Sprintf("%s.%s %s", json_table_name, f.dependantFieldIdentifier, order))
 				*/
 				return "", errors.New("dependant list entities are not supported in sorting")
 			} else {
 				left := buildJSONExtract(SingleClauseRequest{
 					fieldIdentifier:         f.fieldIdentifier,
-					dependantFieldIdentifer: f.dependantFieldIdentifer,
+					dependantFieldIdentifier: f.dependantFieldIdentifier,
 					isDependant:             f.isDependant,
 					isDependantMulti:        f.isDependantMulti,
 				})
@@ -269,7 +286,7 @@ func buildOrderByClause(request ListRequest, entity ListEntity, jsonTables map[s
 func isValidOrderby(request ListRequest, entity ListEntity) ([]OrderByField, error) {
 	res := []OrderByField{}
 	fields := request.GetOrderBy().Fields
-	fieldsMap := entity.FieldIdentfierToTypeMap()
+	fieldsMap := entity.FieldIdentifierToTypeMap()
 	dependantFieldMap := entity.DependantFieldIdentifierToTypeMap()
 	if len(fields) > 0 {
 		for _, f := range fields {
@@ -298,7 +315,7 @@ func isValidOrderby(request ListRequest, entity ListEntity) ([]OrderByField, err
 					isDependant:             true,
 					isDependantMulti:        isDependantMulti,
 					fieldIdentifier:         parts[0],
-					dependantFieldIdentifer: parts[1],
+					dependantFieldIdentifier: parts[1],
 					desc:                    f.Desc,
 					fieldType:               subFieldType,
 				})

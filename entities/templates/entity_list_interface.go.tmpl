@@ -1,0 +1,47 @@
+package {{.Package}}
+
+import (
+    entitytypes "{{.Project.Module}}/entity/types"
+    
+    {{range $import := .Imports}} {{if and (ne $import "github.com/gofrs/uuid") (ne $import "github.com/guregu/null/v6") (ne $import "github.com/mklfarha/sfapi/enum") (ne $import "time")  }}
+    "{{$import}}" {{end}} {{end}}
+)
+
+func (e {{.EntityName}}) FieldIdentifierToTypeMap() map[string]entitytypes.FieldType {
+    return map[string]entitytypes.FieldType{
+        {{range $field := .Fields}}"{{$field.Identifier}}": entitytypes.{{$field.ListType}},
+        {{end}}
+    }
+}
+
+func (e {{.EntityName}}) OrderedFieldIdentifiers() []string {
+    res := []string{}
+    {{range $field := .Fields -}}
+    res = append(res, "{{$field.Identifier}}")
+    {{end}}
+    return res
+}
+
+func (e {{.EntityName}}) DependantFieldIdentifierToTypeMap() map[string]map[string]entitytypes.FieldType {
+    res := make(map[string]map[string]entitytypes.FieldType)
+    {{range $field := .Fields}} {{if and (eq $field.JSON true) (ne $field.DependantEntity nil)}}
+    res["{{$field.Identifier}}"] = {{$field.DependantEntity.Identifier}}.{{$field.GolangType}}{}.FieldIdentifierToTypeMap(){{end}}{{end}}
+    return res 
+}
+
+func (e {{.EntityName}}) EntityIdentifier() string {    
+    return "{{.Identifier}}"
+}
+
+func (e {{.EntityName}}) PrimaryKeyIdentifiers() []string {    
+    return []string{ 
+        {{range $pk := .PrimaryKeys}}"{{$pk.Identifier}}",{{end}}
+    }    
+}
+
+func (e {{.EntityName}}) ArrayFieldIdentifierToType() map[string]entitytypes.FieldType {
+    res := make(map[string]entitytypes.FieldType)
+    {{range $field := .Fields}} {{if eq $field.Array true}}
+    res["{{$field.Identifier}}"] = entitytypes.{{$field.ArrayGenFieldType}}{{end}}{{end}}
+    return res 
+}

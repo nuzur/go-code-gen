@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/iancoleman/strcase"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
@@ -18,8 +19,8 @@ import (
 var templates embed.FS
 
 type ProtoEntityTemplate struct {
-	Entity *nemgen.Entity
-
+	Entity                *nemgen.Entity
+	Project               *project.Project
 	ProjectIdentifier     string
 	ProjectModule         string
 	ParentIdentifier      string
@@ -39,11 +40,11 @@ type ProtoEntityTemplate struct {
 
 func (et ProtoEntityTemplate) PrimaryKeysName() string {
 	if len(et.PrimaryKeys) == 1 {
-		return et.PrimaryKeys[0].Name()
+		return strcase.ToCamel(et.PrimaryKeys[0].Identifier())
 	} else {
 		names := []string{}
 		for _, pk := range et.PrimaryKeys {
-			names = append(names, pk.Name())
+			names = append(names, strcase.ToCamel(pk.Identifier()))
 		}
 		return strings.Join(names, "And")
 	}
@@ -75,6 +76,7 @@ type ProtoServiceTemplate struct {
 	Name       string
 	Entities   []*ProtoEntityTemplate
 	AuthImport string
+	Project    *project.Project
 }
 
 type GenerateProtoParams struct {

@@ -38,7 +38,7 @@ type Params struct {
 
 type EventEntity interface {
     EntityIdentifier() string
-    PrimaryKeyValue() string
+    PrimaryKeyValues() []string
     String() string
 }
 

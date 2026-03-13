@@ -19,7 +19,11 @@ import (
 //go:embed templates/**
 var templates embed.FS
 
-func GenerateEntities(ctx context.Context, params *project.ProjectParams) error {
+type GenerateEntityParams struct {
+	IncludeListInterface bool
+}
+
+func GenerateEntities(ctx context.Context, params *project.ProjectParams, genParams GenerateEntityParams) error {
 
 	project, err := project.New(params)
 	if err != nil {
@@ -53,11 +57,30 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 			fmt.Printf("ERROR: Getting template bytes for entity: %s\n", e.Identifier)
 			continue
 		}
-		filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(entityDir, fmt.Sprintf("%s.go", e.Identifier)),
 			TemplateBytes: templateBytes,
 			Data:          entityTemplate,
 		})
+		if err != nil {
+			return err
+		}
+
+		if genParams.IncludeListInterface {
+			listTemplateBytes, err := files.GetTemplateBytes(templates, "entity_list_interface")
+			if err != nil {
+				fmt.Printf("ERROR: Getting template bytes for entity list interface: %s\n", e.Identifier)
+				continue
+			}
+			_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+				OutputPath:    path.Join(entityDir, fmt.Sprintf("%s_list.go", e.Identifier)),
+				TemplateBytes: listTemplateBytes,
+				Data:          entityTemplate,
+			})
+			if err != nil {
+				return err
+			}
+		}
 
 	}
 

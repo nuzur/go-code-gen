@@ -14,11 +14,11 @@ type JoinParams struct {
 }
 
 type ListEntity interface {
-	FieldIdentfierToTypeMap() map[string]entitytypes.FieldType
+	FieldIdentifierToTypeMap() map[string]entitytypes.FieldType
 	OrderedFieldIdentifiers() []string
 	DependantFieldIdentifierToTypeMap() map[string]map[string]entitytypes.FieldType
 	EntityIdentifier() string
-	PrimaryKeyIdentifier() string
+	PrimaryKeyIdentifiers() []string
 	ArrayFieldIdentifierToType() map[string]entitytypes.FieldType
 }
 
@@ -32,15 +32,15 @@ type ListRequest interface {
 }
 
 type SingleClauseRequest struct {
-	cex                     *expr.Expr_Call
-	declarations            *filtering.Declarations
-	fieldIdentifier         string
-	isDependant             bool
-	isDependantMulti        bool
-	dependantFieldIdentifer string
-	isArray 				bool
-	arrayType 				entitytypes.FieldType
-	entity                  ListEntity
+	cex                      *expr.Expr_Call
+	declarations             *filtering.Declarations
+	fieldIdentifier          string
+	isDependant              bool
+	isDependantMulti         bool
+	dependantFieldIdentifier string
+	isArray 				 bool
+	arrayType 				 entitytypes.FieldType
+	entity                   ListEntity
 }
 
 type SingleClauseResponse struct {
@@ -50,11 +50,11 @@ type SingleClauseResponse struct {
 }
 
 type OrderByField struct {
-	path                    string
-	isDependant             bool
-	isDependantMulti        bool
-	fieldIdentifier         string
-	dependantFieldIdentifer string
-	desc                    bool
-	fieldType               entitytypes.FieldType
+	path                     string
+	isDependant              bool
+	isDependantMulti         bool
+	fieldIdentifier          string
+	dependantFieldIdentifier string
+	desc                     bool
+	fieldType                entitytypes.FieldType
 }

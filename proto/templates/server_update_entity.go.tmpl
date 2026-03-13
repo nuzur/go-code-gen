@@ -6,7 +6,9 @@ import (
 	"{{.ProjectModule}}/core/module/{{.FinalIdentifier}}/types"
 	pb "{{.ProjectModule}}/idl/gen"
 	pbmapper "{{.ProjectModule}}/idl/mapper"
+	{{ if .Project.Monitoring.Enabled }}
 	"{{.ProjectModule}}/monitoring"
+	{{end}}
 	"go.einride.tech/aip/fieldmask"
 	"strings"	
 )
@@ -29,6 +31,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 	
 	err := fieldmask.Validate(req.UpdateMask, req)
 	if err != nil {
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "update_{{.FinalIdentifier}}",
 			Message: "error validating fieldmask in Update{{.Name}}",
@@ -39,6 +42,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 			Data: req,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
@@ -65,6 +69,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 		{{.Name}}: pbmapper.{{.Name}}FromProto(req.Get{{.Name}}()),
 	}, !isFull)
 	if err != nil {
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "update_{{.FinalIdentifier}}",
 			Message: "error calling core upsert in Update{{.Name}}",
@@ -75,11 +80,13 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 			Data: req,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
 	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res))
 	if err != nil {
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "update_{{.FinalIdentifier}}",
 			Message: "error fetching after upsert in Update{{.Name}}",
@@ -90,11 +97,13 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 			Data: req,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
 	if len(fetchRes.Results) == 0 {
 		err := errors.New("error fetching entity")
+		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "update_{{.FinalIdentifier}}",
 			Message: "entity not found after upsert in Update{{.Name}}",
@@ -105,9 +114,11 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 			Data: req,			
 			Error: err,		
 		})
+		{{end}}
 		return nil, err
 	}
 
+	{{ if .Project.Monitoring.Enabled }}
 	s.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "update_{{.FinalIdentifier}}",
 		Message: "successfully handled Update{{.Name}}",
@@ -117,5 +128,6 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 		Type: monitoring.EmitTypeSuccess,
 		Data: req,				
 	})
+	{{end}}
 	return pbmapper.{{.Name}}ToProto(fetchRes.Results[0]), nil
 }
