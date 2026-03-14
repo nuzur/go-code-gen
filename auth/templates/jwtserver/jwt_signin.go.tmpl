@@ -54,8 +54,20 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
     }
 
     user := userRes.Results[0]
+	
+	{{ if ne .UserPasswordField nil }}
+	{{$field := .UserPasswordField}}
+	{{if $field.Required}}
+	passwordStr := user.{{.UserPasswordFieldName}}
+	{{else}}
+	passwordStr := user.{{.UserPasswordFieldName}}.String
+	{{end}}	
+	{{else}}
+	passwordStr := ""
+	{{end}}	
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(creds.Password))
+
+	err = bcrypt.CompareHashAndPassword([]byte(passwordStr), []byte(creds.Password))
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		fmt.Printf("error comparing pwd: %v\n", err)

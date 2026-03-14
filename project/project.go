@@ -130,6 +130,36 @@ func (p *Project) StandaloneEntities() []*nemgen.Entity {
 	return res
 }
 
+func (p *Project) UserEntity() *nemgen.Entity {
+	for _, e := range p.ProjectVersion.Entities {
+		if e.Identifier == "user" {
+			return e
+		}
+	}
+	return nil
+}
+
+func (p *Project) UserPasswordField() *nemgen.Field {
+	userEntity := p.UserEntity()
+	if userEntity == nil {
+		return nil
+	}
+	for _, f := range userEntity.Fields {
+		if f.Identifier == "password" || f.Identifier == "pass" || f.Identifier == "pwd" || f.Identifier == "password_hash" {
+			return f
+		}
+	}
+	return nil
+}
+
+func (p *Project) UserPasswordFieldName() string {
+	passwordField := p.UserPasswordField()
+	if passwordField == nil {
+		return ""
+	}
+	return gcgstrings.ToCamelCase(passwordField.Identifier)
+}
+
 func (p *Project) Enums() []*nemgen.Enum {
 	return p.ProjectVersion.Enums
 }

@@ -10,6 +10,12 @@ import (
 	"errors"
 	"{{.Module}}/core/module/user/types"
 	"github.com/gofrs/uuid"
+	{{ if ne .UserPasswordField nil }}
+	{{$field := .UserPasswordField}}
+	{{if eq $field.Required false}}
+	"github.com/guregu/null/v6"
+	{{end}}
+	{{end}}
 )
 
 func (i *Implementation) Validate(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +57,16 @@ func (i *Implementation) Validate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := userRes.Results[0]
-	user.Password = ""
+
+	{{ if ne .UserPasswordField nil }}
+	{{$field := .UserPasswordField}}
+	{{if $field.Required}}
+	user.{{.UserPasswordFieldName}} = ""
+	{{else}}
+	user.{{.UserPasswordFieldName}} = null.String{}
+	{{end}}
+	{{end}}
+	
 	resJson, _ := json.Marshal(user)
 	w.Write(resJson)
 }
