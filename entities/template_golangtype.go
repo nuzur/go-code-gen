@@ -296,7 +296,7 @@ func (f FieldTemplate) ListType() string {
 		}
 		return "RawJSONFieldType"
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return f.ArrayGolangType()
+		return f.ArrayListType()
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
@@ -305,5 +305,40 @@ func (f FieldTemplate) ListType() string {
 		return "StringFieldType"
 	default:
 		return "interface{}"
+	}
+}
+
+func (f FieldTemplate) ArrayListType() string {
+	if f.Field.Type != nemgen.FieldType_FIELD_TYPE_ARRAY {
+		return "interface{}"
+	}
+
+	arrayType := f.Field.TypeConfig.Array.Type
+
+	switch arrayType {
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID:
+		return "interface{}"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
+		return "IntFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
+		return "FloatFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
+		return "FloatFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
+		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
+		return "StringFieldType"
+	default:
+		return "[]interface{}"
 	}
 }

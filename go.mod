@@ -15,7 +15,6 @@ require (
 )
 
 require (
-	github.com/gertd/go-pluralize v0.2.1
 	github.com/nuzur/extension-sdk v0.0.67
 	github.com/nuzur/sql-gen v1.0.64
 	github.com/otiai10/copy v1.14.1

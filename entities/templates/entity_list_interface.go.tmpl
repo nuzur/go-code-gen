@@ -1,9 +1,10 @@
 package {{.Package}}
 
+{{$projectModule := .Project.Module}}
 import (
     entitytypes "{{.Project.Module}}/entity/types"
     
-    {{range $import := .Imports}} {{if and (ne $import "github.com/gofrs/uuid") (ne $import "github.com/guregu/null/v6") (ne $import "github.com/mklfarha/sfapi/enum") (ne $import "time")  }}
+    {{range $import := .Imports}} {{if and (ne $import "github.com/gofrs/uuid") (ne $import "github.com/guregu/null/v6") (ne $import (printf "%s/enum" $projectModule)) (ne $import "time")  }}
     "{{$import}}" {{end}} {{end}}
 )
 
@@ -42,6 +43,6 @@ func (e {{.EntityName}}) PrimaryKeyIdentifiers() []string {
 func (e {{.EntityName}}) ArrayFieldIdentifierToType() map[string]entitytypes.FieldType {
     res := make(map[string]entitytypes.FieldType)
     {{range $field := .Fields}} {{if eq $field.Array true}}
-    res["{{$field.Identifier}}"] = entitytypes.{{$field.ArrayGenFieldType}}{{end}}{{end}}
+    res["{{$field.Identifier}}"] = entitytypes.{{$field.ArrayListType}}{{end}}{{end}}
     return res 
 }

@@ -19,8 +19,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func BuildList{{.NamePlural}}Request(ctx context.Context, request *pb.List{{.NamePlural}}Request) (types.ListRequest, *pagination.PageToken, error) {
-	err := validatePageSizeForList{{.NamePlural}}(request)
+func BuildList{{.Name}}Request(ctx context.Context, request *pb.List{{.Name}}Request) (types.ListRequest, *pagination.PageToken, error) {
+	err := validatePageSizeForList{{.Name}}(request)
 	if err != nil {		
 		return types.ListRequest{}, nil, err
 	}
@@ -66,14 +66,14 @@ func BuildList{{.NamePlural}}Request(ctx context.Context, request *pb.List{{.Nam
 	}, &pageToken, nil
 }
 
-func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.NamePlural}}Request) (*pb.List{{.NamePlural}}Response, error) {
+func (s *server) List{{.Name}}(ctx context.Context, request *pb.List{{.Name}}Request) (*pb.List{{.Name}}Response, error) {
 	
-	req, pageToken, err := BuildList{{.NamePlural}}Request(ctx, request)
+	req, pageToken, err := BuildList{{.Name}}Request(ctx, request)
 	if err != nil {
 		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.FinalIdentifier}}_request",
-			Message: "error building List{{.NamePlural}} request",
+			Message: "error building List{{.Name}} request",
 			EntityIdentifier: "{{.FinalIdentifier}}",
 			Layer: monitoring.ProtocolServiceLayer,
 			LayerSubtype: "protobuf",
@@ -91,7 +91,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 		{{ if .Project.Monitoring.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "list_{{.FinalIdentifier}}",
-			Message: "error calling core in List{{.NamePlural}}",
+			Message: "error calling core in List{{.Name}}",
 			EntityIdentifier: "{{.FinalIdentifier}}",
 			Layer: monitoring.ProtocolServiceLayer,
 			LayerSubtype: "protobuf",
@@ -104,8 +104,8 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 	}
 
 	// Build the response.
-	response := &pb.List{{.NamePlural}}Response{
-		{{.NamePlural}}: pbmapper.{{.Name}}SliceToProto(result.{{.NamePlural}}),		
+	response := &pb.List{{.Name}}Response{
+		{{.Name}}: pbmapper.{{.Name}}SliceToProto(result.{{.Name}}),		
 	}
 	// Set the next page token.
 	if result.HasNextPage {
@@ -115,7 +115,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 	{{ if .Project.Monitoring.Enabled }}
 	s.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "list_{{.FinalIdentifier}}",
-		Message: "successfully handled List{{.NamePlural}}",
+		Message: "successfully handled List{{.Name}}",
 		EntityIdentifier: "{{.FinalIdentifier}}",
 		Layer: monitoring.ProtocolServiceLayer,
 		LayerSubtype: "protobuf",
@@ -127,7 +127,7 @@ func (s *server) List{{.NamePlural}}(ctx context.Context, request *pb.List{{.Nam
 	return response, nil
 }
 
-func validatePageSizeForList{{.NamePlural}}(request *pb.List{{.NamePlural}}Request) error {
+func validatePageSizeForList{{.Name}}(request *pb.List{{.Name}}Request) error {
 	// Handle request constraints.
 	const (
 		maxPageSize     = 100

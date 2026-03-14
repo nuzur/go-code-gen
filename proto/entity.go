@@ -6,7 +6,6 @@ import (
 	"path"
 	"text/template"
 
-	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/entities"
@@ -26,7 +25,6 @@ func generateEntityProtoFile(
 	fields := []entities.FieldTemplate{}
 	protoEntityTemplate := &ProtoEntityTemplate{}
 	var err error
-	pl := pluralize.NewClient()
 	imports := map[string]interface{}{}
 	if len(e.Fields) > 0 {
 		for _, f := range e.Fields {
@@ -71,21 +69,19 @@ func generateEntityProtoFile(
 			hasVersionField = true
 		}
 		protoEntityTemplate = &ProtoEntityTemplate{
-			Entity:                e,
-			Project:               project,
-			ProjectIdentifier:     project.Identifier,
-			ProjectModule:         project.Module,
-			OriginalIdentifier:    e.Identifier,
-			FinalIdentifier:       finalIdentifier,
-			FinalIdentifierPlural: pl.Plural(finalIdentifier),
-			Name:                  gcgstrings.ToCamelCase(finalIdentifier),
-			NamePlural:            pl.Plural(gcgstrings.ToCamelCase(finalIdentifier)),
-			Type:                  gcgstrings.ToCamelCase(finalIdentifier),
-			Fields:                fields,
-			PrimaryKeys:           primaryKeys,
-			Search:                true, // needs validation
-			Imports:               imports,
-			HasVersionField:       hasVersionField,
+			Entity:             e,
+			Project:            project,
+			ProjectIdentifier:  project.Identifier,
+			ProjectModule:      project.Module,
+			OriginalIdentifier: e.Identifier,
+			FinalIdentifier:    finalIdentifier,
+			Name:               gcgstrings.ToCamelCase(finalIdentifier),
+			Type:               gcgstrings.ToCamelCase(finalIdentifier),
+			Fields:             fields,
+			PrimaryKeys:        primaryKeys,
+			Search:             true, // needs validation
+			Imports:            imports,
+			HasVersionField:    hasVersionField,
 		}
 
 		tmplBytes, err := files.GetTemplateBytes(templates, "proto_entity")

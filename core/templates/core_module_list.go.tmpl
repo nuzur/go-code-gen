@@ -172,7 +172,7 @@ func (m *module) List(ctx context.Context,
 	})
 	{{end}}
 	return types.ListResponse{
-		{{.EntityNamePlural}}: mapModelsToEntities(items),
+		{{.EntityName}}: mapModelsToEntities(items),
 		HasNextPage: hasNextPage,
 	}, nil	
 }

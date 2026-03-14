@@ -3,7 +3,6 @@ package entities
 import (
 	"strings"
 
-	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
@@ -137,14 +136,8 @@ type FieldTemplate struct {
 		ProtoGenName     string   // field name in generated code by protoc*/
 }
 
-var pluralizeClient = pluralize.NewClient()
-
 func (f FieldTemplate) Identifier() string {
 	return f.Field.Identifier
-}
-
-func (f FieldTemplate) SingularIdentifier() string {
-	return pluralizeClient.Singular(f.Identifier())
 }
 
 func (f FieldTemplate) Name() string {

@@ -19,23 +19,21 @@ import (
 var templates embed.FS
 
 type ProtoEntityTemplate struct {
-	Entity                *nemgen.Entity
-	Project               *project.Project
-	ProjectIdentifier     string
-	ProjectModule         string
-	ParentIdentifier      string
-	OriginalIdentifier    string
-	FinalIdentifier       string
-	FinalIdentifierPlural string
-	Name                  string
-	NamePlural            string
-	Type                  string
-	Fields                []entities.FieldTemplate
-	PrimaryKeys           []entities.FieldTemplate
-	Search                bool
-	Imports               map[string]interface{}
-	Declarations          []ProtoEntityDeclaration
-	HasVersionField       bool
+	Entity             *nemgen.Entity
+	Project            *project.Project
+	ProjectIdentifier  string
+	ProjectModule      string
+	ParentIdentifier   string
+	OriginalIdentifier string
+	FinalIdentifier    string
+	Name               string
+	Type               string
+	Fields             []entities.FieldTemplate
+	PrimaryKeys        []entities.FieldTemplate
+	Search             bool
+	Imports            map[string]interface{}
+	Declarations       []ProtoEntityDeclaration
+	HasVersionField    bool
 }
 
 func (et ProtoEntityTemplate) PrimaryKeysName() string {

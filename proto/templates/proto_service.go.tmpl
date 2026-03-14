@@ -15,7 +15,7 @@ import "{{$entity.FinalIdentifier}}.proto";
 service {{.Name}} {    
     {{range $entity := .Entities}}
     // {{$entity.OriginalIdentifier}} start
-    rpc List{{$entity.NamePlural}}(List{{$entity.NamePlural}}Request) returns (List{{$entity.NamePlural}}Response){}
+    rpc List{{$entity.Name}}(List{{$entity.Name}}Request) returns (List{{$entity.Name}}Response){}
     rpc Create{{$entity.Name}}(Create{{$entity.Name}}Request) returns ({{$entity.Name}}) {}
     rpc Update{{$entity.Name}}(Update{{$entity.Name}}Request) returns ({{$entity.Name}}) {}
     // {{$entity.OriginalIdentifier}} end
@@ -24,7 +24,7 @@ service {{.Name}} {
 
 {{range $entity := .Entities}}
 // {{$entity.OriginalIdentifier}} start
-message List{{$entity.NamePlural}}Request {
+message List{{$entity.Name}}Request {
     // The maximum number of records to return. The service may return fewer than
     // this value.
     int32 page_size = 1;
@@ -40,8 +40,8 @@ message List{{$entity.NamePlural}}Request {
     string order_by = 4;    
 }
 
-message List{{$entity.NamePlural}}Response {
-    repeated {{$entity.Name}} {{$entity.FinalIdentifierPlural}} = 1;
+message List{{$entity.Name}}Response {
+    repeated {{$entity.Name}} {{$entity.FinalIdentifier}} = 1;
 
     // A token that can be sent as `page_token` to retrieve the next page.
     // If this field is omitted, there are no subsequent pages.

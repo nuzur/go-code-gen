@@ -3,7 +3,6 @@ package entities
 import (
 	"fmt"
 
-	"github.com/gertd/go-pluralize"
 	"github.com/iancoleman/strcase"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
@@ -40,7 +39,9 @@ func (f FieldTemplate) ProtoType() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
-		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
+		nemgen.FieldType_FIELD_TYPE_MARKDOWN,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT:
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
 		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
@@ -129,7 +130,6 @@ func (f FieldTemplate) ProtoGenName() string {
 }
 
 func (f FieldTemplate) ProtoToMapper() string {
-	pl := pluralize.NewClient()
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return ""
@@ -160,6 +160,8 @@ func (f FieldTemplate) ProtoToMapper() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
 			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
@@ -189,7 +191,7 @@ func (f FieldTemplate) ProtoToMapper() string {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
 				return fmt.Sprintf("%sSliceToProto(e.%s)", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
 			}
-			return fmt.Sprintf("pb.%s(e.%s)", f.ProtoType(), pl.Singular(gcgstrings.ToCamelCase(f.Identifier())))
+			return fmt.Sprintf("pb.%s(e.%s)", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("int64(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -203,7 +205,7 @@ func (f FieldTemplate) ProtoToMapper() string {
 				return fmt.Sprintf("%sToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return fmt.Sprintf("string(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
@@ -257,6 +259,8 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
 			return fmt.Sprintf("null.StringFrom(m.%s)", strcase.ToCamel(f.Identifier()))
@@ -301,7 +305,7 @@ func (f FieldTemplate) ProtoFromMapper() string {
 				return fmt.Sprintf("%sFromProto(m.Get%s())", gcgstrings.ToCamelCase(dependantEntity.Identifier), strcase.ToCamel(f.Identifier()))
 			}
 		}
-		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
+		return fmt.Sprintf("json.RawMessage([]byte(m.Get%s()))", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,

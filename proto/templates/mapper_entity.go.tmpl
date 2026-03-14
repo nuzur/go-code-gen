@@ -9,12 +9,15 @@ package mapper
 import (
     main_entity "{{.ProjectModule}}/entity/{{.OriginalIdentifier}}"
     pb "{{.ProjectModule}}/idl/gen"
-    {{range $field := .Fields}}{{if and (eq $field.GolangType "time.Time") (eq $timestampImport false)}}
-    "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        
-    {{if and (eq $field.Enum true) (eq $enumImport false)}}
-    "{{$projectModule}}/enum" {{$enumImport = true}}{{end}}
-    {{if and (eq $field.IsNullable true) (eq $nullImport false)}}
-    "github.com/guregu/null/v6" {{$nullImport = true}}{{end}}    
+    {{range $field := .Fields}}
+        {{if and (eq $field.GolangType "time.Time") (eq $timestampImport false)}}
+        "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        
+        {{if and (eq $field.Enum true) (eq $enumImport false)}}
+        "{{$projectModule}}/enum" {{$enumImport = true}}{{end}}
+        {{if and (eq $field.IsNullable true) (eq $nullImport false)}}
+        "github.com/guregu/null/v6" {{$nullImport = true}}{{end}}  
+        {{if (eq $field.IsRawJSON true)}}
+        "encoding/json" {{end}}  
     {{end}}    
     
 )

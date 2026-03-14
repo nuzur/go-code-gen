@@ -60,6 +60,6 @@ func (r ListRequest) GetJoinParams() *list.JoinParams {
 }
 
 type ListResponse struct {
-	{{.EntityNamePlural}} []main_entity.{{.EntityName}}
+	{{.EntityName}} []main_entity.{{.EntityName}}
 	HasNextPage bool
 }

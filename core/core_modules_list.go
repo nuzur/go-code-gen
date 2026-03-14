@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/gertd/go-pluralize"
-
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
@@ -19,20 +17,17 @@ type listData struct {
 	ProjectModule     string
 	EntityIdentifier  string
 	EntityName        string
-	EntityNamePlural  string
 	Fields            []entities.FieldTemplate
 	Project           *project.Project
 }
 
 func generateList(ctx context.Context, req coreSubModuleRequest) error {
 	fmt.Printf("--[GPG] Generating core module list: %s\n", req.Entity.Identifier)
-	pl := pluralize.NewClient()
 	listData := listData{
 		ProjectIdentifier: req.Project.Identifier,
 		ProjectModule:     req.Project.Module,
 		EntityIdentifier:  req.Entity.Identifier,
 		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
-		EntityNamePlural:  pl.Plural(gcgstrings.ToCamelCase(req.Entity.Identifier)),
 		Fields:            req.Fields,
 		Project:           req.Project,
 	}
