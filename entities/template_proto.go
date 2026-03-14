@@ -116,6 +116,12 @@ func (f FieldTemplate) ArrayProtoType() string {
 		return "repeated string"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
 		return "repeated string"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+		return "repeated google.protobuf.Timestamp"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
+		return "repeated google.protobuf.Timestamp"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+		return "repeated google.protobuf.Timestamp"
 	default:
 		return ""
 	}
@@ -207,6 +213,15 @@ func (f FieldTemplate) ProtoToMapper() string {
 		}
 		return fmt.Sprintf("string(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
+		switch f.Field.TypeConfig.Array.Type {
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+			return fmt.Sprintf("UUIDSliceToStringSlice(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
+			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
+			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+			return fmt.Sprintf("TimeSliceToProtoTimeSlice(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		}
+
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
@@ -307,6 +322,14 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		}
 		return fmt.Sprintf("json.RawMessage([]byte(m.Get%s()))", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
+		switch f.Field.TypeConfig.Array.Type {
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+			return fmt.Sprintf("StringSliceToUUIDSlice(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
+			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
+			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+			return fmt.Sprintf("ProtoTimeSliceToTimeSlice(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,

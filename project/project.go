@@ -195,12 +195,18 @@ func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relation
 	return nil
 }
 
-func (p *Project) AuthImport() string {
+func (p Project) AuthImport() string {
 	if !p.AuthConfig.Enabled {
 		return ""
 	}
-	authImport := fmt.Sprintf("%s/auth", p.Module)
-	return authImport
+	if p.HasJWTAuth() && p.AuthConfig.Config.JWT != nil {
+		return fmt.Sprintf("auth \"%s/auth/jwtserver\"", p.Module)
+	}
+
+	if p.HasKeycloakAuth() && p.AuthConfig.Config.Keycloak != nil {
+		return fmt.Sprintf("auth \"%s/auth/keycloak\"", p.Module)
+	}
+	return ""
 }
 
 func (p *Project) FieldsToCamelCase() map[string]string {

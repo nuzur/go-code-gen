@@ -269,8 +269,39 @@ func (f FieldTemplate) RepoFromMapper() string {
 		}
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		// todo
-		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		typeStr := ""
+		switch f.Field.TypeConfig.Array.Type {
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+			typeStr = "UUID"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
+			typeStr = "Int"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
+			typeStr = "Float"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
+			typeStr = "Float"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
+			typeStr = "String"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+			typeStr = "Datetime"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
+			typeStr = "Date"
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+			typeStr = "Time"
+		}
+		return fmt.Sprintf("mapper.JSONTo%sSlice(%s)",
+			typeStr,
+			fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier())),
+		)
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:

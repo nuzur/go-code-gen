@@ -116,7 +116,7 @@ func (f FieldTemplate) ArrayGolangType() string {
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
 		return "[]uuid.UUID"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
-		return "[]int"
+		return "[]int64"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
 		return "[]float64"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
@@ -133,6 +133,12 @@ func (f FieldTemplate) ArrayGolangType() string {
 		return "[]string"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
 		return "[]string"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+		return "[]time.Time"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
+		return "[]time.Time"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+		return "[]time.Time"
 	default:
 		return "[]interface{}"
 	}
@@ -338,6 +344,12 @@ func (f FieldTemplate) ArrayListType() string {
 		return "StringFieldType"
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
 		return "StringFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+		return "TimestampFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
+		return "TimestampFieldType"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+		return "TimestampFieldType"
 	default:
 		return "[]interface{}"
 	}

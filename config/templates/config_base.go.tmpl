@@ -7,12 +7,12 @@ auth: {{if eq .HasBasicAuth true}}
     username: {{ .Auth.Config.Basic.Username }}
     password: {{ .Auth.Config.Basic.Password }}{{end}}
   {{if eq .HasJWTAuth true}}jwt:
-    key: {{ .Auth.Config.JWT.Key }}{{end}}
+    key: {{ .AuthConfig.Config.JWT.Key }}{{end}}
   {{if eq .HasKeycloakAuth true}}keycloak:
-    hostname: {{ .Auth.Config.Keycloak.Hostname }}
-    realm: {{ .Auth.Config.Keycloak.Realm }}
-    client_id: {{ .Auth.Config.Keycloak.ClientID }}
-    client_secret: {{ .Auth.Config.Keycloak.ClientSecret }}{{end}}
+    hostname: {{ .AuthConfig.Config.Keycloak.Hostname }}
+    realm: {{ .AuthConfig.Config.Keycloak.Realm }}
+    client_id: {{ .AuthConfig.Config.Keycloak.ClientID }}
+    client_secret: {{ .AuthConfig.Config.Keycloak.ClientSecret }}{{end}}
 
 {{if eq .KafkaEnabled true}}
 events:

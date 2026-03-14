@@ -17,10 +17,13 @@ sql:
             engine: "mysql"
             go_type:              
               type: "int64"
-          - db_type: "json"
+          - db_type: "json"            
             go_type:
-              type: "[]byte"  # workaround sqlc bug when reading null json columns
-            nullable: true
+              type: "[]byte"  # workaround sqlc bug when reading null json columns            
+          - db_type: "json"  
+            nullable: true            
+            go_type:
+              type: "[]byte"  # workaround sqlc bug when reading null json columns            
           - db_type: datetime
             nullable: true            
             go_type:
@@ -28,6 +31,12 @@ sql:
               package: "null"
               type: "Time"
           - db_type: date
+            nullable: true            
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Time"
+          - db_type: time
             nullable: true            
             go_type:
               import: "github.com/guregu/null/v6"

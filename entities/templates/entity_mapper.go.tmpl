@@ -80,6 +80,16 @@ func JSONToDatetimeSlice(data json.RawMessage) []time.Time {
 	return res
 }
 
+func JSONToTimeSlice(data json.RawMessage) []time.Time {
+	res := []time.Time{}
+	err := json.Unmarshal(data, &res)
+	if err != nil {
+		fmt.Printf("error unmarshaling json to datetime slice: %v \n", err)
+		return []time.Time{}
+	}
+	return res
+}
+
 func SliceToJSON(slice interface{}) json.RawMessage {
     res, err := json.Marshal(slice)
     if err != nil {
