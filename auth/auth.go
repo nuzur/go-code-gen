@@ -21,7 +21,7 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
-	if !p.Auth.Enabled {
+	if !p.AuthConfig.Enabled {
 		fmt.Printf("--[GPG][AUTH] Auth is disabled, skipping auth generation\n")
 		return nil
 	}
@@ -45,7 +45,7 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		return err
 	}
 
-	if p.Auth.Enabled && p.Auth.Type == project.BASIC_AUTH_TYPE {
+	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.BASIC_AUTH_TYPE {
 		err = generateBasicAuth(ctx, authDir, p)
 		if err != nil {
 			return err
@@ -54,7 +54,7 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		fmt.Printf("--[GPG][AUTH] Skip basic auth\n")
 	}
 
-	if p.Auth.Enabled && p.Auth.Type == project.JWT_SERVER_AUTH_TYPE {
+	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.JWT_SERVER_AUTH_TYPE {
 		err := generateBasicJWTServer(ctx, authDir, p)
 		if err != nil {
 			return err
@@ -63,7 +63,7 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		fmt.Printf("--[GPG][AUTH] Skip jwt auth \n")
 	}
 
-	if p.Auth.Enabled && p.Auth.Type == project.KEYCLOAK_AUTH_TYPE {
+	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.KEYCLOAK_AUTH_TYPE {
 		err := generateKeycloakClient(ctx, authDir, p)
 		if err != nil {
 			return err

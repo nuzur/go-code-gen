@@ -1,6 +1,6 @@
 
 ports:  
-  grpc: {{.API.GRPCPort}}
+  grpc: {{.APIConfig.GRPCPort}}
 
 auth: {{if eq .HasBasicAuth true}} 
   basic:
@@ -41,4 +41,4 @@ aws:
     bucket: << AWS Bucket Here>>
 
 monitoring:
-  enabled: {{.Monitoring.Enabled}}
+  enabled: {{.MonitoringConfig.Enabled}}

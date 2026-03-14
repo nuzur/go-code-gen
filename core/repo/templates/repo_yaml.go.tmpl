@@ -5,13 +5,14 @@ sql:
     queries: "sql/queries/"
     gen:
       go:
+        emit_exact_table_names: true
         package: "{{.ProjectIdentifier}}db"
         out: "gen"
         emit_interface: true
         emit_json_tags: true
-        rename:{{range $identifier, $camelCase := .Fields}}
-          {{$identifier}}: {{ $camelCase }}{{end}}
-        overrides:
+        rename: {{range $identifier, $camelCase := .Fields}}
+          {{$identifier}}: {{ $camelCase }}{{end}}        
+        overrides:          
           - db_type: "int"            
             engine: "mysql"
             go_type:              
@@ -80,4 +81,7 @@ sql:
               import: "github.com/guregu/null/v6"
               package: "null"
               type: "Bool"
-          
+overrides:
+  go: 
+    rename:{{range $identifier, $camelCase := .Entities}}
+      {{$identifier}}: {{ $camelCase }}{{end}}

@@ -14,31 +14,31 @@ import (
 )
 
 type Project struct {
-	RootPath       string
-	Identifier     string
-	Module         string
-	Project        *nemgen.Project
-	ProjectVersion *nemgen.ProjectVersion
-	EntitiesDir    string
-	ProtoDir       string
-	Core           Core
-	Monitoring     Monitoring
-	Auth           Auth
-	API            API
+	RootPath         string
+	Identifier       string
+	Module           string
+	Project          *nemgen.Project
+	ProjectVersion   *nemgen.ProjectVersion
+	EntitiesConfig   EntitiesConfig
+	ProtoConfig      ProtoConfig
+	CoreConfig       CoreConfig
+	MonitoringConfig MonitoringConfig
+	AuthConfig       AuthConfig
+	APIConfig        APIConfig
 }
 
 type ProjectParams struct {
-	RootPath       string
-	Identifier     string
-	Module         string
-	Project        *nemgen.Project
-	ProjectVersion *nemgen.ProjectVersion
-	EntitiesDir    string
-	ProtoDir       string
-	Core           Core
-	Monitoring     Monitoring
-	Auth           Auth
-	API            API
+	RootPath         string
+	Identifier       string
+	Module           string
+	Project          *nemgen.Project
+	ProjectVersion   *nemgen.ProjectVersion
+	EntitiesConfig   EntitiesConfig
+	ProtoConfig      ProtoConfig
+	CoreConfig       CoreConfig
+	MonitoringConfig MonitoringConfig
+	AuthConfig       AuthConfig
+	APIConfig        APIConfig
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -58,28 +58,28 @@ func New(params *ProjectParams) (*Project, error) {
 		params.Identifier = strings.ToSnakeCase(params.Project.Name)
 	}
 
-	if params.EntitiesDir == "" {
-		params.EntitiesDir = "entity"
+	if params.EntitiesConfig.Dir == "" {
+		params.EntitiesConfig.Dir = "entity"
 	}
 
-	if params.ProtoDir == "" {
-		params.ProtoDir = "idl"
+	if params.ProtoConfig.Dir == "" {
+		params.ProtoConfig.Dir = "idl"
 	}
 
-	if params.Core.CoreDir == "" {
-		params.Core.CoreDir = "core"
+	if params.CoreConfig.CoreDir == "" {
+		params.CoreConfig.CoreDir = "core"
 	}
 
-	if params.Core.RepoDir == "" {
-		params.Core.RepoDir = "repository"
+	if params.CoreConfig.RepoDir == "" {
+		params.CoreConfig.RepoDir = "repository"
 	}
 
-	if params.Core.Events.Dir == "" {
-		params.Core.Events.Dir = "event"
+	if params.CoreConfig.EventsConfig.Dir == "" {
+		params.CoreConfig.EventsConfig.Dir = "event"
 	}
 
-	if params.API.GRPCPort == "" {
-		params.API.GRPCPort = "50051"
+	if params.APIConfig.GRPCPort == "" {
+		params.APIConfig.GRPCPort = "50051"
 	}
 
 	// check for go module in root path, if not present, add it
@@ -102,17 +102,17 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	return &Project{
-		RootPath:       params.RootPath,
-		Identifier:     params.Identifier,
-		Module:         params.Module,
-		Project:        params.Project,
-		ProjectVersion: params.ProjectVersion,
-		EntitiesDir:    params.EntitiesDir,
-		ProtoDir:       params.ProtoDir,
-		Core:           params.Core,
-		Monitoring:     params.Monitoring,
-		Auth:           params.Auth,
-		API:            params.API,
+		RootPath:         params.RootPath,
+		Identifier:       params.Identifier,
+		Module:           params.Module,
+		Project:          params.Project,
+		ProjectVersion:   params.ProjectVersion,
+		EntitiesConfig:   params.EntitiesConfig,
+		ProtoConfig:      params.ProtoConfig,
+		CoreConfig:       params.CoreConfig,
+		MonitoringConfig: params.MonitoringConfig,
+		AuthConfig:       params.AuthConfig,
+		APIConfig:        params.APIConfig,
 	}, nil
 }
 
@@ -196,7 +196,7 @@ func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relation
 }
 
 func (p *Project) AuthImport() string {
-	if !p.Auth.Enabled {
+	if !p.AuthConfig.Enabled {
 		return ""
 	}
 	authImport := fmt.Sprintf("%s/auth", p.Module)
@@ -212,6 +212,25 @@ func (p *Project) FieldsToCamelCase() map[string]string {
 				res[f.Identifier] = gcgstrings.ToCamelCase(f.Identifier)
 			}
 		}
+	}
+	return res
+}
+
+func (p *Project) EntitiesToCamelCase() map[string]string {
+	res := map[string]string{}
+	for _, e := range p.Entities() {
+		_, found := res[e.Identifier]
+		if !found {
+			res[e.Identifier] = gcgstrings.ToCamelCase(e.Identifier)
+		}
+	}
+	return res
+}
+
+func (p *Project) EntitiesAndFieldsToCamelCase() map[string]string {
+	res := p.EntitiesToCamelCase()
+	for k, v := range p.FieldsToCamelCase() {
+		res[k] = v
 	}
 	return res
 }

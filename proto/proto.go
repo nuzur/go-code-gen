@@ -83,15 +83,20 @@ type GenerateProtoParams struct {
 	Server  bool
 }
 
-func GenerateProto(ctx context.Context, params *project.ProjectParams, genParams GenerateProtoParams) error {
+func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 	fmt.Printf("--[GCG][Proto] Generating Directory\n")
 	project, err := project.New(params)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
 
+	if !project.ProtoConfig.Enabled {
+		fmt.Printf("--[GCG][Proto] Skipping proto generation\n")
+		return nil
+	}
+
 	projectDir := project.Dir()
-	protoDir := path.Join(projectDir, project.ProtoDir)
+	protoDir := path.Join(projectDir, project.ProtoConfig.Dir)
 
 	// remove existing
 	err = os.RemoveAll(protoDir)
@@ -107,28 +112,26 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams, genParams
 	if err != nil {
 		return err
 	}
-	if genParams.Protoc {
+	if project.ProtoConfig.Protoc || project.ProtoConfig.Server {
 		// generate base go code with protoc
 		err = generateProtoc(ctx, protoDir, project, entityTemplates)
 		if err != nil {
 			return err
 		}
-
-		if genParams.Mappers {
-			// generate mappers to/from entity/proto
-			err = generateMappers(ctx, protoDir, project, entityTemplates)
-			if err != nil {
-				return err
-			}
-
-			if genParams.Server {
-				// generate server
-				err = generateServer(ctx, protoDir, project, entityTemplates)
-				if err != nil {
-					return err
-				}
-			}
+	}
+	if project.ProtoConfig.Server {
+		// generate mappers to/from entity/proto
+		err = generateMappers(ctx, protoDir, project, entityTemplates)
+		if err != nil {
+			return err
 		}
+
+		// generate server
+		err = generateServer(ctx, protoDir, project, entityTemplates)
+		if err != nil {
+			return err
+		}
+
 	}
 	return err
 }

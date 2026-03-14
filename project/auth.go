@@ -1,9 +1,9 @@
 package project
 
-type Auth struct {
-	Enabled bool       `json:"enabled"`
-	Type    AuthType   `json:"type"`
-	Config  AuthConfig `json:"config"`
+type AuthConfig struct {
+	Enabled bool           `json:"enabled"`
+	Type    AuthType       `json:"type"`
+	Config  AuthTypeConfig `json:"config"`
 }
 
 type AuthType string
@@ -14,7 +14,7 @@ const (
 	KEYCLOAK_AUTH_TYPE   AuthType = "keycloak"
 )
 
-type AuthConfig struct {
+type AuthTypeConfig struct {
 	Basic    *BasicAuthConfig `json:"basic"`
 	JWT      *JWTConfig       `json:"jwt"`
 	Keycloak *KeycloakConfig  `json:"keycloak"`
@@ -37,13 +37,13 @@ type KeycloakConfig struct {
 }
 
 func (p *Project) HasBasicAuth() bool {
-	return p.Auth.Enabled && p.Auth.Type == BASIC_AUTH_TYPE
+	return p.AuthConfig.Enabled && p.AuthConfig.Type == BASIC_AUTH_TYPE
 }
 
 func (p *Project) HasJWTAuth() bool {
-	return p.Auth.Enabled && p.Auth.Type == JWT_SERVER_AUTH_TYPE
+	return p.AuthConfig.Enabled && p.AuthConfig.Type == JWT_SERVER_AUTH_TYPE
 }
 
 func (p *Project) HasKeycloakAuth() bool {
-	return p.Auth.Enabled && p.Auth.Type == KEYCLOAK_AUTH_TYPE
+	return p.AuthConfig.Enabled && p.AuthConfig.Type == KEYCLOAK_AUTH_TYPE
 }

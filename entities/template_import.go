@@ -114,7 +114,7 @@ func (f FieldTemplate) Import() *string {
 		if rel != nil {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
-				importPath := fmt.Sprintf("%s/%s/%s", f.Project.Module, f.Project.EntitiesDir, dependantEntity.Identifier)
+				importPath := fmt.Sprintf("%s/%s/%s", f.Project.Module, f.Project.EntitiesConfig.Dir, dependantEntity.Identifier)
 				return &importPath
 			}
 		}

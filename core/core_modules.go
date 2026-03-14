@@ -38,7 +38,7 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	}
 
 	projectDir := project.Dir()
-	coreDir := path.Join(projectDir, project.Core.CoreDir)
+	coreDir := path.Join(projectDir, project.CoreConfig.CoreDir)
 	moduleDir := path.Join(coreDir, "module")
 
 	err = os.RemoveAll(moduleDir)

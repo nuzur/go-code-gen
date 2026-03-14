@@ -3,11 +3,11 @@ package server
 import (
     "context"
 	
-	{{ if .Project.Auth.Enabled }}
+	{{ if .Project.AuthConfig.Enabled }}
 	"fmt"
     "{{.Module}}/auth"
 	{{ end }}
-	{{ if .Project.Monitoring.Enabled }}
+	{{ if .Project.MonitoringConfig.Enabled }}
     "{{.Module}}/monitoring"
 	{{end}}
 	"strings"
@@ -20,9 +20,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-{{ if and .Project.Monitoring.Enabled .Project.Auth.Enabled }}
+{{ if and .Project.MonitoringConfig.Enabled .Project.AuthConfig.Enabled }}
 func AuthUnaryServerInterceptor(auth auth.Interface, m *monitoring.Implementation, exceptions []string) grpc.UnaryServerInterceptor {
-{{else if .Project.Auth.Enabled }}
+{{else if .Project.AuthConfig.Enabled }}
 func AuthUnaryServerInterceptor(auth auth.Interface, exceptions []string) grpc.UnaryServerInterceptor {
 {{else}}
 func AuthUnaryServerInterceptor(exceptions []string) grpc.UnaryServerInterceptor {
@@ -37,10 +37,10 @@ func AuthUnaryServerInterceptor(exceptions []string) grpc.UnaryServerInterceptor
 		if slices.Contains(finalExceptions, info.FullMethod) {
 			return handler(ctx, req)
 		}	
-		{{ if .Project.Auth.Enabled }}	
+		{{ if .Project.AuthConfig.Enabled }}	
 		token, err := GetAuthorizationToken(ctx)       
         if err != nil {
-			{{ if .Project.Monitoring.Enabled }}
+			{{ if .Project.MonitoringConfig.Enabled }}
              m.Emit(monitoring.EmitRequest{
 				ActionIdentifier: "invalid_auth_token",
 				Message: "error parsing auth token",				
@@ -55,7 +55,7 @@ func AuthUnaryServerInterceptor(exceptions []string) grpc.UnaryServerInterceptor
 
         err = auth.HandleToken(ctx, token)
         if err != nil {
-			{{ if .Project.Monitoring.Enabled }}
+			{{ if .Project.MonitoringConfig.Enabled }}
             m.Emit(monitoring.EmitRequest{
 				ActionIdentifier: "invalid_auth",
 				Message: "error handling auth",				

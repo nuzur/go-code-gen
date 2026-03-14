@@ -5,7 +5,7 @@ func New(params Params) *Implementation {
         {{if eq .KafkaEnabled true}}
         client: params.Client,
         {{end}}
-        {{if eq .Monitoring.Enabled true}}
+        {{if eq .MonitoringConfig.Enabled true}}
         monitoring: params.Monitoring,
         {{end}}
         provider: params.Provider,

@@ -28,10 +28,12 @@ func generateRepositorySQLCode(ctx context.Context, repoDir string, project *pro
 				ProjectIdentifier string
 				ProjectModule     string
 				Fields            map[string]string
+				Entities          map[string]string
 			}{
 				ProjectIdentifier: project.Identifier,
 				ProjectModule:     project.Module,
 				Fields:            project.FieldsToCamelCase(),
+				Entities:          project.EntitiesToCamelCase(),
 			},
 			DisableGoFormat: true,
 			Funcs: template.FuncMap{

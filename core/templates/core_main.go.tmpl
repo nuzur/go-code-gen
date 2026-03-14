@@ -16,10 +16,10 @@ import (
     "{{$projectIdentifier}}/core/module/{{$entity.Identifier}}"	
     {{end}}	
 	"{{.Module}}/core/repository"
-	{{if eq .Monitoring.Enabled true}}
+	{{if eq .MonitoringConfig.Enabled true}}
 	"{{.Module}}/monitoring"
 	{{end}}
-	{{if eq .Core.Events.Enabled true}}
+	{{if eq .CoreConfig.EventsConfig.Enabled true}}
 	"{{.Module}}/core/event"
 	{{end}}
 	
@@ -31,10 +31,10 @@ type Implementation struct {
     {{range $entity := .StandaloneEntities}}
     {{$entity.Identifier}}       {{$entity.Identifier}}.Module
     {{end}}	
-	{{if eq .Monitoring.Enabled true}}
+	{{if eq .MonitoringConfig.Enabled true}}
 	monitoring *monitoring.Implementation
 	{{end}}
-	{{if eq .Core.Events.Enabled true}}
+	{{if eq .CoreConfig.EventsConfig.Enabled true}}
 	events *events.Implementation
 	{{end}}
 }
@@ -43,10 +43,10 @@ type Params struct {
 	fx.In
 	Provider config.Provider
 	Lifecycle fx.Lifecycle	
-	{{if eq .Monitoring.Enabled true}}
+	{{if eq .MonitoringConfig.Enabled true}}
 	Monitoring *monitoring.Implementation
 	{{end}}
-	{{if eq .Core.Events.Enabled true}}
+	{{if eq .CoreConfig.EventsConfig.Enabled true}}
 	Events *events.Implementation
 	{{end}}
 }
@@ -84,10 +84,10 @@ func New(params Params) (*Implementation, error) {
 	return &Implementation{
 		db: db,
 		repository: repository,
-		{{if eq .Monitoring.Enabled true}}
+		{{if eq .MonitoringConfig.Enabled true}}
 		monitoring: params.Monitoring,
 		{{end}}
-		{{if eq .Core.Events.Enabled true}}
+		{{if eq .CoreConfig.EventsConfig.Enabled true}}
 		events: params.Events,
 		{{end}}
 	}, nil
@@ -102,8 +102,8 @@ func (i *Implementation) DB() *sql.DB{
 	return i.db
 }
 
-{{$events := .Core.Events}}
-{{$monitoring := .Monitoring}}
+{{$events := .CoreConfig.EventsConfig}}
+{{$monitoring := .MonitoringConfig}}
 {{range $entity := .StandaloneEntities}}
 func (i Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identifier}}.Module {
 	if i.{{$entity.Identifier}} == nil {

@@ -1,5 +1,5 @@
 package project
 
-type Monitoring struct {
+type MonitoringConfig struct {
 	Enabled bool `json:"enabled"`
 }

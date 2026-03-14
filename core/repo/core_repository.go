@@ -18,7 +18,7 @@ var templates embed.FS
 func GenerateCoreRepository(ctx context.Context, project *project.Project) error {
 	fmt.Printf("--[GCG] Generating core repository\n")
 	projectDir := project.Dir()
-	repoDir := path.Join(projectDir, project.Core.CoreDir, project.Core.RepoDir)
+	repoDir := path.Join(projectDir, project.CoreConfig.CoreDir, project.CoreConfig.RepoDir)
 
 	sqlDir := path.Join(repoDir, "sql")
 

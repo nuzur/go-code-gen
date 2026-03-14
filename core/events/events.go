@@ -19,13 +19,13 @@ var templates embed.FS
 
 func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 
-	if !project.Core.Events.Enabled {
+	if !project.CoreConfig.EventsConfig.Enabled {
 		fmt.Printf("--[GCG][Events] Events disabled skipping\n")
 		return nil
 	}
 
 	projectDir := project.Dir()
-	eventsDir := path.Join(projectDir, project.Core.CoreDir, project.Core.Events.Dir)
+	eventsDir := path.Join(projectDir, project.CoreConfig.CoreDir, project.CoreConfig.EventsConfig.Dir)
 
 	err := os.RemoveAll(eventsDir)
 	if err != nil {
@@ -89,15 +89,15 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 }
 
 func ShouldPublishEvents(project *project.Project, identifier string) bool {
-	if !project.Core.Events.Enabled {
+	if !project.CoreConfig.EventsConfig.Enabled {
 		return false
 	}
 
-	if project.Core.Events.AllEntities {
+	if project.CoreConfig.EventsConfig.AllEntities {
 		return true
 	}
 
-	if slices.Contains(project.Core.Events.EntityIdentifiers, identifier) {
+	if slices.Contains(project.CoreConfig.EventsConfig.EntityIdentifiers, identifier) {
 		return true
 	}
 

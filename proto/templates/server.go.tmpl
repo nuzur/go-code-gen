@@ -6,7 +6,7 @@ import (
 	"net"
 	"{{.Module}}/core"
 	pb "{{.Module}}/idl/gen"
-	{{ if .Project.Monitoring.Enabled }}	
+	{{ if .Project.MonitoringConfig.Enabled }}	
 	"{{.Module}}/monitoring"
 	{{ end }}
 
@@ -26,7 +26,7 @@ import (
 type server struct {
 	pb.Unimplemented{{.Name}}Server
 	core *core.Implementation
-	{{ if .Project.Monitoring.Enabled }}	
+	{{ if .Project.MonitoringConfig.Enabled }}	
 	monitoring *monitoring.Implementation
 	{{ end }}
 }
@@ -37,7 +37,7 @@ type Params struct {
 	Lifecycle fx.Lifecycle
 	Core   *core.Implementation
 	Config config.Provider
-	{{ if .Project.Monitoring.Enabled }}	
+	{{ if .Project.MonitoringConfig.Enabled }}	
 	Monitoring *monitoring.Implementation
 	{{ end }}
 	{{ if ne .AuthImport ""}}
@@ -48,7 +48,7 @@ type Params struct {
 func NewServer(params Params) pb.{{.Name}}Server {
 	return &server{
 		core: params.Core,
-		{{ if .Project.Monitoring.Enabled }}	
+		{{ if .Project.MonitoringConfig.Enabled }}	
 		monitoring: params.Monitoring,
 		{{ end }}
 	}
@@ -58,7 +58,7 @@ func New(params Params) *grpc.Server {
 	log := params.Logger
 	s := grpc.NewServer(
 		{{ if ne .AuthImport ""}}
-		{{ if .Project.Monitoring.Enabled }}
+		{{ if .Project.MonitoringConfig.Enabled }}
 		grpc.UnaryInterceptor(AuthUnaryServerInterceptor(params.Auth, params.Monitoring, []string{})),
 		{{else}}
 		grpc.UnaryInterceptor(AuthUnaryServerInterceptor(params.Auth, []string{})),

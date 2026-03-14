@@ -1,7 +1,7 @@
 package project
 
-type Core struct {
-	CoreDir string
-	Events  Events
-	RepoDir string
+type CoreConfig struct {
+	CoreDir      string       `json:"core_dir"`
+	RepoDir      string       `json:"repo_dir"`
+	EventsConfig EventsConfig `json:"events_config"`
 }

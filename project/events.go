@@ -1,12 +1,12 @@
 package project
 
-type Events struct {
+type EventsConfig struct {
 	Enabled           bool            `json:"enabled"`
 	Dir               string          `json:"dir"`
 	Transport         EventTransport  `json:"transport"`
-	TransportConfig   TransportConfig `json:"transportconfig"`
-	AllEntities       bool            `json:"allentities"`
-	EntityIdentifiers []string        `json:"entityidentifiers"`
+	TransportConfig   TransportConfig `json:"transport_config"`
+	AllEntities       bool            `json:"all_entities"`
+	EntityIdentifiers []string        `json:"entity_identifiers"`
 }
 
 type EventTransport string
@@ -27,11 +27,11 @@ type KafkaTransportConfig struct {
 }
 
 func (p Project) KafkaEnabled() bool {
-	if !p.Core.Events.Enabled {
+	if !p.CoreConfig.EventsConfig.Enabled {
 		return false
 	}
 
-	if p.Core.Events.Transport == KafkaEventTransport && p.Core.Events.TransportConfig.Kafka != nil {
+	if p.CoreConfig.EventsConfig.Transport == KafkaEventTransport && p.CoreConfig.EventsConfig.TransportConfig.Kafka != nil {
 		return true
 	}
 
@@ -40,7 +40,7 @@ func (p Project) KafkaEnabled() bool {
 
 func (p Project) KafkaConfig() *KafkaTransportConfig {
 	if p.KafkaEnabled() {
-		return p.Core.Events.TransportConfig.Kafka
+		return p.CoreConfig.EventsConfig.TransportConfig.Kafka
 	}
 	return nil
 }

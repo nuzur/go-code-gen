@@ -9,7 +9,7 @@ import (
 	"context"
     "errors"
 		
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	"{{.ProjectModule}}/monitoring"
 	{{end}}
 	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"	
@@ -65,7 +65,7 @@ func (m *module) Update(
 		{{range $pk := .PrimaryKeys}}{{$pk.RepoToMapperUpsert}}, {{end}}
 	)
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error fetching existing record for Upsert{{.EntityName}} - with uuid",
@@ -81,7 +81,7 @@ func (m *module) Update(
 
 	if len(existing) == 0 {
 		err := errors.New("entity not found")
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "not found existing record for Upsert{{.EntityName}} - with uuid",
@@ -98,7 +98,7 @@ func (m *module) Update(
 	{{if eq .HasVersionField true}}
 	if existing[0].Version != req.{{.EntityName}}.Version {
 		err := errors.New("upsert version conflict")
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "version conflict Upsert{{.EntityName}}",
@@ -122,7 +122,7 @@ func (m *module) Update(
 		params,
 	)
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error calling repository for Upsert{{.EntityName}} - with uuid",
@@ -146,7 +146,7 @@ func (m *module) Update(
 	if createdTx {
 		err := tx.Commit()
 		if err != nil {
-			{{if eq .Project.Monitoring.Enabled true}}
+			{{if eq .Project.MonitoringConfig.Enabled true}}
 			m.monitoring.Emit(monitoring.EmitRequest{
 				ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 				Message:          "error commiting for Upsert{{.EntityName}}",
@@ -161,7 +161,7 @@ func (m *module) Update(
 		}
 	}
 	
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	m.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 		Message: "successfully handled Upsert{{.EntityName}} - with uuid",
@@ -215,7 +215,7 @@ func (m *module) publishUpdateEvent(ctx context.Context,
 		{{range $pk := .PrimaryKeys}}{{$pk.RepoToMapperUpsert}}, {{end}}
 	)
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error fetching after Upsert{{.EntityName}} - with uuid",
@@ -236,7 +236,7 @@ func (m *module) publishUpdateEvent(ctx context.Context,
 	existingEntities := mapModelsToEntities(existing)	
 	err = m.events.ProduceEntityUpdated(fetchedEntities[0], existingEntities[0])
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error producing insert event for Upsert{{.EntityName}} - with uuid",

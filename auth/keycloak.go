@@ -12,11 +12,11 @@ import (
 )
 
 func generateKeycloakClient(ctx context.Context, authDir string, project *projecttypes.Project) error {
-	if !project.Auth.Enabled || project.Auth.Type != projecttypes.KEYCLOAK_AUTH_TYPE {
+	if !project.AuthConfig.Enabled || project.AuthConfig.Type != projecttypes.KEYCLOAK_AUTH_TYPE {
 		return errors.New("invalid auth type")
 	}
 
-	if project.Auth.Config.Keycloak == nil {
+	if project.AuthConfig.Config.Keycloak == nil {
 		return errors.New("missing keycloak config")
 	}
 

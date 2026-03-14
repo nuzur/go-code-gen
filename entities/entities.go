@@ -23,7 +23,7 @@ type GenerateEntityParams struct {
 	IncludeListInterface bool
 }
 
-func GenerateEntities(ctx context.Context, params *project.ProjectParams, genParams GenerateEntityParams) error {
+func GenerateEntities(ctx context.Context, params *project.ProjectParams) error {
 
 	project, err := project.New(params)
 	if err != nil {
@@ -32,7 +32,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams, genPar
 
 	fmt.Printf("--[GCG] Generating core entities\n")
 	projectDir := project.Dir()
-	entitiesDir := path.Join(projectDir, project.EntitiesDir)
+	entitiesDir := path.Join(projectDir, project.EntitiesConfig.Dir)
 
 	// remove existing
 	err = os.RemoveAll(entitiesDir)
@@ -66,7 +66,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams, genPar
 			return err
 		}
 
-		if genParams.IncludeListInterface {
+		if project.EntitiesConfig.IncludeListInterface {
 			listTemplateBytes, err := files.GetTemplateBytes(templates, "entity_list_interface")
 			if err != nil {
 				fmt.Printf("ERROR: Getting template bytes for entity list interface: %s\n", e.Identifier)

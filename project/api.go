@@ -1,6 +1,6 @@
 package project
 
-type API struct {
+type APIConfig struct {
 	Domain   string `json:"domain"`
 	GRPCPort string `json:"grpcport"`
 }

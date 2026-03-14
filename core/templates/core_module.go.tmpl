@@ -6,10 +6,10 @@ import (
 	"{{.ProjectModule}}/core/repository"
 	coretypes "{{.ProjectModule}}/core/types"
 	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	"{{.ProjectModule}}/monitoring"
 	{{end}}
-	{{if eq .Project.Core.Events.Enabled true}}
+	{{if eq .Project.CoreConfig.EventsConfig.Enabled true}}
 	"{{.ProjectModule}}/core/event"
 	{{end}}
 )
@@ -29,10 +29,10 @@ type Module interface {
 type module struct {
 	mu sync.Mutex
 	repository *repository.Implementation    
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	monitoring *monitoring.Implementation
 	{{end}}
-	{{if eq .Project.Core.Events.Enabled true}}
+	{{if eq .Project.CoreConfig.EventsConfig.Enabled true}}
 	events     *events.Implementation
 	{{end}}
 }
@@ -40,10 +40,10 @@ type module struct {
 func New(params coretypes.ModuleParams) Module {
 	return &module{
 		repository: params.Repository,
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		monitoring: params.Monitoring,
 		{{end}}
-		{{if eq .Project.Core.Events.Enabled true}}
+		{{if eq .Project.CoreConfig.EventsConfig.Enabled true}}
 		events: params.Events,
 		{{end}}
 	}

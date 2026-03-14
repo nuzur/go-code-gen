@@ -6,7 +6,7 @@ import (
 	"{{.ProjectModule}}/core/module/{{.FinalIdentifier}}/types"
 	pb "{{.ProjectModule}}/idl/gen"
 	pbmapper "{{.ProjectModule}}/idl/mapper"
-	{{ if .Project.Monitoring.Enabled }}
+	{{ if .Project.MonitoringConfig.Enabled }}
 	"{{.ProjectModule}}/monitoring"
 	{{end}}
 )
@@ -16,7 +16,7 @@ func (s *server) Create{{.Name}}(ctx context.Context, req *pb.Create{{.Name}}Req
 		{{.Name}}: pbmapper.{{.Name}}FromProto(req.Get{{.Name}}()),
 	})
 	if err != nil {
-		{{ if .Project.Monitoring.Enabled }}
+		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "create_{{.FinalIdentifier}}",
 			Message: "error calling core upsert in Create{{.Name}}",
@@ -33,7 +33,7 @@ func (s *server) Create{{.Name}}(ctx context.Context, req *pb.Create{{.Name}}Req
 
 	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res))
 	if err != nil {
-		{{ if .Project.Monitoring.Enabled }}
+		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "create_{{.FinalIdentifier}}",
 			Message: "error fetching after upsert in Create{{.Name}}",
@@ -50,7 +50,7 @@ func (s *server) Create{{.Name}}(ctx context.Context, req *pb.Create{{.Name}}Req
 
 	if len(fetchRes.Results) == 0 {
 		err := errors.New("error fetching entity")
-		{{ if .Project.Monitoring.Enabled }}
+		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "create_{{.FinalIdentifier}}",
 			Message: "entity not found after upsert in Create{{.Name}}",
@@ -65,7 +65,7 @@ func (s *server) Create{{.Name}}(ctx context.Context, req *pb.Create{{.Name}}Req
 		return nil, err
 	}
 
-	{{ if .Project.Monitoring.Enabled }}
+	{{ if .Project.MonitoringConfig.Enabled }}
 	s.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "create_{{.FinalIdentifier}}",
 		Message: "successfully handled Create{{.Name}}",

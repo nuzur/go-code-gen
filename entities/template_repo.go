@@ -32,6 +32,8 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
@@ -112,6 +114,8 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_FILE,
@@ -208,6 +212,8 @@ func (f FieldTemplate) RepoFromMapper() string {
 		nemgen.FieldType_FIELD_TYPE_URL,
 		nemgen.FieldType_FIELD_TYPE_LOCATION,
 		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
 			return fmt.Sprintf("null.NewString(m.%s.String, m.%s.Valid)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))

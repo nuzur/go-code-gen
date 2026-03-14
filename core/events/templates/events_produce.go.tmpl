@@ -7,7 +7,7 @@ import (
 	{{end}}
 
     
-    {{if eq .Monitoring.Enabled true}}    
+    {{if eq .MonitoringConfig.Enabled true}}    
     "{{.Module}}/monitoring"  
     "fmt"
     {{end}}
@@ -43,7 +43,7 @@ func (i *Implementation) produceToKafkaTopic(topic string, message []byte, entit
 		Message: message,
 	})
 
-    {{if eq .Monitoring.Enabled true}}
+    {{if eq .MonitoringConfig.Enabled true}}
     if err != nil {
         i.monitoring.Emit(monitoring.EmitRequest{
             ActionIdentifier: fmt.Sprintf("event_produce_%s", action),
@@ -67,7 +67,7 @@ func (i *Implementation) produceToKafkaTopic(topic string, message []byte, entit
         ExtraData: map[string]string{"message":string(message),"topic":topic},            
     })
     {{end}}
-    {{if eq .Monitoring.Enabled true}}
+    {{if eq .MonitoringConfig.Enabled true}}
     return nil
     {{else}}
     return err

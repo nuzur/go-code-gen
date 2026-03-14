@@ -8,7 +8,7 @@ import (
     {{if ne .Select.IsPrimary true}}
     "errors"
     {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"{{end}}        
-    {{ if .Project.Monitoring.Enabled }}
+    {{ if .Project.MonitoringConfig.Enabled }}
     "{{.ProjectModule}}/monitoring"  
     {{ end }}
 
@@ -30,7 +30,7 @@ func (m *module) Fetch{{.Select.Name}}(
         {{$field.Field.RepoToMapperFetch}},{{end}}
     )
     if err != nil {  
-        {{ if .Project.Monitoring.Enabled }}
+        {{ if .Project.MonitoringConfig.Enabled }}
         m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "fetch_{{.Select.Identifier}}",
 			Message: "error in Fetch{{.Select.Name}}",
@@ -60,7 +60,7 @@ func (m *module) Fetch{{.Select.Name}}(
         )
         
         if err != nil {
-            {{ if .Project.Monitoring.Enabled }}
+            {{ if .Project.MonitoringConfig.Enabled }}
             m.monitoring.Emit(monitoring.EmitRequest{
                 ActionIdentifier: "fetch_{{.Select.Identifier}}",
                 Message: "error in Fetch{{.Select.Name}} no order",
@@ -94,7 +94,7 @@ func (m *module) Fetch{{.Select.Name}}(
 
     if !orderByFieldFound {
         err := errors.New("order by field not found")
-        {{ if .Project.Monitoring.Enabled }}
+        {{ if .Project.MonitoringConfig.Enabled }}
         m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "fetch_{{.Select.Identifier}}",
 			Message: "error in Fetch{{.Select.Name}} - order by field not found",
@@ -114,7 +114,7 @@ func (m *module) Fetch{{.Select.Name}}(
             sort = req.Sort
         } else {
             err := errors.New("invalid sort value only ASC or DESC are valid")
-            {{ if .Project.Monitoring.Enabled }}
+            {{ if .Project.MonitoringConfig.Enabled }}
             m.monitoring.Emit(monitoring.EmitRequest{
                 ActionIdentifier: "fetch_{{.Select.Identifier}}",
                 Message: "error in Fetch{{.Select.Name}} - invalid sort value only ASC or DESC are valid",
@@ -145,7 +145,7 @@ func (m *module) Fetch{{.Select.Name}}(
                     },
                 )
                 if err != nil {
-                    {{ if .Project.Monitoring.Enabled }}
+                    {{ if .Project.MonitoringConfig.Enabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered asc",
@@ -172,7 +172,7 @@ func (m *module) Fetch{{.Select.Name}}(
                     },
                 )
                 if err != nil {
-                    {{ if .Project.Monitoring.Enabled }}
+                    {{ if .Project.MonitoringConfig.Enabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered desc",
@@ -194,7 +194,7 @@ func (m *module) Fetch{{.Select.Name}}(
     {{end}} 
 
     err := errors.New("could not process request")
-    {{ if .Project.Monitoring.Enabled }}
+    {{ if .Project.MonitoringConfig.Enabled }}
     m.monitoring.Emit(monitoring.EmitRequest{
         ActionIdentifier: "fetch_{{.Select.Identifier}}_invalid",
         Message: "error in Fetch{{.Select.Name}} - invalid request",

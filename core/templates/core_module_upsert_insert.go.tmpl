@@ -11,7 +11,7 @@ import (
     "errors"
     {{end}}
 			
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	"{{.ProjectModule}}/monitoring"
 	{{end}}
 
@@ -74,7 +74,7 @@ func (m *module) Insert(
 		params,
 	)
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error calling repository for Upsert{{.EntityName}} - no uuid",
@@ -98,10 +98,10 @@ func (m *module) Insert(
 	if createdTx {
 		err := tx.Commit()
 		if err != nil {
-			{{if eq .Project.Monitoring.Enabled true}}
+			{{if eq .Project.MonitoringConfig.Enabled true}}
 			m.monitoring.Emit(monitoring.EmitRequest{
 				ActionIdentifier: "upsert_{{.EntityIdentifier}}",
-				Message:          "error commiting for Upsert{{.EntityName}} (1)",
+				Message:          "error committing for Upsert{{.EntityName}} (1)",
 				EntityIdentifier: "{{.EntityIdentifier}}",
 				Layer:            monitoring.RepositoryServiceLayer,
 				Type:             monitoring.EmitTypeError,
@@ -113,7 +113,7 @@ func (m *module) Insert(
 		}
 	}
 
-	{{if eq .Project.Monitoring.Enabled true}}
+	{{if eq .Project.MonitoringConfig.Enabled true}}
 	m.monitoring.Emit(monitoring.EmitRequest{
 		ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 		Message: "successfully handled Upsert{{.EntityName}} - no uuid",
@@ -155,7 +155,7 @@ func (m *module) publishInsertEvent(ctx context.Context,
 		{{range $pk := .PrimaryKeys}}{{$pk.RepoToMapperUpsert}}, {{end}}
 	)
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error fetching after Upsert{{.EntityName}} - no uuid",
@@ -175,7 +175,7 @@ func (m *module) publishInsertEvent(ctx context.Context,
 	}		
 	err = m.events.ProduceEntityInserted(fetchedEntities[0])
 	if err != nil {
-		{{if eq .Project.Monitoring.Enabled true}}
+		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
 			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
 			Message: "error producing insert event for Upsert{{.EntityName}} - no uuid",

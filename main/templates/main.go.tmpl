@@ -1,0 +1,43 @@
+package main
+import (
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+	{{.Identifier}}config "{{.Module}}/config"
+	"{{.Module}}/core"
+
+	{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}
+	pbserver "{{.Module}}/idl/server"		
+	{{end}}
+
+	{{ if .AuthConfig.Enabled }}
+	{{.AuthImport}}
+	{{ end }}
+
+	{{ if .MonitoringConfig.Enabled }}
+	"{{.Module}}/monitoring"
+	{{ end }}
+	
+	{{if eq .CoreConfig.EventsConfig.Enabled true}}
+	"{{.Module}}/core/events"
+	{{end}}
+
+	{{if eq .KafkaEnabled true}}
+	saramafx "github.com/mklfarha/sarama-fx"	
+	{{end}}
+)
+
+func main() {
+	fx.New(
+		fx.Provide(
+			zap.NewProduction,
+			{{.Identifier}}config.New,
+			core.New,	
+			{{ if .MonitoringConfig.Enabled }}monitoring.New,{{end}}
+			{{ if ne .AuthImport ""}}auth.New,{{end}}			
+			{{ if eq .CoreConfig.EventsConfig.Enabled true}}events.New,{{end}}
+		),	
+		{{ if eq .KafkaEnabled true }}saramafx.Module,{{end}}		
+		{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}fx.Invoke(pbserver.New),{{end}}		
+	).Run()
+}
+
