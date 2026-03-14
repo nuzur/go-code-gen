@@ -163,7 +163,7 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+		return fmt.Sprintf("mapper.SliceToJSON(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
