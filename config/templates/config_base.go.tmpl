@@ -1,6 +1,7 @@
 
 ports:  
   grpc: {{.APIConfig.GRPCPort}}
+  http: {{.APIConfig.HTTPPort}}
 
 auth: {{if eq .HasBasicAuth true}} 
   basic:
@@ -33,12 +34,6 @@ db:
     pswd: << Database Password Here>>
     params: << Database Params Here>>
     driver: "<< Database Driver Here >>"
-
-aws:
-  - region: << AWS Region Here>>
-    key_id: << AWS Key ID Here>>
-    secret: << AWS Secret Here>>
-    bucket: << AWS Bucket Here>>
 
 monitoring:
   enabled: {{.MonitoringConfig.Enabled}}

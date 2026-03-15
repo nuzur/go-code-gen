@@ -120,7 +120,7 @@ func getEntityDeclarations(e *ProtoEntityTemplate, allEntities []*ProtoEntityTem
 	for _, f := range e.Fields {
 		finalIdentifier := f.Identifier()
 		if e.Entity.Type == nemgen.EntityType_ENTITY_TYPE_DEPENDENT {
-			finalIdentifier = fmt.Sprintf("%s.%s", e.Entity.Identifier, f.Identifier)
+			finalIdentifier = fmt.Sprintf("%s.%s", e.Entity.Identifier, f.Identifier())
 		}
 		switch f.Field.Type {
 		case nemgen.FieldType_FIELD_TYPE_UUID:

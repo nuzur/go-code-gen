@@ -21,7 +21,7 @@ type Interface interface {
 type Implementation struct {
 	core *core.Implementation
 	logger *zap.Logger
-	key string 
+	key []byte 
 }
 
 type Params struct {
@@ -36,7 +36,7 @@ func New(params Params) (base.Interface, error) {
 	i := Implementation{
 		core: params.Core,
 		logger: params.Logger,
-		key: key,
+		key: []byte(key),
 	}
 
 	http.HandleFunc("/signin", i.SignIn)
