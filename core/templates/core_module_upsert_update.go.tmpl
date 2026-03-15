@@ -13,7 +13,7 @@ import (
 	"{{.Project.Module}}/monitoring"
 	{{end}}
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"	
-	{{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"   	
+	{{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"   	
 	{{$firstJSON := true}}
 	{{$firstEnumMany := true}}
 	{{range $field := .Fields}}				

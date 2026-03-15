@@ -2,7 +2,7 @@ package {{.Package}}
 
 import (    
     main_entity "{{.Project.Module}}/entity/{{.Package}}"
-    {{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"  
+    {{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"  
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
 		"{{.Project.Module}}/entity/mapper"
 	{{end}}

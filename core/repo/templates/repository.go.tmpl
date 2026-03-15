@@ -5,8 +5,8 @@ import (
 
 	"database/sql"
 	
-	{{.Identifier}}db "{{.Module}}/{{.CoreConfig.CoreDir}}/repository/gen"
-	"{{.Module}}/{{.CoreConfig.CoreDir}}/repository/list"
+	{{.Identifier}}db "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoDir}}/gen"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoDir}}/list"
 )
 
 type Implementation struct {
