@@ -3,7 +3,7 @@ import (
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	{{.Identifier}}config "{{.Module}}/config"
-	"{{.Module}}/core"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}"
 
 	{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}
 	pbserver "{{.Module}}/idl/server"		
@@ -18,7 +18,7 @@ import (
 	{{ end }}
 	
 	{{if eq .CoreConfig.EventsConfig.Enabled true}}
-	"{{.Module}}/core/event"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/event"
 	{{end}}
 
 	{{if eq .KafkaEnabled true}}

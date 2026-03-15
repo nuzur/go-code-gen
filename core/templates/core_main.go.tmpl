@@ -1,5 +1,6 @@
 package core
 
+{{$coreDir := .CoreConfig.CoreDir}}
 import (	
 	"database/sql"
 	"errors"
@@ -10,17 +11,17 @@ import (
 	"go.uber.org/config"
 	"go.uber.org/fx"	
 	{{.Identifier}}config "{{.Module}}/config"
-	coretypes "{{.Module}}/core/types"
+	coretypes "{{.Module}}/{{$coreDir}}/types"
     {{$projectIdentifier := .Module}}
     {{range $entity := .StandaloneEntities}}
-    "{{$projectIdentifier}}/core/module/{{$entity.Identifier}}"	
+    "{{$projectIdentifier}}/{{$coreDir}}/module/{{$entity.Identifier}}"	
     {{end}}	
-	"{{.Module}}/core/repository"
+	"{{.Module}}/{{$coreDir}}/repository"
 	{{if eq .MonitoringConfig.Enabled true}}
 	"{{.Module}}/monitoring"
 	{{end}}
 	{{if eq .CoreConfig.EventsConfig.Enabled true}}
-	"{{.Module}}/core/event"
+	"{{.Module}}/{{$coreDir}}/event"
 	{{end}}
 	
 )

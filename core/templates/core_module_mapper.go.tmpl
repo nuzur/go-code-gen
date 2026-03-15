@@ -1,16 +1,16 @@
 package {{.Package}}
 
 import (    
-    main_entity "{{.ProjectModule}}/entity/{{.Package}}"
-    {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"  
+    main_entity "{{.Project.Module}}/entity/{{.Package}}"
+    {{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"  
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
-		"{{.ProjectModule}}/entity/mapper"
+		"{{.Project.Module}}/entity/mapper"
 	{{end}}
 	{{range $import := .Imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 
     "{{$import}}" {{end}}{{end}}
 )
 
-func mapModelsToEntities(models []{{.ProjectIdentifier}}db.{{.EntityName}}) []main_entity.{{.EntityName}} {
+func mapModelsToEntities(models []{{.Project.Identifier}}db.{{.EntityName}}) []main_entity.{{.EntityName}} {
 	result := []main_entity.{{.EntityName}}{}
 	for _, p := range models {
 		result = append(result, mapModelToEntity(p))
@@ -18,7 +18,7 @@ func mapModelsToEntities(models []{{.ProjectIdentifier}}db.{{.EntityName}}) []ma
 	return result
 }
 
-func mapModelToEntity(m {{.ProjectIdentifier}}db.{{.EntityName}}) main_entity.{{.EntityName}} {	
+func mapModelToEntity(m {{.Project.Identifier}}db.{{.EntityName}}) main_entity.{{.EntityName}} {	
 	return main_entity.{{.EntityName}}{ {{range $field := .Fields}}
         {{$field.Name}}: {{$field.RepoFromMapper}},{{end}}	
 	}

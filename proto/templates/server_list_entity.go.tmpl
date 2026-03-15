@@ -5,12 +5,12 @@ import (
 	"fmt"
 	//"encoding/json"
 	
-	"{{.ProjectModule}}/core/module/{{.FinalIdentifier}}/types"
-	pb "{{.ProjectModule}}/idl/gen"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+	pb "{{.Project.Module}}/idl/gen"
 	{{ if .Project.MonitoringConfig.Enabled }}
-	"{{.ProjectModule}}/monitoring"
+	"{{.Project.Module}}/monitoring"
 	{{end}}
-	pbmapper "{{.ProjectModule}}/idl/mapper"
+	pbmapper "{{.Project.Module}}/idl/mapper"
 
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"

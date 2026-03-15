@@ -1,8 +1,8 @@
 package {{.Package}}
 
 {{$entityName := .EntityName}}
-{{$projectIdentifier := .ProjectIdentifier}}
-{{$projectModule := .ProjectModule}}
+{{$projectIdentifier := .Project.Identifier}}
+{{$projectModule := .Project.Module}}
 {{$entityIdenfier := .EntityIdentifier}}
 {{$imports := .Imports}}
 import (
@@ -10,10 +10,10 @@ import (
     "errors"
 		
 	{{if eq .Project.MonitoringConfig.Enabled true}}
-	"{{.ProjectModule}}/monitoring"
+	"{{.Project.Module}}/monitoring"
 	{{end}}
-	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"	
-	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"   	
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"	
+	{{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"   	
 	{{$firstJSON := true}}
 	{{$firstEnumMany := true}}
 	{{range $field := .Fields}}				
@@ -35,7 +35,7 @@ import (
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
-	"{{.ProjectModule}}/entity/mapper"
+	"{{.Project.Module}}/entity/mapper"
 	{{end}}
 	
 )
@@ -183,15 +183,15 @@ func buildUpdateResponse(req types.UpsertRequest) types.UpsertResponse {
 	}
 }
 
-func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.ProjectIdentifier}}db.{{.EntityName}}, partial bool) {{.ProjectIdentifier}}db.Update{{.EntityName}}Params {	
+func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.Project.Identifier}}db.{{.EntityName}}, partial bool) {{.Project.Identifier}}db.Update{{.EntityName}}Params {	
 	if !partial {
-		return {{.ProjectIdentifier}}db.Update{{.EntityName}}Params{ {{range $field := .Fields}}			
+		return {{.Project.Identifier}}db.Update{{.EntityName}}Params{ {{range $field := .Fields}}			
 			{{$field.Name}}: {{$field.RepoToMapperUpsert}}, 			
 			{{end}}
 		}
 	}
 
-	res := {{.ProjectIdentifier}}db.Update{{.EntityName}}Params{}
+	res := {{.Project.Identifier}}db.Update{{.EntityName}}Params{}
 	
 	{{range $field := .Fields}}						
 		res.{{$field.Name}} = {{$field.RepoToMapperUpsert}} 				
@@ -205,8 +205,8 @@ func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.Project
 {{if eq .ShouldPublishEvents true}}
 func (m *module) publishUpdateEvent(ctx context.Context, 
 		req types.UpsertRequest, 
-		qtx *{{.ProjectIdentifier}}db.Queries,		
-		existing []{{.ProjectIdentifier}}db.{{.EntityName}}) error {
+		qtx *{{.Project.Identifier}}db.Queries,		
+		existing []{{.Project.Identifier}}db.{{.EntityName}}) error {
 
 	if m.events == nil {
 		return nil

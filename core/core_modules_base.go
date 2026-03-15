@@ -13,25 +13,21 @@ import (
 )
 
 type coreModuleTemplate struct {
-	Project           *project.Project
-	Package           string
-	ProjectIdentifier string
-	ProjectModule     string
-	EntityIdentifier  string
-	EntityName        string
-	SelectStatements  []repo.SchemaSelectStatement
+	Project          *project.Project
+	Package          string
+	EntityIdentifier string
+	EntityName       string
+	SelectStatements []repo.SchemaSelectStatement
 }
 
 func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error {
 	fmt.Printf("--[GCG] Generating core module base: %s\n", req.Entity.Identifier)
 	moduleTemplate := coreModuleTemplate{
-		Project:           req.Project,
-		Package:           req.Entity.Identifier,
-		ProjectIdentifier: req.Project.Identifier,
-		ProjectModule:     req.Project.Module,
-		EntityIdentifier:  req.Entity.Identifier,
-		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
-		SelectStatements:  req.Selects,
+		Project:          req.Project,
+		Package:          req.Entity.Identifier,
+		EntityIdentifier: req.Entity.Identifier,
+		EntityName:       gcgstrings.ToCamelCase(req.Entity.Identifier),
+		SelectStatements: req.Selects,
 	}
 
 	coreTmplBytes, err := files.GetTemplateBytes(templates, "core_module")

@@ -1,5 +1,7 @@
 package project
 
+import "fmt"
+
 type AuthConfig struct {
 	Enabled bool           `json:"enabled"`
 	Type    AuthType       `json:"type"`
@@ -34,6 +36,20 @@ type KeycloakConfig struct {
 	Realm        string `json:"realm" yaml:"realm"`
 	ClientID     string `json:"client_id" yaml:"client_id"`
 	ClientSecret string `json:"client_secret" yaml:"client_secret"`
+}
+
+func (p Project) AuthImport() string {
+	if !p.AuthConfig.Enabled {
+		return ""
+	}
+	if p.HasJWTAuth() && p.AuthConfig.Config.JWT != nil {
+		return fmt.Sprintf("auth \"%s/auth/jwtserver\"", p.Module)
+	}
+
+	if p.HasKeycloakAuth() && p.AuthConfig.Config.Keycloak != nil {
+		return fmt.Sprintf("auth \"%s/auth/keycloak\"", p.Module)
+	}
+	return ""
 }
 
 func (p *Project) HasBasicAuth() bool {

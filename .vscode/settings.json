@@ -9,6 +9,7 @@
         "gofrs",
         "grpcport",
         "jwtserver",
+        "maingen",
         "MYSQLDB",
         "nemgen",
         "pbserver",

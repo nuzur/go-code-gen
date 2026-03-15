@@ -41,9 +41,19 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	coreDir := path.Join(projectDir, project.CoreConfig.CoreDir)
 	moduleDir := path.Join(coreDir, "module")
 
-	err = os.RemoveAll(moduleDir)
+	err = os.RemoveAll(coreDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting module directory\n")
+		fmt.Printf("ERROR: Deleting core directory\n")
+	}
+
+	// generate config module
+	err = config.GenerateConfig(ctx, project)
+	if err != nil {
+		return err
+	}
+
+	if project.CoreConfig.Enabled == false {
+		return nil
 	}
 
 	// generate repository
@@ -140,7 +150,5 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 		},
 	})
 
-	// generate config module
-	err = config.GenerateConfig(ctx, project)
 	return err
 }

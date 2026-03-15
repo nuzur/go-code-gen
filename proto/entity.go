@@ -11,6 +11,7 @@ import (
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
+	projecttypes "github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	"github.com/nuzur/go-code-gen/templatefuncs"
 	nemgen "github.com/nuzur/nem/idl/gen"
@@ -71,8 +72,6 @@ func generateEntityProtoFile(
 		protoEntityTemplate = &ProtoEntityTemplate{
 			Entity:             e,
 			Project:            project,
-			ProjectIdentifier:  project.Identifier,
-			ProjectModule:      project.Module,
 			OriginalIdentifier: e.Identifier,
 			FinalIdentifier:    finalIdentifier,
 			Name:               gcgstrings.ToCamelCase(finalIdentifier),
@@ -101,7 +100,7 @@ func generateEntityProtoFile(
 	return protoEntityTemplate, err
 }
 
-func generateEnumsProtoFile(ctx context.Context, protoDir string, project *project.Project) error {
+func generateEnumsProtoFile(ctx context.Context, protoDir string, project *projecttypes.Project) error {
 	enumTemplates := []ProtoEnumTemplate{}
 	for _, e := range project.Enums() {
 
@@ -126,22 +125,20 @@ func generateEnumsProtoFile(ctx context.Context, protoDir string, project *proje
 		OutputPath:    path.Join(protoDir, "proto", "enum.proto"),
 		TemplateBytes: tmplBytes,
 		Data: struct {
-			ProjectIdentifier string
-			ProjectModule     string
-			Name              string
-			Enums             []ProtoEnumTemplate
+			Project *projecttypes.Project
+			Name    string
+			Enums   []ProtoEnumTemplate
 		}{
-			ProjectIdentifier: project.Identifier,
-			ProjectModule:     project.Module,
-			Name:              "Enum",
-			Enums:             enumTemplates,
+			Project: project,
+			Name:    "Enum",
+			Enums:   enumTemplates,
 		},
 		DisableGoFormat: true,
 	})
 	return nil
 }
 
-func generateProtoFiles(ctx context.Context, protoDir string, project *project.Project) (entityTemplates []*ProtoEntityTemplate, returnErr error) {
+func generateProtoFiles(ctx context.Context, protoDir string, project *projecttypes.Project) (entityTemplates []*ProtoEntityTemplate, returnErr error) {
 	entityTemplates = []*ProtoEntityTemplate{}
 	// generate enums
 	fmt.Printf("--[GCG][Proto] Generating Enums\n")

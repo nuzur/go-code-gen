@@ -9,13 +9,13 @@ import (
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/files"
-	"github.com/nuzur/go-code-gen/project"
+	projectypes "github.com/nuzur/go-code-gen/project"
 )
 
 //go:embed templates/**
 var templates embed.FS
 
-func GenerateCoreRepository(ctx context.Context, project *project.Project) error {
+func GenerateCoreRepository(ctx context.Context, project *projectypes.Project) error {
 	fmt.Printf("--[GCG] Generating core repository\n")
 	projectDir := project.Dir()
 	repoDir := path.Join(projectDir, project.CoreConfig.CoreDir, project.CoreConfig.RepoDir)
@@ -59,13 +59,7 @@ func GenerateCoreRepository(ctx context.Context, project *project.Project) error
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(repoDir, "repository.go"),
 		TemplateBytes: tmplBytes,
-		Data: struct {
-			ProjectIdentifier string
-			ProjectModule     string
-		}{
-			ProjectIdentifier: project.Identifier,
-			ProjectModule:     project.Module,
-		},
+		Data:          project,
 	})
 	if err != nil {
 		return err

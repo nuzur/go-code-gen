@@ -1,12 +1,10 @@
 package {{.Package}}
 
-{{$entityName := .EntityName}}
-{{$entityIdenfier := .EntityIdentifier}}
 import (
 	"context"    
 	
 	"github.com/gofrs/uuid"	
-	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"		
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"		
 )
 
 func (m *module) Upsert(

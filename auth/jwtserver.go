@@ -22,7 +22,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 	}
 
 	jwtServerDir := path.Join(authDir, "jwtserver")
-	fmt.Printf("--[GPG][AUTH] Generating JWT server\n")
+	fmt.Printf("--[GCG][AUTH] Generating JWT server\n")
 	jwtTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_server"))
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for jwt server: %v\n", err)

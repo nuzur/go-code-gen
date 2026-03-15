@@ -1,15 +1,15 @@
 package {{.Package}}
 
-{{ $projectModule := .ProjectModule}}
+{{ $projectModule := .Project.Module}}
 import (
 	"context"    
     
-    "{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+    "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
     {{if ne .Select.IsPrimary true}}
     "errors"
-    {{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"{{end}}        
+    {{.Project.Identifier}}db "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/repository/gen"{{end}}        
     {{ if .Project.MonitoringConfig.Enabled }}
-    "{{.ProjectModule}}/monitoring"  
+    "{{ $projectModule }}/monitoring"  
     {{ end }}
 
     {{ range $import := .Imports }}
@@ -51,7 +51,7 @@ func (m *module) Fetch{{.Select.Name}}(
     if req.OrderBy == "" {
         models, err := m.repository.Queries.Fetch{{.Select.Name}}(
             ctx,
-            {{.ProjectIdentifier}}db.Fetch{{.Select.Name}}Params{ {{range $field := .Select.Fields}}                
+            {{.Project.Identifier}}db.Fetch{{.Select.Name}}Params{ {{range $field := .Select.Fields}}                
                 {{$field.Field.Name}}: {{$field.Field.RepoToMapperFetch}},                                            
                 {{end}}
                 Offset: req.Offset,
@@ -130,7 +130,7 @@ func (m *module) Fetch{{.Select.Name}}(
     }
 
     {{$select := .Select}}
-    {{$projectIdentifier := .ProjectIdentifier}}
+    {{$projectIdentifier := .Project.Identifier}}
     switch req.OrderBy {
         {{range $timeField := .Select.TimeFields}}
         case "{{$timeField.Identifier}}":

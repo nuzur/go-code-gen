@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 	"errors"
-	"{{.ProjectModule}}/core/module/{{.FinalIdentifier}}/types"
-	pb "{{.ProjectModule}}/idl/gen"
-	pbmapper "{{.ProjectModule}}/idl/mapper"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+	pb "{{.Project.Module}}/idl/gen"
+	pbmapper "{{.Project.Module}}/idl/mapper"
 	{{ if .Project.MonitoringConfig.Enabled }}
-	"{{.ProjectModule}}/monitoring"
+	"{{.Project.Module}}/monitoring"
 	{{end}}
 )
 

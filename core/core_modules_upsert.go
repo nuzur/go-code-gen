@@ -17,11 +17,10 @@ import (
 )
 
 type upsertModuleTemplate struct {
+	Project             *project.Project
 	Package             string
 	EntityName          string
 	EntityIdentifier    string
-	ProjectIdentifier   string
-	ProjectModule       string
 	PrimaryKeys         []entities.FieldTemplate
 	PrimaryKeysName     string
 	Fields              []entities.FieldTemplate
@@ -32,7 +31,6 @@ type upsertModuleTemplate struct {
 	HasArrayField       bool
 	HasNullString       bool
 	HasNullUUID         bool
-	Project             *project.Project
 }
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
@@ -60,8 +58,6 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	}
 	upsertTemplate := upsertModuleTemplate{
 		Package:             req.Entity.Identifier,
-		ProjectIdentifier:   req.Project.Identifier,
-		ProjectModule:       req.Project.Module,
 		EntityIdentifier:    req.Entity.Identifier,
 		EntityName:          gcgstrings.ToCamelCase(req.Entity.Identifier),
 		PrimaryKeys:         primaryKeys,

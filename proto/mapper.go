@@ -9,7 +9,7 @@ import (
 	"github.com/iancoleman/strcase"
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/files"
-	"github.com/nuzur/go-code-gen/project"
+	projecttypes "github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	"github.com/nuzur/go-code-gen/templatefuncs"
 )
@@ -35,7 +35,7 @@ func generateEntityMapper(ctx context.Context, dir string, et *ProtoEntityTempla
 	return nil
 }
 
-func generateMappers(ctx context.Context, protoDir string, project *project.Project, entityTemplates []*ProtoEntityTemplate) error {
+func generateMappers(ctx context.Context, protoDir string, project *projecttypes.Project, entityTemplates []*ProtoEntityTemplate) error {
 	fmt.Printf("--[GCG][Proto] Generating mappers\n")
 	tmplBytes, err := files.GetTemplateBytes(templates, "mapper_base")
 	if err != nil {
@@ -66,11 +66,11 @@ func generateMappers(ctx context.Context, protoDir string, project *project.Proj
 		OutputPath:    path.Join(protoDir, "mapper", "enum.go"),
 		TemplateBytes: tmplEnumBytes,
 		Data: struct {
-			ProjectModule string
-			Enums         []ProtoEnumTemplate
+			Project *projecttypes.Project
+			Enums   []ProtoEnumTemplate
 		}{
-			ProjectModule: project.Module,
-			Enums:         enumTemplates,
+			Project: project,
+			Enums:   enumTemplates,
 		},
 		DisableGoFormat: false,
 	})

@@ -35,3 +35,13 @@ func DeleteFile(filePath string) error {
 	}
 	return nil
 }
+
+func DeleteFileIfExists(filePath string) error {
+	if FileExists(filePath) {
+		err := DeleteFile(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to delete file: %w", err)
+		}
+	}
+	return nil
+}

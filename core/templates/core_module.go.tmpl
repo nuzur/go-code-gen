@@ -3,14 +3,14 @@ package {{.Package}}
 import (
 	"context"
     "sync"
-	"{{.ProjectModule}}/core/repository"
-	coretypes "{{.ProjectModule}}/core/types"
-	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository"
+	coretypes "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/types"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
 	{{if eq .Project.MonitoringConfig.Enabled true}}
-	"{{.ProjectModule}}/monitoring"
+	"{{.Project.Module}}/monitoring"
 	{{end}}
 	{{if eq .Project.CoreConfig.EventsConfig.Enabled true}}
-	"{{.ProjectModule}}/core/event"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/event"
 	{{end}}
 )
 

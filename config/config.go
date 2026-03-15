@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
 	"path"
 
 	"github.com/nuzur/filetools"
@@ -15,10 +16,22 @@ import (
 var templates embed.FS
 
 func GenerateConfig(ctx context.Context, project *project.Project) error {
-	fmt.Printf("--[GPG] Generating config\n")
+	fmt.Printf("--[GCG][Config] Generating config\n")
 
 	projectDir := project.Dir()
 	configDir := path.Join(projectDir, "config")
+
+	// remove existing
+	err := os.RemoveAll(configDir)
+	if err != nil {
+		fmt.Printf("ERROR: Deleting config directory\n")
+	}
+
+	if project.CoreConfig.Enabled == false {
+		fmt.Printf("--[GCG][Config] Skipping config generation\n")
+		return nil
+	}
+
 	tmplBytes, err := files.GetTemplateBytes(templates, path.Join("config"))
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for config: %v\n", err)

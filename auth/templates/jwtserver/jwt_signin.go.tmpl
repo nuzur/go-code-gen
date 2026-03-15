@@ -9,7 +9,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"golang.org/x/crypto/bcrypt"
-	"{{.Module}}/core/module/user/types"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/user/types"
 )
 
 func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {

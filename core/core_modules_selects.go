@@ -16,20 +16,18 @@ import (
 )
 
 type fetchModuleTemplate struct {
-	Package           string
-	EntityName        string
-	EntityIdentifier  string
-	ProjectIdentifier string
-	ProjectModule     string
-	Select            repo.SchemaSelectStatement
-	Fields            []entities.FieldTemplate
-	Imports           []string
-	SearchFields      []entities.FieldTemplate
-	Project           *project.Project
+	Package          string
+	EntityName       string
+	EntityIdentifier string
+	Select           repo.SchemaSelectStatement
+	Fields           []entities.FieldTemplate
+	Imports          []string
+	SearchFields     []entities.FieldTemplate
+	Project          *project.Project
 }
 
 func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GPG] Generating core module selects: %s\n", req.Entity.Identifier)
+	fmt.Printf("--[GCG] Generating core module selects: %s\n", req.Entity.Identifier)
 	for _, sel := range req.Selects {
 		importsTypes := map[string]any{}
 		importsFetch := map[string]any{}
@@ -43,14 +41,12 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 		}
 
 		fetchTemplate := fetchModuleTemplate{
-			Package:           req.Entity.Identifier,
-			ProjectIdentifier: req.Project.Identifier,
-			ProjectModule:     req.Project.Module,
-			EntityIdentifier:  req.Entity.Identifier,
-			EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
-			Select:            sel,
-			Imports:           maps.MapKeys(importsTypes),
-			Project:           req.Project,
+			Project:          req.Project,
+			Package:          req.Entity.Identifier,
+			EntityIdentifier: req.Entity.Identifier,
+			EntityName:       gcgstrings.ToCamelCase(req.Entity.Identifier),
+			Select:           sel,
+			Imports:          maps.MapKeys(importsTypes),
 		}
 
 		typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_fetch_types")

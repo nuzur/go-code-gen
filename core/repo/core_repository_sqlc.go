@@ -9,11 +9,11 @@ import (
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/files"
-	"github.com/nuzur/go-code-gen/project"
+	projecttypes "github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 )
 
-func generateRepositorySQLCode(ctx context.Context, repoDir string, project *project.Project) error {
+func generateRepositorySQLCode(ctx context.Context, repoDir string, project *projecttypes.Project) error {
 	// generate sqlc yaml file
 	tmplBytes, err := files.GetTemplateBytes(templates, "repo_yaml")
 	if err != nil {
@@ -25,15 +25,13 @@ func generateRepositorySQLCode(ctx context.Context, repoDir string, project *pro
 			OutputPath:    path.Join(repoDir, "sqlc.yaml"),
 			TemplateBytes: tmplBytes,
 			Data: struct {
-				ProjectIdentifier string
-				ProjectModule     string
-				Fields            map[string]string
-				Entities          map[string]string
+				Project  *projecttypes.Project
+				Fields   map[string]string
+				Entities map[string]string
 			}{
-				ProjectIdentifier: project.Identifier,
-				ProjectModule:     project.Module,
-				Fields:            project.FieldsToCamelCase(),
-				Entities:          project.EntitiesToCamelCase(),
+				Project:  project,
+				Fields:   project.FieldsToCamelCase(),
+				Entities: project.EntitiesToCamelCase(),
 			},
 			DisableGoFormat: true,
 			Funcs: template.FuncMap{

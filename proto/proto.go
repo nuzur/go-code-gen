@@ -21,8 +21,6 @@ var templates embed.FS
 type ProtoEntityTemplate struct {
 	Entity             *nemgen.Entity
 	Project            *project.Project
-	ProjectIdentifier  string
-	ProjectModule      string
 	ParentIdentifier   string
 	OriginalIdentifier string
 	FinalIdentifier    string
@@ -90,11 +88,6 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
-	if !project.ProtoConfig.Enabled {
-		fmt.Printf("--[GCG][Proto] Skipping proto generation\n")
-		return nil
-	}
-
 	projectDir := project.Dir()
 	protoDir := path.Join(projectDir, project.ProtoConfig.Dir)
 
@@ -102,6 +95,11 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 	err = os.RemoveAll(protoDir)
 	if err != nil {
 		fmt.Printf("ERROR: Deleting proto directory\n")
+	}
+
+	if !project.ProtoConfig.Enabled {
+		fmt.Printf("--[GCG][Proto] Skipping proto generation\n")
+		return nil
 	}
 
 	fullDir := path.Join(protoDir, "gen")
@@ -119,7 +117,7 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 			return err
 		}
 	}
-	if project.ProtoConfig.Server {
+	if project.CoreConfig.Enabled && project.ProtoConfig.Server {
 		// generate mappers to/from entity/proto
 		err = generateMappers(ctx, protoDir, project, entityTemplates)
 		if err != nil {

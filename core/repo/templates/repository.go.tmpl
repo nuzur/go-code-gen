@@ -5,18 +5,18 @@ import (
 
 	"database/sql"
 	
-	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"
-	"{{.ProjectModule}}/core/repository/list"
+	{{.Identifier}}db "{{.Module}}/{{.CoreConfig.CoreDir}}/repository/gen"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/repository/list"
 )
 
 type Implementation struct {
-	Queries *{{.ProjectIdentifier}}db.Queries
+	Queries *{{.Identifier}}db.Queries
 	DB      *sql.DB
 	List    *list.Implementation
 }
 
 func New(db *sql.DB) *Implementation {
-	queries := {{.ProjectIdentifier}}db.New(db)
+	queries := {{.Identifier}}db.New(db)
 	return &Implementation{
 		Queries: queries,
 		DB:      db,

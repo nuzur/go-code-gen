@@ -20,13 +20,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "list.go"),
 		TemplateBytes: listTmplBytes,
-		Data: struct {
-			ProjectIdentifier string
-			ProjectModule     string
-		}{
-			ProjectIdentifier: project.Identifier,
-			ProjectModule:     project.Module,
-		},
+		Data:          project,
 	})
 	if err != nil {
 		return err
@@ -40,13 +34,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "list_fields.go"),
 		TemplateBytes: listFieldsTmplBytes,
-		Data: struct {
-			ProjectIdentifier string
-			ProjectModule     string
-		}{
-			ProjectIdentifier: project.Identifier,
-			ProjectModule:     project.Module,
-		},
+		Data:          project,
 	})
 	if err != nil {
 		return err
@@ -60,13 +48,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "types.go"),
 		TemplateBytes: typesTmplBytes,
-		Data: struct {
-			ProjectIdentifier string
-			ProjectModule     string
-		}{
-			ProjectIdentifier: project.Identifier,
-			ProjectModule:     project.Module,
-		},
+		Data:          project,
 	})
 	if err != nil {
 		return err

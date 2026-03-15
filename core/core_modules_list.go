@@ -13,23 +13,19 @@ import (
 )
 
 type listData struct {
-	ProjectIdentifier string
-	ProjectModule     string
-	EntityIdentifier  string
-	EntityName        string
-	Fields            []entities.FieldTemplate
-	Project           *project.Project
+	Project          *project.Project
+	EntityIdentifier string
+	EntityName       string
+	Fields           []entities.FieldTemplate
 }
 
 func generateList(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GPG] Generating core module list: %s\n", req.Entity.Identifier)
+	fmt.Printf("--[GCG] Generating core module list: %s\n", req.Entity.Identifier)
 	listData := listData{
-		ProjectIdentifier: req.Project.Identifier,
-		ProjectModule:     req.Project.Module,
-		EntityIdentifier:  req.Entity.Identifier,
-		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
-		Fields:            req.Fields,
-		Project:           req.Project,
+		EntityIdentifier: req.Entity.Identifier,
+		EntityName:       gcgstrings.ToCamelCase(req.Entity.Identifier),
+		Fields:           req.Fields,
+		Project:          req.Project,
 	}
 
 	typeTmplBytes, err := files.GetTemplateBytes(templates, "core_module_list_types")

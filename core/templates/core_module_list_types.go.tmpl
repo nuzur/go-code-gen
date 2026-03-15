@@ -2,12 +2,12 @@ package types
 
 import (
 	"encoding/json"
-	main_entity "{{.ProjectModule}}/entity/{{.EntityIdentifier}}"
+	main_entity "{{.Project.Module}}/entity/{{.EntityIdentifier}}"
 
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"
 	"go.uber.org/zap/zapcore"
-	"{{.ProjectModule}}/core/repository/list"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/list"
 )
 
 type ListRequest struct {

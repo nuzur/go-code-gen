@@ -21,15 +21,16 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
-	if !p.AuthConfig.Enabled {
-		fmt.Printf("--[GPG][AUTH] Auth is disabled, skipping auth generation\n")
-		return nil
-	}
 	projectDir := p.Dir()
 	authDir := path.Join(projectDir, "auth")
 	err = os.RemoveAll(authDir)
 	if err != nil {
 		fmt.Printf("ERROR: Deleting module directory\n")
+	}
+
+	if !p.AuthConfig.Enabled {
+		fmt.Printf("--[GCG][AUTH] Auth is disabled, skipping auth generation\n")
+		return nil
 	}
 
 	typeTmplBytes, err := files.GetTemplateBytes(templates, "auth_types")
@@ -50,8 +51,6 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		if err != nil {
 			return err
 		}
-	} else {
-		fmt.Printf("--[GPG][AUTH] Skip basic auth\n")
 	}
 
 	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.JWT_SERVER_AUTH_TYPE {
@@ -59,8 +58,6 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		if err != nil {
 			return err
 		}
-	} else {
-		fmt.Printf("--[GPG][AUTH] Skip jwt auth \n")
 	}
 
 	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.KEYCLOAK_AUTH_TYPE {
@@ -68,8 +65,6 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		if err != nil {
 			return err
 		}
-	} else {
-		fmt.Printf("--[GPG][AUTH] Skip keycloak auth \n")
 	}
 
 	return nil

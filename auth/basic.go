@@ -11,7 +11,7 @@ import (
 )
 
 func generateBasicAuth(ctx context.Context, authDir string, project *project.Project) error {
-	fmt.Printf("--[GPG][AUTH] Generating basic auth\n")
+	fmt.Printf("--[GCG][AUTH] Generating basic auth\n")
 	tmplBytes, err := files.GetTemplateBytes(templates, "auth_basic")
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for basic auth: %v\n", err)

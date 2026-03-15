@@ -30,7 +30,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		return fmt.Errorf("%v", err)
 	}
 
-	fmt.Printf("--[GCG] Generating core entities\n")
+	fmt.Printf("--[GCG] Generating entities\n")
 	projectDir := project.Dir()
 	entitiesDir := path.Join(projectDir, project.EntitiesConfig.Dir)
 

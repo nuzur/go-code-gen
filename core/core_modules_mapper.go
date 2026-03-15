@@ -9,20 +9,20 @@ import (
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/maps"
+	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
 type mapperModuleTemplate struct {
-	Package           string
-	EntityName        string
-	ProjectIdentifier string
-	ProjectModule     string
-	Fields            []entities.FieldTemplate
-	Imports           []string
-	HasArrayField     bool
-	HasNullString     bool
-	HasNullUUID       bool
+	Project       *project.Project
+	Package       string
+	EntityName    string
+	Fields        []entities.FieldTemplate
+	Imports       []string
+	HasArrayField bool
+	HasNullString bool
+	HasNullUUID   bool
 }
 
 func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
@@ -39,14 +39,13 @@ func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 		}
 	}
 	mapperTemplate := mapperModuleTemplate{
-		Package:           req.Entity.Identifier,
-		ProjectIdentifier: req.Project.Identifier,
-		ProjectModule:     req.Project.Module,
-		EntityName:        gcgstrings.ToCamelCase(req.Entity.Identifier),
-		Fields:            req.Fields,
-		Imports:           maps.MapKeys(req.Imports),
-		HasArrayField:     hasArrayField,
-		HasNullUUID:       hasNullUUID,
+		Package:       req.Entity.Identifier,
+		Project:       req.Project,
+		EntityName:    gcgstrings.ToCamelCase(req.Entity.Identifier),
+		Fields:        req.Fields,
+		Imports:       maps.MapKeys(req.Imports),
+		HasArrayField: hasArrayField,
+		HasNullUUID:   hasNullUUID,
 	}
 
 	mapperTmplBytes, err := files.GetTemplateBytes(templates, "core_module_mapper")

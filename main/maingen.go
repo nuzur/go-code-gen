@@ -15,13 +15,23 @@ import (
 var templates embed.FS
 
 func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
-	fmt.Printf("--[GPG] Generating main\n")
+	fmt.Printf("--[GCG] Generating main\n")
 	project, err := project.New(params)
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
 
 	projectDir := project.Dir()
+
+	// delete existing main.go if it exists
+	err = files.DeleteFileIfExists(path.Join(projectDir, "main.go"))
+	if err != nil {
+		fmt.Printf("ERROR: Deleting main.go\n")
+	}
+
+	if project.CoreConfig.Enabled == false {
+		return nil
+	}
 
 	tplBytes, err := files.GetTemplateBytes(templates, path.Join("main"))
 	if err != nil {

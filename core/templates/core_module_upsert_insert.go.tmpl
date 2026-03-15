@@ -1,8 +1,8 @@
 package {{.Package}}
 
 {{$entityName := .EntityName}}
-{{$projectIdentifier := .ProjectIdentifier}}
-{{$projectModule := .ProjectModule}}
+{{$projectIdentifier := .Project.Identifier}}
+{{$projectModule := .Project.Module}}
 {{$entityIdenfier := .EntityIdentifier}}
 {{$imports := .Imports}}
 import (
@@ -12,11 +12,11 @@ import (
     {{end}}
 			
 	{{if eq .Project.MonitoringConfig.Enabled true}}
-	"{{.ProjectModule}}/monitoring"
+	"{{$projectModule}}/monitoring"
 	{{end}}
 
-	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"	
-	{{.ProjectIdentifier}}db "{{.ProjectModule}}/core/repository/gen"  
+	"{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"	
+	{{.Project.Identifier}}db "{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"  
 		
 	{{$firstJSON := true}}
 	{{$firstEnumMany := true}}
@@ -39,7 +39,7 @@ import (
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
-	"{{.ProjectModule}}/entity/mapper"
+	"{{.Project.Module}}/entity/mapper"
 	{{end}}	
 )
 
@@ -135,8 +135,8 @@ func buildInsertResponse(req types.UpsertRequest) types.UpsertResponse {
 	}
 }
 
-func mapUpsertRequestToInsertParams(req types.UpsertRequest) {{.ProjectIdentifier}}db.Insert{{.EntityName}}Params {	
-	return {{.ProjectIdentifier}}db.Insert{{.EntityName}}Params{ {{range $field := .Fields}}						
+func mapUpsertRequestToInsertParams(req types.UpsertRequest) {{.Project.Identifier}}db.Insert{{.EntityName}}Params {	
+	return {{.Project.Identifier}}db.Insert{{.EntityName}}Params{ {{range $field := .Fields}}						
         {{$field.Name}}: {{$field.RepoToMapperUpsert}}, 		
 		{{end}}
 	}
@@ -145,7 +145,7 @@ func mapUpsertRequestToInsertParams(req types.UpsertRequest) {{.ProjectIdentifie
 {{if eq .ShouldPublishEvents true}}
 func (m *module) publishInsertEvent(ctx context.Context, 
 		req types.UpsertRequest, 
-		qtx *{{.ProjectIdentifier}}db.Queries) error {
+		qtx *{{.Project.Identifier}}db.Queries) error {
 
 	if m.events == nil {
 		return nil

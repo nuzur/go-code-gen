@@ -3,11 +3,11 @@ package {{.EntityIdentifier}}
 import (
 	"context"
 	"fmt"
-	main_entity "{{.ProjectModule}}/entity/{{.EntityIdentifier}}"
-	"{{.ProjectModule}}/core/module/{{.EntityIdentifier}}/types"
-	repogen "{{.ProjectModule}}/core/repository/gen"
+	main_entity "{{.Project.Module}}/entity/{{.EntityIdentifier}}"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
+	repogen "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/repository/gen"
 	{{if eq .Project.MonitoringConfig.Enabled true}}
-	"{{.ProjectModule}}/monitoring" 
+	"{{.Project.Module}}/monitoring" 
 	{{end}}
 	"slices"
 	

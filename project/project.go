@@ -1,15 +1,12 @@
 package project
 
 import (
-	"bytes"
 	"fmt"
 	"os/exec"
 	"path"
-	"slices"
 
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/strings"
-	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -116,144 +113,26 @@ func New(params *ProjectParams) (*Project, error) {
 	}, nil
 }
 
-func (p *Project) Entities() []*nemgen.Entity {
-	return p.ProjectVersion.Entities
-}
-
-func (p *Project) StandaloneEntities() []*nemgen.Entity {
-	var res []*nemgen.Entity
-	for _, e := range p.ProjectVersion.Entities {
-		if e.Type == nemgen.EntityType_ENTITY_TYPE_STANDALONE {
-			res = append(res, e)
-		}
-	}
-	return res
-}
-
-func (p *Project) UserEntity() *nemgen.Entity {
-	for _, e := range p.ProjectVersion.Entities {
-		if e.Identifier == "user" {
-			return e
-		}
-	}
-	return nil
-}
-
-func (p *Project) UserPasswordField() *nemgen.Field {
-	userEntity := p.UserEntity()
-	if userEntity == nil {
-		return nil
-	}
-	for _, f := range userEntity.Fields {
-		if f.Identifier == "password" || f.Identifier == "pass" || f.Identifier == "pwd" || f.Identifier == "password_hash" {
-			return f
-		}
-	}
-	return nil
-}
-
-func (p *Project) UserPasswordFieldName() string {
-	passwordField := p.UserPasswordField()
-	if passwordField == nil {
-		return ""
-	}
-	return gcgstrings.ToCamelCase(passwordField.Identifier)
-}
-
-func (p *Project) Enums() []*nemgen.Enum {
-	return p.ProjectVersion.Enums
-}
-
 func (p *Project) Dir() string {
 	return path.Join(p.RootPath, p.Identifier)
 }
 
-func (p *Project) GetEnum(uuid string) *nemgen.Enum {
-	for _, e := range p.ProjectVersion.Enums {
-		if e.Uuid == uuid {
-			return e
-		}
-	}
-	return nil
-}
-
-func (p *Project) GetEntity(id string) *nemgen.Entity {
-	for _, e := range p.ProjectVersion.Entities {
-		if e.Uuid == id {
-			return e
-		}
-	}
-	return nil
-}
-
-func (p *Project) GetRelationshipFromField(field *nemgen.Field) *nemgen.Relationship {
-	for _, r := range p.ProjectVersion.Relationships {
-		if slices.Contains(r.From.GetTypeConfig().Entity.FieldUuids, field.Uuid) {
-			return r
-		}
-	}
-	return nil
-}
-
-func (p Project) AuthImport() string {
-	if !p.AuthConfig.Enabled {
-		return ""
-	}
-	if p.HasJWTAuth() && p.AuthConfig.Config.JWT != nil {
-		return fmt.Sprintf("auth \"%s/auth/jwtserver\"", p.Module)
-	}
-
-	if p.HasKeycloakAuth() && p.AuthConfig.Config.Keycloak != nil {
-		return fmt.Sprintf("auth \"%s/auth/keycloak\"", p.Module)
-	}
-	return ""
-}
-
-func (p *Project) FieldsToCamelCase() map[string]string {
-	res := map[string]string{}
-	for _, e := range p.Entities() {
-		for _, f := range e.Fields {
-			_, found := res[f.Identifier]
-			if !found {
-				res[f.Identifier] = gcgstrings.ToCamelCase(f.Identifier)
-			}
-		}
-	}
-	return res
-}
-
-func (p *Project) EntitiesToCamelCase() map[string]string {
-	res := map[string]string{}
-	for _, e := range p.Entities() {
-		_, found := res[e.Identifier]
-		if !found {
-			res[e.Identifier] = gcgstrings.ToCamelCase(e.Identifier)
-		}
-	}
-	return res
-}
-
-func (p *Project) EntitiesAndFieldsToCamelCase() map[string]string {
-	res := p.EntitiesToCamelCase()
-	for k, v := range p.FieldsToCamelCase() {
-		res[k] = v
-	}
-	return res
-}
-
 func (p *Project) InstallDependency(dep string) error {
-	var out bytes.Buffer
-	var stderr bytes.Buffer
 	cmd := exec.Command("go", "get", dep)
 	cmd.Dir = p.Dir()
-	cmd.Stdout = &out
-	cmd.Stderr = &stderr
-	err := cmd.Run()
+	out, err := cmd.Output()
 	if err != nil {
-		fmt.Printf("error running go install %s: %v | %v | %v\n", dep, err, out.String(), stderr.String())
-	}
-	if stderr.Len() > 0 {
-		fmt.Printf("error installing dependency %s: %s\n", dep, stderr.String())
+		fmt.Printf("error running go get %s: %v | %v\n", dep, err, string(out))
 	}
 	return err
+}
+
+func (p *Project) GoModTidy(dir string) {
+	fmt.Printf("--[GCG][Project] Running go mod tidy in %s\n", dir)
+	cmd := exec.Command("go", "mod", "tidy")
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		fmt.Printf("error running go mod tidy: %v | %v\n", err, string(out))
+	}
 }
