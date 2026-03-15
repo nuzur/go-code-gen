@@ -21,7 +21,7 @@ import (
 	"{{.Module}}/monitoring"
 	{{end}}
 	{{if eq .CoreConfig.EventsConfig.Enabled true}}
-	"{{.Module}}/{{$coreDir}}/event"
+	"{{.Module}}/{{$coreDir}}/{{.CoreConfig.EventsConfig.Dir}}"
 	{{end}}
 	
 )

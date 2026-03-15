@@ -1,10 +1,10 @@
 package {{.Package}}
 
 import (    
-    main_entity "{{.Project.Module}}/entity/{{.Package}}"
+    main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.Package}}"
     {{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"  
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
-		"{{.Project.Module}}/entity/mapper"
+		"{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/mapper"
 	{{end}}
 	{{range $import := .Imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 
     "{{$import}}" {{end}}{{end}}

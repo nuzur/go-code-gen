@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
-	pb "{{.Project.Module}}/idl/gen"
-	pbmapper "{{.Project.Module}}/idl/mapper"
+	pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
+	pbmapper "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/mapper"
 	{{ if .Project.MonitoringConfig.Enabled }}
 	"{{.Project.Module}}/monitoring"
 	{{end}}

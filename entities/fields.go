@@ -28,7 +28,7 @@ func ResolveFieldsAndImports(project *project.Project, fields []*nemgen.Field, e
 			if rel != nil {
 				dependantEntity := project.GetEntity(rel.To.TypeConfig.Entity.EntityUuid)
 				if dependantEntity != nil {
-					nestedEntityImport := fmt.Sprintf("%s/entity/%s", project.Module, dependantEntity.Identifier)
+					nestedEntityImport := fmt.Sprintf("%s/%s/%s", project.Module, project.EntitiesConfig.Dir, dependantEntity.Identifier)
 					imports[nestedEntityImport] = struct{}{}
 				}
 			}

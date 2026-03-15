@@ -2,7 +2,7 @@ package mapper
 
 import (
     "{{.Project.Module}}/enum"
-    pb "{{.Project.Module}}/idl/gen"    
+    pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"    
 )
 
 {{range $enum := .Enums}}

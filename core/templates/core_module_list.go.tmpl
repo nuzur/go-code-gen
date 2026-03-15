@@ -3,7 +3,7 @@ package {{.EntityIdentifier}}
 import (
 	"context"
 	"fmt"
-	main_entity "{{.Project.Module}}/entity/{{.EntityIdentifier}}"
+	main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.EntityIdentifier}}"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
 	repogen "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"
 	{{if eq .Project.MonitoringConfig.Enabled true}}

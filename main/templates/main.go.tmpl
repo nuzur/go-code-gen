@@ -18,7 +18,7 @@ import (
 	{{ end }}
 	
 	{{if eq .CoreConfig.EventsConfig.Enabled true}}
-	"{{.Module}}/{{.CoreConfig.CoreDir}}/event"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.EventsConfig.Dir}}"
 	{{end}}
 
 	{{if eq .KafkaEnabled true}}

@@ -6,11 +6,11 @@ import (
 	//"encoding/json"
 	
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
-	pb "{{.Project.Module}}/idl/gen"
+	pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
 	{{ if .Project.MonitoringConfig.Enabled }}
 	"{{.Project.Module}}/monitoring"
 	{{end}}
-	pbmapper "{{.Project.Module}}/idl/mapper"
+	pbmapper "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/mapper"
 
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"

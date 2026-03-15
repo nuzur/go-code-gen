@@ -36,7 +36,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 				importsTypes[*f.Field.Import()] = struct{}{}
 			}
 			if f.Field.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID && !f.Field.IsRequired() {
-				importsFetch[fmt.Sprintf("%s/entity/mapper", req.Project.Module)] = struct{}{}
+				importsFetch[fmt.Sprintf("%s/%s/mapper", req.Project.Module, req.Project.EntitiesConfig.Dir)] = struct{}{}
 			}
 		}
 

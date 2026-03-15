@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net"
 	"{{.Module}}/core"
-	pb "{{.Module}}/idl/gen"
+	pb "{{.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
 	{{ if .Project.MonitoringConfig.Enabled }}	
 	"{{.Module}}/monitoring"
 	{{ end }}

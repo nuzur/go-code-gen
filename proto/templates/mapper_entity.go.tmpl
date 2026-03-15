@@ -7,8 +7,8 @@ package mapper
 {{$projectModule := .Project.Module}}
 
 import (
-    main_entity "{{.Project.Module}}/entity/{{.OriginalIdentifier}}"
-    pb "{{.Project.Module}}/idl/gen"
+    main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.OriginalIdentifier}}"
+    pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
     {{range $field := .Fields}}
         {{if and (eq $field.GolangType "time.Time") (eq $timestampImport false)}}
         "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        

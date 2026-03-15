@@ -3,7 +3,7 @@ package types
 import (
     "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoDir}}"
     {{if eq .CoreConfig.EventsConfig.Enabled true}}
-    "{{.Module}}/{{.CoreConfig.CoreDir}}/event"
+    "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.EventsConfig.Dir}}"
     {{end}}
     {{if eq .MonitoringConfig.Enabled true}}
     "{{.Module}}/monitoring"

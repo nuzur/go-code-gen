@@ -2,7 +2,7 @@ package {{.Package}}
 
 {{$projectModule := .Project.Module}}
 import (
-    entitytypes "{{.Project.Module}}/entity/types"
+    entitytypes "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/types"
     
     {{range $import := .Imports}} {{if and (ne $import "github.com/gofrs/uuid") (ne $import "github.com/guregu/null/v6") (ne $import (printf "%s/enum" $projectModule)) (ne $import "time")  }}
     "{{$import}}" {{end}} {{end}}

@@ -3,7 +3,8 @@ package {{.Package}}
 {{$entityName := .EntityName}}
 {{$projectIdentifier := .Project.Identifier}}
 {{$projectModule := .Project.Module}}
-{{$entityIdenfier := .EntityIdentifier}}
+{{$entityDir := .Project.EntitiesConfig.Dir}}
+{{$entityIdentifier := .EntityIdentifier}}
 {{$imports := .Imports}}
 import (
 	"context"
@@ -26,7 +27,7 @@ import (
 		{{end}}
 		{{if eq $firstEnumMany true}}
 			{{if eq $field.EnumMany true}}
-				main_entity "{{$projectModule}}/entity/{{$entityIdenfier}}"
+				main_entity "{{$projectModule}}/{{$entityDir}}/{{$entityIdentifier}}"
 				{{$firstEnumMany = false}}
 			{{end}}
 		{{end}}
@@ -35,7 +36,7 @@ import (
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
-	"{{.Project.Module}}/entity/mapper"
+	"{{$projectModule}}/{{$entityDir}}/mapper"
 	{{end}}
 	
 )
