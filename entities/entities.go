@@ -30,7 +30,6 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		return fmt.Errorf("%v", err)
 	}
 
-	fmt.Printf("--[GCG] Generating entities\n")
 	projectDir := project.Dir()
 	entitiesDir := path.Join(projectDir, project.EntitiesConfig.Dir)
 
@@ -40,6 +39,12 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		fmt.Printf("ERROR: Deleting entity directory\n")
 	}
 
+	if !project.EntitiesConfig.Enabled {
+		fmt.Printf("INFO: Entities generation is disabled, skipping...\n")
+		return nil
+	}
+
+	fmt.Printf("--[GCG] Generating entities and enums\n")
 	generateEnums(ctx, project)
 
 	allImports := map[string]any{}

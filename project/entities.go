@@ -8,6 +8,7 @@ import (
 )
 
 type EntitiesConfig struct {
+	Enabled              bool   `json:"enabled"`
 	IncludeListInterface bool   `json:"include_list_interface"`
 	Dir                  string `json:"dir"`
 }
