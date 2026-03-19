@@ -86,11 +86,13 @@ func New(params *ProjectParams) (*Project, error) {
 	if !files.FileExists(goModPath) {
 		err := files.CreateGoMod(path.Join(params.RootPath, params.Identifier), params.Module)
 		if err != nil {
+			fmt.Printf("[GCG] Error creating mod file %v", err.Error())
 			return nil, fmt.Errorf("error creating go.mod: %v", err)
 		}
 	} else {
 		moduleName, err := files.ReadGoMod(goModPath)
 		if err != nil {
+			fmt.Printf("[GCG] Error reading mod file %v", err.Error())
 			return nil, fmt.Errorf("error reading go.mod: %v", err)
 		}
 		if moduleName != params.Module {
