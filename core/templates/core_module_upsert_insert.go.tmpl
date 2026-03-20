@@ -17,7 +17,7 @@ import (
 	{{end}}
 
 	"{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"	
-	{{.Project.Identifier}}db "{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"  
+	{{.Project.Identifier}}db "{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"  
 		
 	{{$firstJSON := true}}
 	{{$firstEnumMany := true}}

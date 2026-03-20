@@ -1,7 +1,7 @@
 package types 
 
 import (
-    "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoDir}}"
+    "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoConfig.Dir}}"
     {{if eq .CoreConfig.EventsConfig.Enabled true}}
     "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.EventsConfig.Dir}}"
     {{end}}

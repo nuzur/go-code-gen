@@ -67,8 +67,8 @@ func New(params *ProjectParams) (*Project, error) {
 		params.CoreConfig.CoreDir = "core"
 	}
 
-	if params.CoreConfig.RepoDir == "" {
-		params.CoreConfig.RepoDir = "repository"
+	if params.CoreConfig.RepoConfig.Dir == "" {
+		params.CoreConfig.RepoConfig.Dir = "repository"
 	}
 
 	if params.CoreConfig.EventsConfig.Dir == "" {
@@ -77,6 +77,10 @@ func New(params *ProjectParams) (*Project, error) {
 
 	if params.APIConfig.GRPCPort == "" {
 		params.APIConfig.GRPCPort = "50051"
+	}
+
+	if params.APIConfig.HTTPPort == "" {
+		params.APIConfig.HTTPPort = "8080"
 	}
 
 	// check for go module in root path, if not present, add it

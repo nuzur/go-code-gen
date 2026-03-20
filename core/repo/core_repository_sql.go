@@ -8,14 +8,14 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/nuzur/go-code-gen/files"
-	"github.com/nuzur/go-code-gen/project"
+	projecttypes "github.com/nuzur/go-code-gen/project"
 	nemgen "github.com/nuzur/nem/idl/gen"
 	"github.com/nuzur/sql-gen/db"
 	"github.com/nuzur/sql-gen/tosql"
 	"github.com/otiai10/copy"
 )
 
-func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir string) error {
+func generateRepositorySQL(ctx context.Context, project *projecttypes.Project, sqlDir string, dbType projecttypes.DatabaseType) error {
 
 	entityUUIDs := []string{}
 	for _, e := range project.Entities() {
@@ -29,10 +29,14 @@ func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir
 	marshalledPv, _ := json.Marshal(project.ProjectVersion)
 	var projectVersionCopy nemgen.ProjectVersion
 	json.Unmarshal(marshalledPv, &projectVersionCopy)
+	dbTypeForSQLGen := db.MYSQLDBType
+	if dbType == projecttypes.POSTGRESQL {
+		dbTypeForSQLGen = db.PGDBType
+	}
 	req := tosql.GenerateRequest{
 		ExecutionUUID: uuid.Must(uuid.NewV4()).String(),
 		Configvalues: &tosql.ConfigValues{
-			DBType:   db.MYSQLDBType,
+			DBType:   dbTypeForSQLGen,
 			Entities: entityUUIDs,
 			Actions: []tosql.Action{
 				tosql.CreateAction,
@@ -46,6 +50,7 @@ func generateRepositorySQL(ctx context.Context, project *project.Project, sqlDir
 			},
 		},
 		ProjectVersion: &projectVersionCopy,
+		ForGolang:      true,
 	}
 	res, err := tosql.GenerateSQL(context.Background(), req)
 	if err != nil {

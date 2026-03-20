@@ -3,7 +3,7 @@ package {{.Package}}
 import (
 	"context"
     "sync"
-	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}"
 	coretypes "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/types"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
 	{{if eq .Project.MonitoringConfig.Enabled true}}

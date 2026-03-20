@@ -7,7 +7,12 @@ import (
 	"fmt"
 	"context"
 
+	{{if eq .CoreConfig.RepoConfig.DatabaseType "postgresql"}}
+	_ "github.com/lib/pq"
+	{{else if eq .CoreConfig.RepoConfig.DatabaseType "mysql"}}
 	_ "github.com/go-sql-driver/mysql"
+	{{end}}
+	
 	"go.uber.org/config"
 	"go.uber.org/fx"	
 	{{.Identifier}}config "{{.Module}}/config"
@@ -16,7 +21,7 @@ import (
     {{range $entity := .StandaloneEntities}}
     "{{$projectIdentifier}}/{{$coreDir}}/module/{{$entity.Identifier}}"	
     {{end}}	
-	"{{.Module}}/{{$coreDir}}/{{.CoreConfig.RepoDir}}"
+	"{{.Module}}/{{$coreDir}}/{{.CoreConfig.RepoConfig.Dir}}"
 	{{if eq .MonitoringConfig.Enabled true}}
 	"{{.Module}}/monitoring"
 	{{end}}

@@ -1,6 +1,6 @@
 version: "2"
 sql:
-  - engine: "mysql"
+  - engine: "{{.Project.CoreConfig.RepoConfig.DatabaseType}}"
     schema: "sql/schema/create.sql"
     queries: "sql/queries/"
     gen:
@@ -14,7 +14,7 @@ sql:
           {{$identifier}}: {{ $camelCase }}{{end}}        
         overrides:          
           - db_type: "int"            
-            engine: "mysql"
+            engine: "{{.Project.CoreConfig.RepoConfig.DatabaseType}}"
             go_type:              
               type: "int64"
           - db_type: "json"            

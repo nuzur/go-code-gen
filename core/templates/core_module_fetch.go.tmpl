@@ -7,7 +7,7 @@ import (
     "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
     {{if ne .Select.IsPrimary true}}
     "errors"
-    {{.Project.Identifier}}db "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoDir}}/gen"{{end}}        
+    {{.Project.Identifier}}db "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"{{end}}        
     {{ if .Project.MonitoringConfig.Enabled }}
     "{{ $projectModule }}/monitoring"  
     {{ end }}
