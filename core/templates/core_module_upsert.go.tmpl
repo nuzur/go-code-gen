@@ -2,8 +2,10 @@ package {{.Package}}
 
 import (
 	"context"    
-	
-	"github.com/gofrs/uuid"	
+	{{$addedUUIDImport := false}}
+    {{range $pk := .PrimaryKeys}}
+    {{if $pk.IsUUID}}{{if not $addedUUIDImport}}"github.com/gofrs/uuid"{{$addedUUIDImport = true}}{{end}}{{end}}    
+    {{end}}  	
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"		
 )
 

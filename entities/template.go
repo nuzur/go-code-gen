@@ -175,3 +175,7 @@ func (f FieldTemplate) IsSearchable() bool {
 func (f FieldTemplate) Array() bool {
 	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY
 }
+
+func (f FieldTemplate) IsUUID() bool {
+	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID
+}

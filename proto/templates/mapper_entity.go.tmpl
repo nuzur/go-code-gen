@@ -4,6 +4,7 @@ package mapper
 {{$uuidImport := false}}
 {{$enumImport := false}}
 {{$nullImport := false}}
+{{$jsonImport := false}}
 {{$projectModule := .Project.Module}}
 
 import (
@@ -16,8 +17,8 @@ import (
         "{{$projectModule}}/enum" {{$enumImport = true}}{{end}}
         {{if and (eq $field.IsNullable true) (eq $nullImport false)}}
         "github.com/guregu/null/v6" {{$nullImport = true}}{{end}}  
-        {{if (eq $field.IsRawJSON true)}}
-        "encoding/json" {{end}}  
+        {{if and (eq $field.IsRawJSON true) (eq $jsonImport false)}}
+        "encoding/json" {{$jsonImport = true}}{{end}}  
     {{end}}    
     
 )

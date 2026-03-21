@@ -159,24 +159,24 @@ func (f FieldTemplate) ZeroValue() string {
 		return "uuid.Nil"
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
 		if !f.IsRequired() {
-			return "null.Int64"
+			return "null.Int64{}"
 		}
 		return "0"
 	case nemgen.FieldType_FIELD_TYPE_FLOAT:
 		if !f.IsRequired() {
-			return "null.Float"
+			return "null.Float{}"
 		}
 		return "0.0"
 	case nemgen.FieldType_FIELD_TYPE_DECIMAL:
 		if !f.IsRequired() {
-			return "null.Float"
+			return "null.Float{}"
 		}
-		return "float64"
+		return "0.0"
 	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
 		if !f.IsRequired() {
-			return "null.Bool"
+			return "null.Bool{}"
 		}
-		return "bool"
+		return "false"
 	case nemgen.FieldType_FIELD_TYPE_CHAR,
 		nemgen.FieldType_FIELD_TYPE_VARCHAR,
 		nemgen.FieldType_FIELD_TYPE_TEXT,
@@ -190,22 +190,22 @@ func (f FieldTemplate) ZeroValue() string {
 		nemgen.FieldType_FIELD_TYPE_CODE,
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		if !f.IsRequired() {
-			return "null.String"
+			return "null.String{}"
 		}
-		return "string"
+		return "\"\""
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
 		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			return "[]byte"
+			return "[]byte{}"
 		}
 
 		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			return "[]string"
+			return "[]string{}"
 		}
 
 		if !f.IsRequired() {
-			return "null.String"
+			return "null.String{}"
 		}
-		return "string"
+		return "\"\""
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
@@ -215,7 +215,7 @@ func (f FieldTemplate) ZeroValue() string {
 			}
 			return "enum." + gcgstrings.ToCamelCase(enum.Identifier)
 		}
-		return "int64"
+		return "0"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
 		rel := f.Project.GetRelationshipFromField(f.Field)
 		if rel != nil {
@@ -224,21 +224,21 @@ func (f FieldTemplate) ZeroValue() string {
 				return gcgstrings.ToCamelCase(dependantEntity.Identifier)
 			}
 		}
-		return "RawMessage"
+		return "nil"
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return f.ArrayGolangType()
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
 		if !f.IsRequired() {
-			return "null.Time"
+			return "null.Time{}"
 		}
-		return "time.Time"
+		return "time.Time{}"
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
 		if !f.IsRequired() {
-			return "null.String"
+			return "null.String{}"
 		}
-		return "string"
+		return "\"\""
 	default:
 		return "interface{}"
 	}

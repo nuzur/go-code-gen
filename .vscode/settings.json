@@ -3,6 +3,7 @@
         "Configvalues",
         "einride",
         "entitytypes",
+        "errgroup",
         "filetools",
         "gcgstrings",
         "genproto",

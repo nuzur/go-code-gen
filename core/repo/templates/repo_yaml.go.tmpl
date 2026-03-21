@@ -13,8 +13,7 @@ sql:
         rename: {{range $identifier, $camelCase := .Fields}}
           {{$identifier}}: {{ $camelCase }}{{end}}        
         overrides:          
-          - db_type: "int"            
-            engine: "{{.Project.CoreConfig.RepoConfig.DatabaseType}}"
+          - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"int"{{else}}"pg_catalog.int4"{{end}}            
             go_type:              
               type: "int64"
           - db_type: "json"            
@@ -60,7 +59,7 @@ sql:
               import: "github.com/guregu/null/v6"
               package: "null"
               type: "String"
-          - db_type: int
+          - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"int"{{else}}"pg_catalog.int4"{{end}}
             nullable: true            
             go_type:
               import: "github.com/guregu/null/v6"

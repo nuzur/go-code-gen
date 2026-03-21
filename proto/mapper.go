@@ -62,20 +62,23 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
-		OutputPath:    path.Join(protoDir, "mapper", "enum.go"),
-		TemplateBytes: tmplEnumBytes,
-		Data: struct {
-			Project *projecttypes.Project
-			Enums   []ProtoEnumTemplate
-		}{
-			Project: project,
-			Enums:   enumTemplates,
-		},
-		DisableGoFormat: false,
-	})
-	if err != nil {
-		return err
+
+	if len(enumTemplates) > 0 {
+		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+			OutputPath:    path.Join(protoDir, "mapper", "enum.go"),
+			TemplateBytes: tmplEnumBytes,
+			Data: struct {
+				Project *projecttypes.Project
+				Enums   []ProtoEnumTemplate
+			}{
+				Project: project,
+				Enums:   enumTemplates,
+			},
+			DisableGoFormat: false,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, et := range entityTemplates {

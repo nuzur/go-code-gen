@@ -18,14 +18,19 @@ func (i *Implementation) Produce(message []byte, entityIdentifier string, action
     if i.provider.Get("events.enabled").String() == "false" {
         return nil
     }
+
+    
 	
     {{if eq .KafkaEnabled true}}
+    topics := []string{}
+	i.provider.Get("kafka.topics").Populate(&topics)
     eg := errgroup.Group{}
-        {{range $t := .KafkaConfig.Topics}}  
+        for _, topic := range topics {
+            t := topic
             eg.Go(func() error {
-                return i.produceToKafkaTopic("{{$t}}", message, entityIdentifier, action)
+                return i.produceToKafkaTopic(t, message, entityIdentifier, action)
             })
-        {{end}}	
+        }        
         if err := eg.Wait(); err != nil {           
             return err
         }    

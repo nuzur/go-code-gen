@@ -16,11 +16,13 @@ auth:
 events:
   enabled: true
 kafka:  
-  version: {{.KafkaConfig.Version}} 
-  brokers: {{range $b := .KafkaConfig.Brokers}}  
-    - {{$b}} {{end}}    
-  topics: {{range $t := .KafkaConfig.Topics}}  
-    - {{$t}} {{end}}
+  version: << Kafka Version Here >>
+  brokers: 
+    - << Kafka Broker 1 Here >>
+    - << Kafka Broker 2 Here >>
+  topics: 
+    - << Kafka Topic 1 Here >>
+    - << Kafka Topic 2 Here >>
 {{end}}
 
 db:

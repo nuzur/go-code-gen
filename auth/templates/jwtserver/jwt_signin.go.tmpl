@@ -53,9 +53,10 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
     }
 
-    user := userRes.Results[0]
+    
 	
 	{{ if ne .UserPasswordField nil }}
+	user := userRes.Results[0]
 	{{$field := .UserPasswordField}}
 	{{if $field.Required}}
 	passwordStr := user.{{.UserPasswordFieldName}}

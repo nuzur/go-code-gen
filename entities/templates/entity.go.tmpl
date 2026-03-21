@@ -21,7 +21,7 @@ func (e {{.EntityName}}) String() string {
 
 func (e {{.EntityName}}) PrimaryKeyValues() []string {  
     return []string{
-    {{range $pk := .PrimaryKeys}}e.{{$pk.Name}}.String(),
+    {{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}e.{{$pk.Name}}.String(){{else}}e.{{$pk.Name}}{{end}},
     {{end}}
     }    
 }

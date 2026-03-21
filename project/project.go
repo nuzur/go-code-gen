@@ -71,6 +71,10 @@ func New(params *ProjectParams) (*Project, error) {
 		params.CoreConfig.RepoConfig.Dir = "repository"
 	}
 
+	if params.CoreConfig.RepoConfig.DatabaseType == "" {
+		params.CoreConfig.RepoConfig.DatabaseType = MYSQL
+	}
+
 	if params.CoreConfig.EventsConfig.Dir == "" {
 		params.CoreConfig.EventsConfig.Dir = "event"
 	}
