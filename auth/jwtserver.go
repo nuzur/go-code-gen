@@ -17,10 +17,6 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		return errors.New("invalid auth type")
 	}
 
-	if project.AuthConfig.Config.JWT == nil {
-		return errors.New("missing JWT config")
-	}
-
 	jwtServerDir := path.Join(authDir, "jwtserver")
 	fmt.Printf("--[GCG][AUTH] Generating JWT server\n")
 	jwtTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_server"))
@@ -43,7 +39,6 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "types.go"),
 		TemplateBytes: jwtTypesTmplBytes,
-		Data:          project.AuthConfig.Config.JWT,
 	})
 	if err != nil {
 		return err

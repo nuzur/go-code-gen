@@ -3,17 +3,14 @@ ports:
   grpc: {{.APIConfig.GRPCPort}}
   http: {{.APIConfig.HTTPPort}}
 
-auth: {{if eq .HasBasicAuth true}} 
-  basic:
-    username: {{ .Auth.Config.Basic.Username }}
-    password: {{ .Auth.Config.Basic.Password }}{{end}}
+auth:
   {{if eq .HasJWTAuth true}}jwt:
-    key: {{ .AuthConfig.Config.JWT.Key }}{{end}}
+    key: << Key Here >>{{end}}
   {{if eq .HasKeycloakAuth true}}keycloak:
-    hostname: {{ .AuthConfig.Config.Keycloak.Hostname }}
-    realm: {{ .AuthConfig.Config.Keycloak.Realm }}
-    client_id: {{ .AuthConfig.Config.Keycloak.ClientID }}
-    client_secret: {{ .AuthConfig.Config.Keycloak.ClientSecret }}{{end}}
+    hostname: << Keycloak Hostname Here >>
+    realm: << Keycloak Realm Here >>
+    client_id: << Keycloak Client ID Here >>
+    client_secret: << Keycloak Client Secret Here >>{{end}}
 
 {{if eq .KafkaEnabled true}}
 events:

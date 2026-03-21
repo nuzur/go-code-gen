@@ -16,10 +16,6 @@ func generateKeycloakClient(ctx context.Context, authDir string, project *projec
 		return errors.New("invalid auth type")
 	}
 
-	if project.AuthConfig.Config.Keycloak == nil {
-		return errors.New("missing keycloak config")
-	}
-
 	kcServerDir := path.Join(authDir, "keycloak")
 	fmt.Printf("--[GCG][AUTH] Generating keycloak client\n")
 	clientTmplBytes, err := files.GetTemplateBytes(templates, path.Join("keycloak", "keycloak_client"))

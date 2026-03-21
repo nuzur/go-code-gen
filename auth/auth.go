@@ -46,13 +46,6 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 		return err
 	}
 
-	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.BASIC_AUTH_TYPE {
-		err = generateBasicAuth(ctx, authDir, p)
-		if err != nil {
-			return err
-		}
-	}
-
 	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.JWT_SERVER_AUTH_TYPE {
 		err := generateBasicJWTServer(ctx, authDir, p)
 		if err != nil {
