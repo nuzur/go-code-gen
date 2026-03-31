@@ -7,7 +7,10 @@ import (
 
 	"github.com/nuzur/go-code-gen/auth"
 	"github.com/nuzur/go-code-gen/core"
+	"github.com/nuzur/go-code-gen/docker"
 	"github.com/nuzur/go-code-gen/entities"
+	"github.com/nuzur/go-code-gen/githubactions"
+	"github.com/nuzur/go-code-gen/helm"
 	maingen "github.com/nuzur/go-code-gen/main"
 	"github.com/nuzur/go-code-gen/project"
 	"github.com/nuzur/go-code-gen/proto"
@@ -40,6 +43,21 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	}
 
 	err = maingen.GenerateMain(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	err = docker.GenerateDocker(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	err = helm.GenerateHelm(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	err = githubactions.GenerateGitHubActions(ctx, params)
 	if err != nil {
 		return err
 	}

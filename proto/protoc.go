@@ -50,10 +50,14 @@ func generateProtoc(ctx context.Context, protoDir string, project *project.Proje
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println(fmt.Sprint(err) + ": " + stderr.String())
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Running gen.sh: %v, stderr: %s", err, stderr.String()))
+		}
 		return err
 	} else {
-		fmt.Println("--[GCG][Proto] Proto Go code generated! " + out.String())
+		if project.OnStatusChange != nil {
+			project.OnStatusChange("Proto code generated successfully!")
+		}
 	}
 	return err
 }

@@ -1,0 +1,42 @@
+name: {{.Identifier}} helm
+
+env:
+  GCR_IMAGE: ghcr.io/${{ "{{" }} github.repository_owner {{ "}}" }}/helm
+  REGISTRY: ghcr.io
+  APP_NAME: {{.Identifier}}
+
+on:
+  push:
+    branches:
+      - {{.GitHubActionsConfig.MainBranch}}
+    paths:
+      - {{.HelmConfig.Dir}}/{{.Identifier}}/**
+
+jobs:
+  release:
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
+        with:
+            registry: ${{ "{{" }} env.REGISTRY {{ "}}" }}
+            username: ${{ "{{" }} github.actor {{ "}}" }}
+            password: ${{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }}
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+      - name: Login to GHCR using helm
+        run: |
+          echo ${{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }} | helm registry login ghcr.io --username ${{ "{{" }} github.actor {{ "}}" }} --password-stdin
+      - name: Package helm chart to local registry
+        run: |
+          helm package ${{ "{{" }} github.workspace {{ "}}" }}/{{.HelmConfig.Dir}}/{{.Identifier}}/
+      - name: Publish chart to GHCR
+        run: |
+          helm push {{.Identifier}}-$(grep 'version:' ${{ "{{" }} github.workspace {{ "}}" }}/{{.HelmConfig.Dir}}/{{.Identifier}}/Chart.yaml | tail -n1 | awk '{ print $2 }').tgz oci://${{ "{{" }} env.GCR_IMAGE {{ "}}" }}

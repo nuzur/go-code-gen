@@ -11,33 +11,39 @@ import (
 )
 
 type Project struct {
-	RootPath         string
-	Identifier       string
-	Module           string
-	Project          *nemgen.Project
-	ProjectVersion   *nemgen.ProjectVersion
-	EntitiesConfig   EntitiesConfig
-	ProtoConfig      ProtoConfig
-	CoreConfig       CoreConfig
-	MonitoringConfig MonitoringConfig
-	AuthConfig       AuthConfig
-	APIConfig        APIConfig
-	OnStatusChange   func(status string)
+	RootPath             string
+	Identifier           string
+	Module               string
+	Project              *nemgen.Project
+	ProjectVersion       *nemgen.ProjectVersion
+	EntitiesConfig       EntitiesConfig
+	ProtoConfig          ProtoConfig
+	CoreConfig           CoreConfig
+	MonitoringConfig     MonitoringConfig
+	AuthConfig           AuthConfig
+	APIConfig            APIConfig
+	DockerConfig         DockerConfig
+	HelmConfig           HelmConfig
+	GitHubActionsConfig  GitHubActionsConfig
+	OnStatusChange       func(status string)
 }
 
 type ProjectParams struct {
-	RootPath         string
-	Identifier       string
-	Module           string
-	Project          *nemgen.Project
-	ProjectVersion   *nemgen.ProjectVersion
-	EntitiesConfig   EntitiesConfig
-	ProtoConfig      ProtoConfig
-	CoreConfig       CoreConfig
-	MonitoringConfig MonitoringConfig
-	AuthConfig       AuthConfig
-	APIConfig        APIConfig
-	OnStatusChange   func(status string)
+	RootPath             string
+	Identifier           string
+	Module               string
+	Project              *nemgen.Project
+	ProjectVersion       *nemgen.ProjectVersion
+	EntitiesConfig       EntitiesConfig
+	ProtoConfig          ProtoConfig
+	CoreConfig           CoreConfig
+	MonitoringConfig     MonitoringConfig
+	AuthConfig           AuthConfig
+	APIConfig            APIConfig
+	DockerConfig         DockerConfig
+	HelmConfig           HelmConfig
+	GitHubActionsConfig  GitHubActionsConfig
+	OnStatusChange       func(status string)
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -89,6 +95,30 @@ func New(params *ProjectParams) (*Project, error) {
 		params.APIConfig.HTTPPort = "8080"
 	}
 
+	if params.DockerConfig.BaseImage == "" {
+		params.DockerConfig.BaseImage = "golang:1.22-alpine"
+	}
+
+	if params.DockerConfig.RunImage == "" {
+		params.DockerConfig.RunImage = "alpine:latest"
+	}
+
+	if params.HelmConfig.Dir == "" {
+		params.HelmConfig.Dir = ".helm"
+	}
+
+	if params.HelmConfig.ImageTag == "" {
+		params.HelmConfig.ImageTag = "latest"
+	}
+
+	if params.GitHubActionsConfig.GoVersion == "" {
+		params.GitHubActionsConfig.GoVersion = "1.22"
+	}
+
+	if params.GitHubActionsConfig.MainBranch == "" {
+		params.GitHubActionsConfig.MainBranch = "main"
+	}
+
 	// check for go module in root path, if not present, add it
 	// read go.mod if exists and check if module name matches, if not, return error
 	// if go.mod does not exist, create one with the module name
@@ -114,18 +144,21 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	return &Project{
-		RootPath:         params.RootPath,
-		Identifier:       params.Identifier,
-		Module:           params.Module,
-		Project:          params.Project,
-		ProjectVersion:   params.ProjectVersion,
-		EntitiesConfig:   params.EntitiesConfig,
-		ProtoConfig:      params.ProtoConfig,
-		CoreConfig:       params.CoreConfig,
-		MonitoringConfig: params.MonitoringConfig,
-		AuthConfig:       params.AuthConfig,
-		APIConfig:        params.APIConfig,
-		OnStatusChange:   params.OnStatusChange,
+		RootPath:            params.RootPath,
+		Identifier:          params.Identifier,
+		Module:              params.Module,
+		Project:             params.Project,
+		ProjectVersion:      params.ProjectVersion,
+		EntitiesConfig:      params.EntitiesConfig,
+		ProtoConfig:         params.ProtoConfig,
+		CoreConfig:          params.CoreConfig,
+		MonitoringConfig:    params.MonitoringConfig,
+		AuthConfig:          params.AuthConfig,
+		APIConfig:           params.APIConfig,
+		DockerConfig:        params.DockerConfig,
+		HelmConfig:          params.HelmConfig,
+		GitHubActionsConfig: params.GitHubActionsConfig,
+		OnStatusChange:      params.OnStatusChange,
 	}, nil
 }
 
