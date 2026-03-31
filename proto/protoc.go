@@ -15,7 +15,9 @@ import (
 )
 
 func generateProtoc(ctx context.Context, protoDir string, project *project.Project, entityTemplates []*ProtoEntityTemplate) error {
-	fmt.Printf("--[GCG][Proto] Generating Go code\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Code with protoc")
+	}
 	// create gen.sh file
 	tmplBytes, err := files.GetTemplateBytes(templates, "gen")
 	if err != nil {

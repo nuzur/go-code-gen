@@ -27,7 +27,9 @@ type fetchModuleTemplate struct {
 }
 
 func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GCG] Generating core module selects: %s\n", req.Entity.Identifier)
+	if req.OnStatusChange != nil {
+		req.OnStatusChange(fmt.Sprintf("Generating core module selects for entity: %s", req.Entity.Identifier))
+	}
 	for _, sel := range req.Selects {
 		importsTypes := map[string]any{}
 		importsFetch := map[string]any{}

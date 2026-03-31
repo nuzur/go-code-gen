@@ -141,11 +141,15 @@ func generateEnumsProtoFile(ctx context.Context, protoDir string, project *proje
 func generateProtoFiles(ctx context.Context, protoDir string, project *projecttypes.Project) (entityTemplates []*ProtoEntityTemplate, returnErr error) {
 	entityTemplates = []*ProtoEntityTemplate{}
 	// generate enums
-	fmt.Printf("--[GCG][Proto] Generating Enums\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Enums")
+	}
 	generateEnumsProtoFile(ctx, protoDir, project)
 
 	//generate entities/models
-	fmt.Printf("--[GCG][Proto] Generating Entities\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Entities")
+	}
 	for _, e := range project.Entities() {
 		template, err := generateEntityProtoFile(ctx, protoDir, project, e)
 		if err != nil {
@@ -158,7 +162,9 @@ func generateProtoFiles(ctx context.Context, protoDir string, project *projectty
 	}
 
 	//generate project service definition
-	fmt.Printf("--[GCG][Proto] Generating Service Definition\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Service Definition")
+	}
 	tmplBytes, err := files.GetTemplateBytes(templates, "proto_service")
 	if err != nil {
 		return nil, err

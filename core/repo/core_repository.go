@@ -16,7 +16,9 @@ import (
 var templates embed.FS
 
 func GenerateCoreRepository(ctx context.Context, project *projectypes.Project) error {
-	fmt.Printf("--[GCG] Generating core repository\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating core repository")
+	}
 	projectDir := project.Dir()
 	repoDir := path.Join(projectDir, project.CoreConfig.CoreDir, project.CoreConfig.RepoConfig.Dir)
 
@@ -24,13 +26,17 @@ func GenerateCoreRepository(ctx context.Context, project *projectypes.Project) e
 
 	err := os.RemoveAll(repoDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting repo directory\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting repo directory: %v", err))
+		}
 	}
 
 	// install sqlc
 	err = project.InstallDependency("github.com/sqlc-dev/sqlc/cmd/sqlc")
 	if err != nil {
-		fmt.Printf("error running go install sqlc: %v", err)
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Installing sqlc: %v", err))
+		}
 	}
 
 	// generate sql files

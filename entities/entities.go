@@ -36,21 +36,29 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	// remove existing
 	err = os.RemoveAll(entitiesDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting entity directory\n")
+		if params.OnStatusChange != nil {
+			params.OnStatusChange(fmt.Sprintf("ERROR: Deleting entity directory: %v", err))
+		}
 	}
 
 	if !project.EntitiesConfig.Enabled {
-		fmt.Printf("INFO: Entities generation is disabled, skipping...\n")
+		if params.OnStatusChange != nil {
+			params.OnStatusChange("INFO: Entities generation is disabled, skipping...")
+		}
 		return nil
 	}
 
-	fmt.Printf("--[GCG] Generating entities and enums\n")
+	if params.OnStatusChange != nil {
+		params.OnStatusChange("Generating entities and enums")
+	}
 	generateEnums(ctx, project)
 
 	allImports := map[string]any{}
 	for _, e := range project.Entities() {
 
-		fmt.Printf("----[GCG] Generating entity: %s\n", e.Identifier)
+		if params.OnStatusChange != nil {
+			params.OnStatusChange(fmt.Sprintf("Generating entity: %s", e.Identifier))
+		}
 		entityDir := path.Join(entitiesDir, e.Identifier)
 		entityTemplate, entityImports := ResolveEntityTemplate(e, project)
 		for imp := range entityImports {
@@ -59,7 +67,9 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 
 		templateBytes, err := files.GetTemplateBytes(templates, "entity")
 		if err != nil {
-			fmt.Printf("ERROR: Getting template bytes for entity: %s\n", e.Identifier)
+			if params.OnStatusChange != nil {
+				params.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for entity: %s", e.Identifier))
+			}
 			continue
 		}
 		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -74,7 +84,9 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		if project.EntitiesConfig.IncludeListInterface {
 			listTemplateBytes, err := files.GetTemplateBytes(templates, "entity_list_interface")
 			if err != nil {
-				fmt.Printf("ERROR: Getting template bytes for entity list interface: %s\n", e.Identifier)
+				if params.OnStatusChange != nil {
+					params.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for entity list interface: %s", e.Identifier))
+				}
 				continue
 			}
 			_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -93,7 +105,9 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		if !strings.Contains(imp, fmt.Sprintf("%s/", project.Identifier)) {
 			err = project.InstallDependency(imp)
 			if err != nil {
-				fmt.Printf("error running go get %s\n", imp)
+				if params.OnStatusChange != nil {
+					params.OnStatusChange(fmt.Sprintf("ERROR: Running go get %s", imp))
+				}
 			}
 		}
 	}

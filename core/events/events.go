@@ -20,7 +20,9 @@ var templates embed.FS
 func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 
 	if !project.CoreConfig.EventsConfig.Enabled {
-		fmt.Printf("--[GCG][Events] Events disabled skipping\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange("Events generation is disabled, skipping...")
+		}
 		return nil
 	}
 
@@ -29,9 +31,13 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 
 	err := os.RemoveAll(eventsDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting core/events directory\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting core/events directory: %v", err))
+		}
 	}
-	fmt.Printf("--[GCG][Events] Generating core/events module\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating core/events module")
+	}
 
 	eventsTmplBytes, err := files.GetTemplateBytes(templates, "events")
 	if err != nil {

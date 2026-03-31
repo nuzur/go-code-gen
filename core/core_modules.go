@@ -20,12 +20,13 @@ import (
 )
 
 type coreSubModuleRequest struct {
-	Project   *project.Project
-	Entity    *nemgen.Entity
-	ModuleDir string
-	Fields    []entities.FieldTemplate
-	Imports   map[string]any
-	Selects   []repo.SchemaSelectStatement
+	Project        *project.Project
+	Entity         *nemgen.Entity
+	ModuleDir      string
+	Fields         []entities.FieldTemplate
+	Imports        map[string]any
+	Selects        []repo.SchemaSelectStatement
+	OnStatusChange func(status string)
 }
 
 //go:embed templates/**
@@ -43,7 +44,9 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 
 	err = os.RemoveAll(coreDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting core directory\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting core directory: %v", err))
+		}
 	}
 
 	// generate config module
@@ -68,7 +71,9 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 		return err
 	}
 
-	fmt.Printf("--[GCG] Generating core modules\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating core modules")
+	}
 	for _, e := range project.Entities() {
 		if e.Type != nemgen.EntityType_ENTITY_TYPE_STANDALONE {
 			continue
@@ -80,12 +85,13 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 			delete(imports, "github.com/gofrs/uuid")
 		}
 		req := coreSubModuleRequest{
-			Project:   project,
-			Entity:    e,
-			ModuleDir: moduleDir,
-			Fields:    fields,
-			Imports:   imports,
-			Selects:   selects,
+			Project:        project,
+			Entity:         e,
+			ModuleDir:      moduleDir,
+			Fields:         fields,
+			Imports:        imports,
+			Selects:        selects,
+			OnStatusChange: project.OnStatusChange,
 		}
 
 		// generate base files for entities, module and options

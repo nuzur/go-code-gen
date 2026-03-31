@@ -21,7 +21,9 @@ type coreModuleTemplate struct {
 }
 
 func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GCG] Generating core module base: %s\n", req.Entity.Identifier)
+	if req.OnStatusChange != nil {
+		req.OnStatusChange(fmt.Sprintf("Generating core module for entity: %s", req.Entity.Identifier))
+	}
 	moduleTemplate := coreModuleTemplate{
 		Project:          req.Project,
 		Package:          req.Entity.Identifier,

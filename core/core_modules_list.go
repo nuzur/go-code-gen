@@ -20,7 +20,9 @@ type listData struct {
 }
 
 func generateList(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GCG] Generating core module list: %s\n", req.Entity.Identifier)
+	if req.OnStatusChange != nil {
+		req.OnStatusChange(fmt.Sprintf("Generating list module for entity: %s", req.Entity.Identifier))
+	}
 	listData := listData{
 		EntityIdentifier: req.Entity.Identifier,
 		EntityName:       gcgstrings.ToCamelCase(req.Entity.Identifier),

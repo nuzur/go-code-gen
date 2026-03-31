@@ -36,7 +36,9 @@ func generateEntityMapper(ctx context.Context, dir string, et *ProtoEntityTempla
 }
 
 func generateMappers(ctx context.Context, protoDir string, project *projecttypes.Project, entityTemplates []*ProtoEntityTemplate) error {
-	fmt.Printf("--[GCG][Proto] Generating mappers\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Mappers")
+	}
 	tmplBytes, err := files.GetTemplateBytes(templates, "mapper_base")
 	if err != nil {
 		return err
@@ -50,7 +52,9 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 		return err
 	}
 
-	fmt.Printf("--[GCG][Proto] Generating enum mappers\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Enum Mappers")
+	}
 	enumTemplates := []ProtoEnumTemplate{}
 	for _, e := range project.Enums() {
 		enumTemplates = append(enumTemplates, ProtoEnumTemplate{

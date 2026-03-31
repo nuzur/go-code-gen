@@ -13,7 +13,9 @@ import (
 )
 
 func generateServer(ctx context.Context, protoDir string, project *project.Project, entityTemplates []*ProtoEntityTemplate) error {
-	fmt.Printf("--[GCG][Proto] Generating server.go\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Server")
+	}
 	tmplBytes, err := files.GetTemplateBytes(templates, "server")
 	if err != nil {
 		return err
@@ -34,7 +36,9 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		return err
 	}
 
-	fmt.Printf("--[GCG][Proto] Generating auth.go\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating Proto Server Auth")
+	}
 	tmplBytesAuth, err := files.GetTemplateBytes(templates, "server_auth")
 	if err != nil {
 		return err
@@ -59,7 +63,9 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		if se.Entity.Type == nemgen.EntityType_ENTITY_TYPE_DEPENDENT {
 			continue
 		}
-		fmt.Printf("--[GCG][Proto] Generating create: %v\n", se.FinalIdentifier)
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("Generating server code for entity: %s", se.FinalIdentifier))
+		}
 		tmplBytesCreate, err := files.GetTemplateBytes(templates, "server_create_entity")
 		if err != nil {
 			return err
@@ -74,7 +80,9 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 			return err
 		}
 
-		fmt.Printf("--[GCG][Proto] Generating update: %v\n", se.FinalIdentifier)
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("Generating update server code for entity: %s", se.FinalIdentifier))
+		}
 		tmplBytesUpdate, err := files.GetTemplateBytes(templates, "server_update_entity")
 		if err != nil {
 			return err
@@ -90,7 +98,9 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		}
 
 		se.Declarations = getEntityDeclarations(se, entityTemplates)
-		fmt.Printf("--[GCG][Proto] Generating list: %v\n", se.FinalIdentifier)
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("Generating list server code for entity: %s", se.FinalIdentifier))
+		}
 		tmplBytesList, err := files.GetTemplateBytes(templates, "server_list_entity")
 		if err != nil {
 			return err

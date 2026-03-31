@@ -16,7 +16,9 @@ import (
 var templates embed.FS
 
 func GenerateConfig(ctx context.Context, project *project.Project) error {
-	fmt.Printf("--[GCG][Config] Generating config\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating config")
+	}
 
 	projectDir := project.Dir()
 	configDir := path.Join(projectDir, "config")
@@ -24,16 +26,23 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 	// remove existing
 	err := os.RemoveAll(configDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting config directory\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting config directory: %v", err))
+		}
 	}
 
 	if project.CoreConfig.Enabled == false {
-		fmt.Printf("--[GCG][Config] Skipping config generation\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange("Core config is disabled, skipping config generation")
+		}
 		return nil
 	}
 
 	tmplBytes, err := files.GetTemplateBytes(templates, path.Join("config"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for config: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for config: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -47,6 +56,9 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 
 	baseTmplBytes, err := files.GetTemplateBytes(templates, path.Join("config_base"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for config base: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for config base: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -58,6 +70,9 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 
 	cliTmplBytes, err := files.GetTemplateBytes(templates, path.Join("config_cli"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for config cli: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for config cli: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{

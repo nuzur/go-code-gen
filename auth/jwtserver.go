@@ -18,9 +18,14 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 	}
 
 	jwtServerDir := path.Join(authDir, "jwtserver")
-	fmt.Printf("--[GCG][AUTH] Generating JWT server\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating JWT server")
+	}
 	jwtTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_server"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt server: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt server: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -34,6 +39,9 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 
 	jwtTypesTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_types"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt types: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt types: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -46,6 +54,9 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 
 	jwtParseTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_parse"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt parse: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt parse: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -59,6 +70,9 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 
 	jwtRefreshTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_refresh"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt refresh: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt refresh: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -72,6 +86,9 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 
 	jwtSigninTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_signin"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt signin: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt signin: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
@@ -85,6 +102,9 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 
 	jwtValidateTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_validate"))
 	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt validate: %v", err))
+		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt validate: %v\n", err)
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{

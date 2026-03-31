@@ -17,7 +17,9 @@ func generateKeycloakClient(ctx context.Context, authDir string, project *projec
 	}
 
 	kcServerDir := path.Join(authDir, "keycloak")
-	fmt.Printf("--[GCG][AUTH] Generating keycloak client\n")
+	if project.OnStatusChange != nil {
+		project.OnStatusChange("Generating keycloak client")
+	}
 	clientTmplBytes, err := files.GetTemplateBytes(templates, path.Join("keycloak", "keycloak_client"))
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for keycloak client: %v\n", err)

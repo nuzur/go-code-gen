@@ -22,6 +22,7 @@ type Project struct {
 	MonitoringConfig MonitoringConfig
 	AuthConfig       AuthConfig
 	APIConfig        APIConfig
+	OnStatusChange   func(status string)
 }
 
 type ProjectParams struct {
@@ -36,6 +37,7 @@ type ProjectParams struct {
 	MonitoringConfig MonitoringConfig
 	AuthConfig       AuthConfig
 	APIConfig        APIConfig
+	OnStatusChange   func(status string)
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -94,13 +96,16 @@ func New(params *ProjectParams) (*Project, error) {
 	if !files.FileExists(goModPath) {
 		err := files.CreateGoMod(path.Join(params.RootPath, params.Identifier), params.Module)
 		if err != nil {
-			fmt.Printf("[GCG] Error creating mod file %v\n", err.Error())
-			//return nil, fmt.Errorf("error creating go.mod: %v", err)
+			if params.OnStatusChange != nil {
+				params.OnStatusChange(fmt.Sprintf("ERROR: Creating go.mod file: %v", err))
+			}
 		}
 	} else {
 		moduleName, err := files.ReadGoMod(goModPath)
 		if err != nil {
-			fmt.Printf("[GCG] Error reading mod file %v\n", err.Error())
+			if params.OnStatusChange != nil {
+				params.OnStatusChange(fmt.Sprintf("ERROR: Reading go.mod file: %v", err))
+			}
 			return nil, fmt.Errorf("error reading go.mod: %v", err)
 		}
 		if moduleName != params.Module {
@@ -120,6 +125,7 @@ func New(params *ProjectParams) (*Project, error) {
 		MonitoringConfig: params.MonitoringConfig,
 		AuthConfig:       params.AuthConfig,
 		APIConfig:        params.APIConfig,
+		OnStatusChange:   params.OnStatusChange,
 	}, nil
 }
 
@@ -138,7 +144,6 @@ func (p *Project) InstallDependency(dep string) error {
 }
 
 func (p *Project) GoModTidy(dir string) {
-	fmt.Printf("--[GCG][Project] Running go mod tidy in %s\n", dir)
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = dir
 	out, err := cmd.Output()

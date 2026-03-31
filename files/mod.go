@@ -9,7 +9,6 @@ import (
 )
 
 func CreateGoMod(goModPath, moduleName string) error {
-	fmt.Printf("[GCG] Creating mod file: %s module:%s\n", goModPath, moduleName)
 	err := os.MkdirAll(goModPath, 0o755)
 	if err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

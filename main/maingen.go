@@ -15,7 +15,9 @@ import (
 var templates embed.FS
 
 func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
-	fmt.Printf("--[GCG] Generating main\n")
+	if params.OnStatusChange != nil {
+		params.OnStatusChange("Generating main.go")
+	}
 	project, err := project.New(params)
 	if err != nil {
 		return fmt.Errorf("%v", err)
@@ -26,7 +28,9 @@ func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
 	// delete existing main.go if it exists
 	err = files.DeleteFileIfExists(path.Join(projectDir, "main.go"))
 	if err != nil {
-		fmt.Printf("ERROR: Deleting main.go\n")
+		if params.OnStatusChange != nil {
+			params.OnStatusChange(fmt.Sprintf("ERROR: Deleting main.go: %v", err))
+		}
 	}
 
 	if project.CoreConfig.Enabled == false {

@@ -24,7 +24,9 @@ func generateEnum(ctx context.Context,
 	project *project.Project,
 	enum *nemgen.Enum) {
 
-	fmt.Printf("----[GCG] Generating enum: %s\n", enum.Identifier)
+	if project.OnStatusChange != nil {
+		project.OnStatusChange(fmt.Sprintf("Generating enum: %s", enum.Identifier))
+	}
 
 	values := make([]string, len(enum.StaticValues))
 	for i, v := range enum.StaticValues {
@@ -44,7 +46,9 @@ func generateEnum(ctx context.Context,
 
 	templateBytes, err := files.GetTemplateBytes(templates, "enum")
 	if err != nil {
-		fmt.Printf("ERROR: Getting template bytes for enum: %s\n", enum.Identifier)
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for enum: %s, error: %v", enum.Identifier, err))
+		}
 		return
 	}
 	filetools.GenerateFile(

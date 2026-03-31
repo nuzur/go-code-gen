@@ -34,7 +34,9 @@ type upsertModuleTemplate struct {
 }
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GCG] Generating core module upsert: %s\n", req.Entity.Identifier)
+	if req.OnStatusChange != nil {
+		req.OnStatusChange(fmt.Sprintf("Generating core module upsert for entity: %s", req.Entity.Identifier))
+	}
 
 	entityTemplate, _ := entities.ResolveEntityTemplate(req.Entity, req.Project)
 	primaryKeys := entityTemplate.PrimaryKeys()

@@ -26,7 +26,9 @@ type mapperModuleTemplate struct {
 }
 
 func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
-	fmt.Printf("--[GCG] Generating core module mapper: %s\n", req.Entity.Identifier)
+	if req.OnStatusChange != nil {
+		req.OnStatusChange(fmt.Sprintf("Generating mapper for entity: %s", req.Entity.Identifier))
+	}
 	hasArrayField := false
 	hasNullUUID := false
 	for _, f := range req.Fields {

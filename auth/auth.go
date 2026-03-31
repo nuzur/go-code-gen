@@ -25,17 +25,23 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 	authDir := path.Join(projectDir, "auth")
 	err = os.RemoveAll(authDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting module directory\n")
+		if params.OnStatusChange != nil {
+			params.OnStatusChange(fmt.Sprintf("ERROR: Deleting auth directory: %v", err))
+		}
 	}
 
 	if !p.AuthConfig.Enabled {
-		fmt.Printf("--[GCG][AUTH] Auth is disabled, skipping auth generation\n")
+		if params.OnStatusChange != nil {
+			params.OnStatusChange("Auth is disabled, skipping auth generation")
+		}
 		return nil
 	}
 
 	typeTmplBytes, err := files.GetTemplateBytes(templates, "auth_types")
 	if err != nil {
-		return fmt.Errorf("ERROR: Getting template bytes for auth types: %v\n", err)
+		if params.OnStatusChange != nil {
+			params.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for auth types: %v", err))
+		}
 	}
 	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(authDir, "types.go"),

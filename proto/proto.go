@@ -82,7 +82,9 @@ type GenerateProtoParams struct {
 }
 
 func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
-	fmt.Printf("--[GCG][Proto] Generating Directory\n")
+	if params.OnStatusChange != nil {
+		params.OnStatusChange("Generating Proto Directory")
+	}
 	project, err := project.New(params)
 	if err != nil {
 		return fmt.Errorf("%v", err)
@@ -94,11 +96,15 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 	// remove existing
 	err = os.RemoveAll(protoDir)
 	if err != nil {
-		fmt.Printf("ERROR: Deleting proto directory\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting proto directory: %v", err))
+		}
 	}
 
 	if !project.ProtoConfig.Enabled {
-		fmt.Printf("--[GCG][Proto] Skipping proto generation\n")
+		if project.OnStatusChange != nil {
+			project.OnStatusChange("Proto generation is disabled, skipping...")
+		}
 		return nil
 	}
 
