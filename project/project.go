@@ -11,39 +11,39 @@ import (
 )
 
 type Project struct {
-	RootPath             string
-	Identifier           string
-	Module               string
-	Project              *nemgen.Project
-	ProjectVersion       *nemgen.ProjectVersion
-	EntitiesConfig       EntitiesConfig
-	ProtoConfig          ProtoConfig
-	CoreConfig           CoreConfig
-	MonitoringConfig     MonitoringConfig
-	AuthConfig           AuthConfig
-	APIConfig            APIConfig
-	DockerConfig         DockerConfig
-	HelmConfig           HelmConfig
-	GitHubActionsConfig  GitHubActionsConfig
-	OnStatusChange       func(status string)
+	RootPath            string
+	Identifier          string
+	Module              string
+	Project             *nemgen.Project
+	ProjectVersion      *nemgen.ProjectVersion
+	EntitiesConfig      EntitiesConfig
+	ProtoConfig         ProtoConfig
+	CoreConfig          CoreConfig
+	MonitoringConfig    MonitoringConfig
+	AuthConfig          AuthConfig
+	APIConfig           APIConfig
+	DockerConfig        DockerConfig
+	HelmConfig          HelmConfig
+	GitHubActionsConfig GitHubActionsConfig
+	OnStatusChange      func(status string)
 }
 
 type ProjectParams struct {
-	RootPath             string
-	Identifier           string
-	Module               string
-	Project              *nemgen.Project
-	ProjectVersion       *nemgen.ProjectVersion
-	EntitiesConfig       EntitiesConfig
-	ProtoConfig          ProtoConfig
-	CoreConfig           CoreConfig
-	MonitoringConfig     MonitoringConfig
-	AuthConfig           AuthConfig
-	APIConfig            APIConfig
-	DockerConfig         DockerConfig
-	HelmConfig           HelmConfig
-	GitHubActionsConfig  GitHubActionsConfig
-	OnStatusChange       func(status string)
+	RootPath            string
+	Identifier          string
+	Module              string
+	Project             *nemgen.Project
+	ProjectVersion      *nemgen.ProjectVersion
+	EntitiesConfig      EntitiesConfig
+	ProtoConfig         ProtoConfig
+	CoreConfig          CoreConfig
+	MonitoringConfig    MonitoringConfig
+	AuthConfig          AuthConfig
+	APIConfig           APIConfig
+	DockerConfig        DockerConfig
+	HelmConfig          HelmConfig
+	GitHubActionsConfig GitHubActionsConfig
+	OnStatusChange      func(status string)
 }
 
 func New(params *ProjectParams) (*Project, error) {
@@ -96,7 +96,7 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	if params.DockerConfig.BaseImage == "" {
-		params.DockerConfig.BaseImage = "golang:1.22-alpine"
+		params.DockerConfig.BaseImage = "golang:1.24-alpine"
 	}
 
 	if params.DockerConfig.RunImage == "" {
@@ -112,7 +112,7 @@ func New(params *ProjectParams) (*Project, error) {
 	}
 
 	if params.GitHubActionsConfig.GoVersion == "" {
-		params.GitHubActionsConfig.GoVersion = "1.22"
+		params.GitHubActionsConfig.GoVersion = "1.24"
 	}
 
 	if params.GitHubActionsConfig.MainBranch == "" {
