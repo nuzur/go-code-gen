@@ -15,16 +15,12 @@ import (
 
 func (m *module) List(ctx context.Context,
 	request types.ListRequest,
-	opts ...Option) (types.ListResponse, error) {
-
-	optConfig := applyAllOptions(opts)
+	opts ...Option) (types.ListResponse, error) {	
 	query, err := m.repository.BuildListEntityQuery(
 		ctx, 
 		request, 
 		main_entity.{{.EntityName}}{}, 
-		false,
-		optConfig.ListIncludeColumns,
-		optConfig.ListExcludeColumns,)
+		false)
 	if err != nil {
 		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
@@ -83,12 +79,12 @@ func (m *module) List(ctx context.Context,
 		var i repogen.{{.EntityName}}
 		fields := []any{}
 		{{range $field := .Fields}}
-		if len(optConfig.ListIncludeColumns) > 0 {
-			if slices.Contains(optConfig.ListIncludeColumns, "{{$field.Identifier}}") {
+		if len(request.GetIncludeFields()) > 0 {
+			if slices.Contains(request.GetIncludeFields(), "{{$field.Identifier}}") {
 				fields = append(fields, &i.{{$field.Name}})				
 			} 
-		} else if len(optConfig.ListExcludeColumns) > 0 {
-			if !slices.Contains(optConfig.ListExcludeColumns, "{{$field.Identifier}}") {				
+		} else if len(request.GetExcludeFields()) > 0 {
+			if !slices.Contains(request.GetExcludeFields(), "{{$field.Identifier}}") {				
 				fields = append(fields, &i.{{$field.Name}})				
 			} 
 		} else {
@@ -180,7 +176,7 @@ func (m *module) List(ctx context.Context,
 func (m *module) ListCount(ctx context.Context,
 	request types.ListRequest,
 	opts ...Option) (int64, error) {
-	query, err := m.repository.BuildListEntityQuery(ctx, request, main_entity.{{.EntityName}}{}, true, nil, nil)
+	query, err := m.repository.BuildListEntityQuery(ctx, request, main_entity.{{.EntityName}}{}, true)
 	if err != nil {
 		return -1, err
 	}

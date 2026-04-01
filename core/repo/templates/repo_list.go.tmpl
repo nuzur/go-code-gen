@@ -24,10 +24,11 @@ func (i *Implementation) BuildListEntityQuery(
 	ctx context.Context,
 	request ListRequest,
 	entity ListEntity,		
-	onlyCount bool, 
-	includeColumns []string,
-	excludeColumns []string,	
+	onlyCount bool,		
 	) (string, error) {
+
+	includeColumns := request.GetIncludeFields()
+	excludeColumns := request.GetExcludeFields()
 
 	columnsFinal := fmt.Sprintf("%s.*", entity.EntityIdentifier())
 	if len(includeColumns) > 0 && len(excludeColumns) > 0 {

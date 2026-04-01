@@ -63,6 +63,8 @@ func BuildList{{.Name}}Request(ctx context.Context, request *pb.List{{.Name}}Req
 		Filter:                filter,
 		FilteringDeclarations: declarations,
 		OrderBy:               orderBy,
+		IncludeFields:         request.GetIncludeFields(),
+		ExcludeFields:         request.GetExcludeFields(),
 	}, &pageToken, nil
 }
 

@@ -29,6 +29,8 @@ type ListRequest interface {
 	GetPageSize() int32
 	GetOffset() int64
 	GetJoinParams() *JoinParams
+	GetIncludeFields() []string
+	GetExcludeFields() []string
 }
 
 type SingleClauseRequest struct {

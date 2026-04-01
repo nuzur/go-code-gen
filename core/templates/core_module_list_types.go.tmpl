@@ -17,6 +17,8 @@ type ListRequest struct {
 	FilteringDeclarations 	*filtering.Declarations
 	OrderBy     			ordering.OrderBy	
 	JoinParams 				*list.JoinParams
+	IncludeFields			[]string
+	ExcludeFields			[]string
 }
 
 func (r ListRequest) MarshalLogObject(e zapcore.ObjectEncoder) error { 
@@ -57,6 +59,14 @@ func (r ListRequest) GetOrderBy() ordering.OrderBy {
 
 func (r ListRequest) GetJoinParams() *list.JoinParams {
 	return r.JoinParams
+}
+
+func (r ListRequest) GetIncludeFields() []string {
+	return r.IncludeFields
+}
+
+func (r ListRequest) GetExcludeFields() []string {
+	return r.ExcludeFields
 }
 
 type ListResponse struct {
