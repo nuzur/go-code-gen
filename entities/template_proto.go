@@ -140,6 +140,9 @@ func (f FieldTemplate) ProtoToMapper() string {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
+		if !f.IsRequired() {
+			return fmt.Sprintf("StringFromUUIDPtr(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("e.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_INTEGER:
 		if !f.IsRequired() {

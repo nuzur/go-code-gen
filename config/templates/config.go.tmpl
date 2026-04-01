@@ -46,11 +46,17 @@ func New() (config.Provider, error) {
 
 func NewWithPathAndEnvironment(p string, env string) (config.Provider, error) {
 	paths := strings.Split(p, ",")
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no config paths provided")
+	}
+	if paths[0] == "" {
+		return nil, fmt.Errorf("config path is empty")
+	}
 	configFiles := []config.YAMLOption{}
 	for _, pt := range paths {
 		fi, err := os.Stat(pt)
 		if err != nil {
-			fmt.Println(err)
+			fmt.Printf("error reading path: %v, error: %v\n", pt, err)
 			return nil, err
 		}
 		switch mode := fi.Mode(); {

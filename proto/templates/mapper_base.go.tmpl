@@ -36,6 +36,13 @@ func StringToUUIDPtr(s string) *uuid.UUID {
     return &parsed
 }
 
+func StringFromUUIDPtr(u *uuid.UUID) string {
+    if u == nil {
+        return ""
+    }
+    return u.String()
+}
+
 func UUIDSliceToStringSlice(uuids []uuid.UUID) []string {
     res := []string{}
     for _, u := range uuids {
