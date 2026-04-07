@@ -1,11 +1,15 @@
 package {{.Package}}
 
+{{$projectModule := .Project.Module}}
+{{$entityDir := .Project.EntitiesConfig.Dir}}
 import (
     "fmt"
     "encoding/json"
          
     {{range $import := .Imports}}
     "{{$import}}" {{end}}
+
+    "{{$projectModule}}/{{$entityDir}}/mapper"
     
      
 )
@@ -35,8 +39,10 @@ func {{.EntityName}}FromJSON(data json.RawMessage) {{.EntityName}} {
         return entity
     }
 
-    if err := json.Unmarshal(data, &entity); err != nil {
-        fmt.Printf("unmarshal error {{.EntityName}}FromJSON: %v\n", err)
+    if err := json.Unmarshal(data, &entity); err != nil {        
+        if err2 := mapper.FlexibleUnmarshal(data, &entity); err2 != nil {
+            fmt.Printf("flexible unmarshal error {{.EntityName}}FromJSON: %v\n", err2)
+        }
     }
     return entity
 }
@@ -50,8 +56,17 @@ func {{.EntityName}}SliceFromJSON(data json.RawMessage)[]{{.EntityName}} {
         return entity
     }
 
-    if err := json.Unmarshal(data, &entity); err != nil {
-        fmt.Printf("unmarshal error {{.EntityName}}SliceFromJSON: %v\n", err)
+    if err := json.Unmarshal(data, &entity); err != nil {        
+        var rawSlice []json.RawMessage
+        if err2 := json.Unmarshal(data, &rawSlice); err2 == nil {
+            for _, raw := range rawSlice {
+                item := {{.EntityName}}{}
+                if err3 := mapper.FlexibleUnmarshal(raw, &item); err3 != nil {
+                    fmt.Printf("flexible unmarshal error {{.EntityName}}SliceFromJSON item: %v\n", err3)
+                }
+                entity = append(entity, item)
+            }
+        }
     }
     return entity
 }
@@ -83,3 +98,5 @@ func {{.EntityName}}SliceToJSON(e []{{.EntityName}}) json.RawMessage {
     }
     return res
 }
+
+
