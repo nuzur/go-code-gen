@@ -36,11 +36,16 @@ func (m *module) List(ctx context.Context,
 		return types.ListResponse{}, err
 	}
 
+	// pin to a single connection so SET sort_buffer_size applies to the same session
+	conn, err := m.repository.DB.Conn(ctx)
+	if err != nil {
+		return types.ListResponse{}, err
+	}
+	defer conn.Close()
+
 	// increase sort buffer size 
 	// TODO make this configurable 
-	txn, _ := m.repository.DB.Begin()
-	defer txn.Commit()
-	bufferRows, err := txn.QueryContext(ctx, "SET sort_buffer_size=5000000")
+	bufferRows, err := conn.QueryContext(ctx, "SET sort_buffer_size=5000000")
 	if err != nil {
 		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
@@ -56,7 +61,7 @@ func (m *module) List(ctx context.Context,
 		return types.ListResponse{}, err
 	}
 	bufferRows.Close()
-	rows, err := txn.QueryContext(ctx, query)
+	rows, err := conn.QueryContext(ctx, query)
 	if err != nil {
 		{{if eq .Project.MonitoringConfig.Enabled true}}
 		m.monitoring.Emit(monitoring.EmitRequest{
