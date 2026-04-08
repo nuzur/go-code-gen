@@ -57,7 +57,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	for _, e := range project.Entities() {
 
 		if params.OnStatusChange != nil {
-			params.OnStatusChange(fmt.Sprintf("Generating entity: %s", e.Identifier))
+			params.OnStatusChange("Generating entities")
 		}
 		entityDir := path.Join(entitiesDir, e.Identifier)
 		entityTemplate, entityImports := ResolveEntityTemplate(e, project)

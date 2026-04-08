@@ -2,8 +2,9 @@ package {{.Package}}
 
 {{ $projectModule := .Project.Module}}
 import (
-	"context"    
-    
+	"context"
+	"fmt"
+
     "{{ $projectModule }}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
     {{if ne .Select.IsPrimary true}}
     "errors"
@@ -25,29 +26,54 @@ func (m *module) Fetch{{.Select.Name}}(
     opts ...Option,
 ) (types.Fetch{{.Select.Name}}Response, error) {
     {{if eq .Select.IsPrimary true}}
-    models, err := m.repository.Queries.Fetch{{.Select.Name}}(
-        ctx,{{range $field := .Select.Fields}}
-        {{$field.Field.RepoToMapperFetch}},{{end}}
-    )
-    if err != nil {  
-        {{ if .Project.MonitoringConfig.Enabled }}
-        m.monitoring.Emit(monitoring.EmitRequest{
-			ActionIdentifier: "fetch_{{.Select.Identifier}}",
-			Message: "error in Fetch{{.Select.Name}}",
-			EntityIdentifier: "{{.Select.EntityIdentifier}}",
-			Layer: monitoring.RepositoryServiceLayer,
-			Type: monitoring.EmitTypeError,
-			Data: req,
-			Error: err,
-		})  
-        {{ end }}    
+    resolvedOpts := applyAllOptions(opts)
+    cacheKey := fmt.Sprintf("Fetch{{.Select.Name}}:%v", req)
+    if !resolvedOpts.SkipCache {
+        if cached, found := m.cache.Get(cacheKey); found {
+            return cached.(types.Fetch{{.Select.Name}}Response), nil
+        }
+    }
+    v, err, _ := m.sg.Do(cacheKey, func() (any, error) {
+        models, err := m.repository.Queries.Fetch{{.Select.Name}}(
+            ctx,{{range $field := .Select.Fields}}
+            {{$field.Field.RepoToMapperFetch}},{{end}}
+        )
+        if err != nil {
+            {{ if .Project.MonitoringConfig.Enabled }}
+            m.monitoring.Emit(monitoring.EmitRequest{
+                ActionIdentifier: "fetch_{{.Select.Identifier}}",
+                Message: "error in Fetch{{.Select.Name}}",
+                EntityIdentifier: "{{.Select.EntityIdentifier}}",
+                Layer: monitoring.RepositoryServiceLayer,
+                Type: monitoring.EmitTypeError,
+                Data: req,
+                Error: err,
+            })
+            {{ end }}
+            return types.Fetch{{.Select.Name}}Response{}, err
+        }
+        return types.Fetch{{.Select.Name}}Response{
+            Results: mapModelsToEntities(models),
+        }, nil
+    })
+    if err != nil {
         return types.Fetch{{.Select.Name}}Response{}, err
     }
-    return types.Fetch{{.Select.Name}}Response{
-        Results: mapModelsToEntities(models),
-    }, nil
-            
+    result := v.(types.Fetch{{.Select.Name}}Response)
+    if !resolvedOpts.SkipCache {
+        m.cache.Set(cacheKey, result, 0)
+    }
+    return result, nil
+
     {{else}}
+    resolvedOpts := applyAllOptions(opts)
+    cacheKey := fmt.Sprintf("Fetch{{.Select.Name}}:%v", req)
+    if !resolvedOpts.SkipCache {
+        if cached, found := m.cache.Get(cacheKey); found {
+            return cached.(types.Fetch{{.Select.Name}}Response), nil
+        }
+    }
+    v, fetchErr, _ := m.sg.Do(cacheKey, func() (any, error) {
     if req.OrderBy == "" {
         models, err := m.repository.Queries.Fetch{{.Select.Name}}(
             ctx,
@@ -206,5 +232,14 @@ func (m *module) Fetch{{.Select.Name}}(
     })
     {{ end }}
     return types.Fetch{{.Select.Name}}Response{}, err
+    }) // end sg.Do
+    if fetchErr != nil {
+        return types.Fetch{{.Select.Name}}Response{}, fetchErr
+    }
+    result := v.(types.Fetch{{.Select.Name}}Response)
+    if !resolvedOpts.SkipCache {
+        m.cache.Set(cacheKey, result, 0)
+    }
+    return result, nil
     {{end}}
 }

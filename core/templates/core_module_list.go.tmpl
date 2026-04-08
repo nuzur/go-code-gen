@@ -2,6 +2,7 @@ package {{.EntityIdentifier}}
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.EntityIdentifier}}"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
@@ -36,48 +37,77 @@ func (m *module) List(ctx context.Context,
 		return types.ListResponse{}, err
 	}
 
-	// pin to a single connection so SET sort_buffer_size applies to the same session
-	conn, err := m.repository.DB.Conn(ctx)
-	if err != nil {
-		return types.ListResponse{}, err
+	resolvedOpts := applyAllOptions(opts)
+	cacheKey := fmt.Sprintf("List{{.EntityName}}:%v", request)
+	if !resolvedOpts.SkipCache {
+		if cached, found := m.cache.Get(cacheKey); found {
+			return cached.(types.ListResponse), nil
+		}
 	}
-	defer conn.Close()
 
-	// increase sort buffer size 
-	// TODO make this configurable 
-	bufferRows, err := conn.QueryContext(ctx, "SET sort_buffer_size=5000000")
-	if err != nil {
-		{{if eq .Project.MonitoringConfig.Enabled true}}
-		m.monitoring.Emit(monitoring.EmitRequest{
-			ActionIdentifier: "list_{{.EntityIdentifier}}_sort_buffer",
-			Message: "error in setting sort buffer for List{{.EntityName}}",
-			EntityIdentifier: "{{.EntityIdentifier}}",
-			Layer: monitoring.RepositoryServiceLayer,
-			Type: monitoring.EmitTypeError,
-			Data: request,
-			Error: err,
-		})
-		{{end}}
-		return types.ListResponse{}, err
+	var rows *sql.Rows
+	if len(request.GetOrderBy().Fields) > 0 {
+		// pin to a single connection so SET sort_buffer_size applies to the same session
+		conn, connErr := m.repository.DB.Conn(ctx)
+		if connErr != nil {
+			return types.ListResponse{}, connErr
+		}
+		defer conn.Close()
+
+		// increase sort buffer size
+		// TODO make this configurable
+		bufferRows, bufferErr := conn.QueryContext(ctx, "SET sort_buffer_size=5000000")
+		if bufferErr != nil {
+			{{if eq .Project.MonitoringConfig.Enabled true}}
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "list_{{.EntityIdentifier}}_sort_buffer",
+				Message: "error in setting sort buffer for List{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer: monitoring.RepositoryServiceLayer,
+				Type: monitoring.EmitTypeError,
+				Data: request,
+				Error: bufferErr,
+			})
+			{{end}}
+			return types.ListResponse{}, bufferErr
+		}
+		bufferRows.Close()
+		rows, err = conn.QueryContext(ctx, query)
+		if err != nil {
+			{{if eq .Project.MonitoringConfig.Enabled true}}
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "list_{{.EntityIdentifier}}_db",
+				Message: "error in executing query for List{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer: monitoring.RepositoryServiceLayer,
+				Type: monitoring.EmitTypeError,
+				Data: request,
+				ExtraData: map[string]string{"query":query},
+				Error: err,
+			})
+			{{end}}
+			fmt.Printf("error in executing query for List{{.EntityName}}: %v \n %v\n", query, err)
+			return types.ListResponse{}, err
+		}
+	} else {
+		rows, err = m.repository.DB.QueryContext(ctx, query)
+		if err != nil {
+			{{if eq .Project.MonitoringConfig.Enabled true}}
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "list_{{.EntityIdentifier}}_db",
+				Message: "error in executing query for List{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer: monitoring.RepositoryServiceLayer,
+				Type: monitoring.EmitTypeError,
+				Data: request,
+				ExtraData: map[string]string{"query":query},
+				Error: err,
+			})
+			{{end}}
+			fmt.Printf("error in executing query for List{{.EntityName}}: %v \n %v\n", query, err)
+			return types.ListResponse{}, err
+		}
 	}
-	bufferRows.Close()
-	rows, err := conn.QueryContext(ctx, query)
-	if err != nil {
-		{{if eq .Project.MonitoringConfig.Enabled true}}
-		m.monitoring.Emit(monitoring.EmitRequest{
-			ActionIdentifier: "list_{{.EntityIdentifier}}_db",
-			Message: "error in executing query for List{{.EntityName}}",
-			EntityIdentifier: "{{.EntityIdentifier}}",
-			Layer: monitoring.RepositoryServiceLayer,
-			Type: monitoring.EmitTypeError,
-			Data: request,
-			ExtraData: map[string]string{"query":query},
-			Error: err,
-		})
-		{{end}}
-		fmt.Printf("error in executing query for List{{.EntityName}}: %v \n %v\n", query, err)
-		return types.ListResponse{}, err
-	}	
 	defer rows.Close()
 	var items []repogen.{{.EntityName}}
 	for rows.Next() {
@@ -172,10 +202,14 @@ func (m *module) List(ctx context.Context,
 		ExtraData: map[string]string{"query":query},		
 	})
 	{{end}}
-	return types.ListResponse{
+	listResponse := types.ListResponse{
 		{{.EntityName}}: mapModelsToEntities(items),
 		HasNextPage: hasNextPage,
-	}, nil	
+	}
+	if !resolvedOpts.SkipCache {
+		m.cache.Set(cacheKey, listResponse, 0)
+	}
+	return listResponse, nil	
 }
 
 func (m *module) ListCount(ctx context.Context,

@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"path"
 	"strings"
 
@@ -35,7 +34,7 @@ type upsertModuleTemplate struct {
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	if req.OnStatusChange != nil {
-		req.OnStatusChange(fmt.Sprintf("Generating core module upsert for entity: %s", req.Entity.Identifier))
+		req.OnStatusChange("Generating core module upsert for entities")
 	}
 
 	entityTemplate, _ := entities.ResolveEntityTemplate(req.Entity, req.Project)

@@ -39,7 +39,8 @@ message List{{$entity.Name}}Request {
     string filter = 3;
     string order_by = 4;  
     repeated string include_fields = 5;
-    repeated string exclude_fields = 6;  
+    repeated string exclude_fields = 6;
+    bool skip_cache = 7;
 }
 
 message List{{$entity.Name}}Response {

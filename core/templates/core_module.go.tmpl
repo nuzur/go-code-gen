@@ -2,7 +2,10 @@ package {{.Package}}
 
 import (
 	"context"
-    "sync"
+	"sync"
+	"time"
+	"golang.org/x/sync/singleflight"
+	gocache "github.com/patrickmn/go-cache"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}"
 	coretypes "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/types"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
@@ -27,8 +30,10 @@ type Module interface {
 }
 
 type module struct {
-	mu sync.Mutex
-	repository *repository.Implementation    
+	mu         sync.Mutex
+	sg         singleflight.Group
+	cache      *gocache.Cache
+	repository *repository.Implementation
 	{{if eq .Project.MonitoringConfig.Enabled true}}
 	monitoring *monitoring.Implementation
 	{{end}}
@@ -40,6 +45,7 @@ type module struct {
 func New(params coretypes.ModuleParams) Module {
 	return &module{
 		repository: params.Repository,
+		cache:      gocache.New(30*time.Second, 5*time.Minute),
 		{{if eq .Project.MonitoringConfig.Enabled true}}
 		monitoring: params.Monitoring,
 		{{end}}

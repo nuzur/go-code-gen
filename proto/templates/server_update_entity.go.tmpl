@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+	{{.FinalIdentifier}}module "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}"
 	pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
 	pbmapper "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/mapper"
 	{{ if .Project.MonitoringConfig.Enabled }}
@@ -84,7 +85,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 		return nil, err
 	}
 
-	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res))
+	fetchRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx, types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res), {{.FinalIdentifier}}module.WithSkipCache())
 	if err != nil {
 		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{

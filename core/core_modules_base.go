@@ -22,7 +22,7 @@ type coreModuleTemplate struct {
 
 func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error {
 	if req.OnStatusChange != nil {
-		req.OnStatusChange(fmt.Sprintf("Generating core module for entity: %s", req.Entity.Identifier))
+		req.OnStatusChange("Generating core module for entities")
 	}
 	moduleTemplate := coreModuleTemplate{
 		Project:          req.Project,

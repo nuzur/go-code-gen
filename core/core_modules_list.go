@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"path"
 
 	"github.com/nuzur/filetools"
@@ -21,7 +20,7 @@ type listData struct {
 
 func generateList(ctx context.Context, req coreSubModuleRequest) error {
 	if req.OnStatusChange != nil {
-		req.OnStatusChange(fmt.Sprintf("Generating list module for entity: %s", req.Entity.Identifier))
+		req.OnStatusChange("Generating list module for entities")
 	}
 	listData := listData{
 		EntityIdentifier: req.Entity.Identifier,

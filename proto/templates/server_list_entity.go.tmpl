@@ -6,6 +6,7 @@ import (
 	//"encoding/json"
 	
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+	{{.FinalIdentifier}}module "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}"
 	pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
 	{{ if .Project.MonitoringConfig.Enabled }}
 	"{{.Project.Module}}/monitoring"
@@ -70,6 +71,7 @@ func BuildList{{.Name}}Request(ctx context.Context, request *pb.List{{.Name}}Req
 
 func (s *server) List{{.Name}}(ctx context.Context, request *pb.List{{.Name}}Request) (*pb.List{{.Name}}Response, error) {
 	
+	var err error
 	req, pageToken, err := BuildList{{.Name}}Request(ctx, request)
 	if err != nil {
 		{{ if .Project.MonitoringConfig.Enabled }}
@@ -88,7 +90,12 @@ func (s *server) List{{.Name}}(ctx context.Context, request *pb.List{{.Name}}Req
 	}
 
 	// Query the storage.
-	result, err := s.core.{{.Name}}().List(ctx, req)
+	var result types.ListResponse
+	if request.GetSkipCache() {
+		result, err = s.core.{{.Name}}().List(ctx, req, {{.FinalIdentifier}}module.WithSkipCache())
+	} else {
+		result, err = s.core.{{.Name}}().List(ctx, req)
+	}
 	if err != nil {
 		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{

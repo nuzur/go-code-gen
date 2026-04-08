@@ -64,7 +64,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 			continue
 		}
 		if project.OnStatusChange != nil {
-			project.OnStatusChange(fmt.Sprintf("Generating server code for entity: %s", se.FinalIdentifier))
+			project.OnStatusChange("Generating server code for entities")
 		}
 		tmplBytesCreate, err := files.GetTemplateBytes(templates, "server_create_entity")
 		if err != nil {
@@ -81,7 +81,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		}
 
 		if project.OnStatusChange != nil {
-			project.OnStatusChange(fmt.Sprintf("Generating update server code for entity: %s", se.FinalIdentifier))
+			project.OnStatusChange("Generating update server code for entities")
 		}
 		tmplBytesUpdate, err := files.GetTemplateBytes(templates, "server_update_entity")
 		if err != nil {
@@ -99,7 +99,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 
 		se.Declarations = getEntityDeclarations(se, entityTemplates)
 		if project.OnStatusChange != nil {
-			project.OnStatusChange(fmt.Sprintf("Generating list server code for entity: %s", se.FinalIdentifier))
+			project.OnStatusChange("Generating list server code for entities")
 		}
 		tmplBytesList, err := files.GetTemplateBytes(templates, "server_list_entity")
 		if err != nil {

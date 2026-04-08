@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"fmt"
 	"path"
 
 	"github.com/nuzur/filetools"
@@ -27,7 +26,7 @@ type mapperModuleTemplate struct {
 
 func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 	if req.OnStatusChange != nil {
-		req.OnStatusChange(fmt.Sprintf("Generating mapper for entity: %s", req.Entity.Identifier))
+		req.OnStatusChange("Generating mapper for entities")
 	}
 	hasArrayField := false
 	hasNullUUID := false
