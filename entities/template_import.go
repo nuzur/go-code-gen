@@ -3,6 +3,7 @@ package entities
 import (
 	"fmt"
 
+	"github.com/nuzur/go-code-gen/project"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -120,7 +121,10 @@ func (f FieldTemplate) Import() *string {
 		}
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return nil
+		// we want to get the import of type of array
+		arrayTypeConfig := f.Field.TypeConfig.Array
+		arrayFieldTemplate := mapArrayTypeConfigToFieldTemplate(f.Project, arrayTypeConfig)
+		return arrayFieldTemplate.Import()
 	case nemgen.FieldType_FIELD_TYPE_DATE:
 		if !f.IsRequired() {
 			return &nullImp
@@ -143,5 +147,66 @@ func (f FieldTemplate) Import() *string {
 		return nil
 	default:
 		return nil
+	}
+}
+
+func mapArrayTypeConfigToFieldTemplate(project *project.Project, arrayTypeConfig *nemgen.FieldTypeArrayConfig) FieldTemplate {
+	return FieldTemplate{
+		Field: &nemgen.Field{
+			Type: mapArrayTypeToFieldType(arrayTypeConfig.Type),
+			TypeConfig: &nemgen.FieldTypeConfig{
+				Integer:   arrayTypeConfig.TypeConfig.Integer,
+				Float:     arrayTypeConfig.TypeConfig.Float,
+				Decimal:   arrayTypeConfig.TypeConfig.Decimal,
+				Char:      arrayTypeConfig.TypeConfig.Char,
+				Varchar:   arrayTypeConfig.TypeConfig.Varchar,
+				Email:     arrayTypeConfig.TypeConfig.Email,
+				Phone:     arrayTypeConfig.TypeConfig.Phone,
+				Url:       arrayTypeConfig.TypeConfig.Url,
+				Date:      arrayTypeConfig.TypeConfig.Date,
+				Encrypted: arrayTypeConfig.TypeConfig.Encrypted,
+				Enum:      arrayTypeConfig.TypeConfig.Enum,
+			},
+		},
+		Project: project,
+	}
+}
+
+func mapArrayTypeToFieldType(in nemgen.FieldTypeArrayConfigType) nemgen.FieldType {
+	switch in {
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID:
+		return nemgen.FieldType_FIELD_TYPE_INVALID
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+		return nemgen.FieldType_FIELD_TYPE_UUID
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
+		return nemgen.FieldType_FIELD_TYPE_INTEGER
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
+		return nemgen.FieldType_FIELD_TYPE_FLOAT
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
+		return nemgen.FieldType_FIELD_TYPE_DECIMAL
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR:
+		return nemgen.FieldType_FIELD_TYPE_CHAR
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
+		return nemgen.FieldType_FIELD_TYPE_VARCHAR
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
+		return nemgen.FieldType_FIELD_TYPE_EMAIL
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
+		return nemgen.FieldType_FIELD_TYPE_PHONE
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
+		return nemgen.FieldType_FIELD_TYPE_URL
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
+		return nemgen.FieldType_FIELD_TYPE_COLOR
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
+		return nemgen.FieldType_FIELD_TYPE_DATE
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+		return nemgen.FieldType_FIELD_TYPE_DATETIME
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
+		return nemgen.FieldType_FIELD_TYPE_ENCRYPTED
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+		return nemgen.FieldType_FIELD_TYPE_TIME
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM:
+		return nemgen.FieldType_FIELD_TYPE_ENUM
+	default:
+		return nemgen.FieldType_FIELD_TYPE_INVALID
 	}
 }

@@ -101,39 +101,6 @@ type FieldTemplate struct {
 	Project *project.Project
 	Field   *nemgen.Field
 	Entity  *nemgen.Entity
-
-	/*
-		// parent entity identifier
-		ParentIdentifier string
-
-		// specific imports
-		Import *string
-
-		// json specific config
-		JSON           bool
-		JSONMany       bool
-		JSONRaw        bool
-		JSONIdentifier string
-		Array          bool
-		//ArrayInternalType entity.FieldType
-		ArrayGenFieldType string
-
-		// enums
-		Enum     bool
-		EnumMany bool
-
-		// repo mappers
-		RepoToMapper      string
-		RepoToMapperFetch string
-		RepoFromMapper    string
-
-		// proto mappers
-		ProtoType        string   // the type in the proto file
-		ProtoName        string   // the field name in the proto file
-		ProtoEnumOptions []string // enum options
-		ProtoToMapper    string   // used in mapper to map from entity to proto
-		ProtoFromMapper  string   // user in mapper tp map from proto to entity
-		ProtoGenName     string   // field name in generated code by protoc*/
 }
 
 func (f FieldTemplate) Identifier() string {
