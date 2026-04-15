@@ -25,7 +25,7 @@ func generateEnum(ctx context.Context,
 	enum *nemgen.Enum) {
 
 	if project.OnStatusChange != nil {
-		project.OnStatusChange(fmt.Sprintf("Generating enum: %s", enum.Identifier))
+		project.OnStatusChange("Generating enums")
 	}
 
 	values := make([]string, len(enum.StaticValues))

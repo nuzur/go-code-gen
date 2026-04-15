@@ -212,6 +212,12 @@ func FlexibleUnmarshal(data json.RawMessage, target interface{}) error {
             continue
         }
 
+        // uuid.UUID (array of 16 bytes named "UUID"): coerce empty string to null
+        if ft.Name() == "UUID" && s == `""` {
+            rawMap[key] = json.RawMessage("null")
+            continue
+        }
+
         // time.Time or null.Time (struct named "Time"): coerce date-only string to RFC3339
         if ft.Kind() == reflect.Struct && ft.Name() == "Time" {
             // s is the raw JSON value including quotes, e.g. "\"2024-11-08\""
