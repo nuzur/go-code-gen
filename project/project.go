@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path"
-	"sync"
 
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/strings"
@@ -27,7 +26,6 @@ type Project struct {
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
 	OnStatusChange      func(status string)
-	depMu               sync.Mutex
 }
 
 type ProjectParams struct {
@@ -169,8 +167,6 @@ func (p *Project) Dir() string {
 }
 
 func (p *Project) InstallDependency(dep string) error {
-	p.depMu.Lock()
-	defer p.depMu.Unlock()
 	cmd := exec.Command("go", "get", dep)
 	cmd.Dir = p.Dir()
 	out, err := cmd.Output()
