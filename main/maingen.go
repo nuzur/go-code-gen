@@ -15,12 +15,17 @@ import (
 var templates embed.FS
 
 func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
-	if params.OnStatusChange != nil {
-		params.OnStatusChange("Generating main.go")
-	}
 	project, err := project.New(params)
 	if err != nil {
 		return fmt.Errorf("%v", err)
+	}
+
+	if project.CoreConfig.Enabled == false {
+		return nil
+	}
+
+	if params.OnStatusChange != nil {
+		params.OnStatusChange("Generating main.go")
 	}
 
 	projectDir := project.Dir()
@@ -31,10 +36,6 @@ func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
 		if params.OnStatusChange != nil {
 			params.OnStatusChange(fmt.Sprintf("ERROR: Deleting main.go: %v", err))
 		}
-	}
-
-	if project.CoreConfig.Enabled == false {
-		return nil
 	}
 
 	tplBytes, err := files.GetTemplateBytes(templates, path.Join("main"))

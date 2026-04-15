@@ -56,7 +56,8 @@ func {{.EntityName}}SliceFromJSON(data json.RawMessage)[]{{.EntityName}} {
         return entity
     }
 
-    if err := json.Unmarshal(data, &entity); err != nil {        
+    if err := json.Unmarshal(data, &entity); err != nil {
+        entity = []{{.EntityName}}{}
         var rawSlice []json.RawMessage
         if err2 := json.Unmarshal(data, &rawSlice); err2 == nil {
             for _, raw := range rawSlice {

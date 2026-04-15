@@ -14,6 +14,7 @@ import (
 	maingen "github.com/nuzur/go-code-gen/main"
 	"github.com/nuzur/go-code-gen/project"
 	"github.com/nuzur/go-code-gen/proto"
+	"golang.org/x/sync/errgroup"
 )
 
 func Generate(ctx context.Context, params *project.ProjectParams) error {
@@ -22,43 +23,16 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
-	err = entities.GenerateEntities(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = proto.GenerateProto(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = core.GenerateCoreModules(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = auth.GenerateAuth(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = maingen.GenerateMain(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = docker.GenerateDocker(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = helm.GenerateHelm(ctx, params)
-	if err != nil {
-		return err
-	}
-
-	err = githubactions.GenerateGitHubActions(ctx, params)
-	if err != nil {
+	g, gctx := errgroup.WithContext(ctx)
+	g.Go(func() error { return entities.GenerateEntities(gctx, params) })
+	g.Go(func() error { return proto.GenerateProto(gctx, params) })
+	g.Go(func() error { return core.GenerateCoreModules(gctx, params) })
+	g.Go(func() error { return auth.GenerateAuth(gctx, params) })
+	g.Go(func() error { return maingen.GenerateMain(gctx, params) })
+	g.Go(func() error { return docker.GenerateDocker(gctx, params) })
+	g.Go(func() error { return helm.GenerateHelm(gctx, params) })
+	g.Go(func() error { return githubactions.GenerateGitHubActions(gctx, params) })
+	if err = g.Wait(); err != nil {
 		return err
 	}
 
