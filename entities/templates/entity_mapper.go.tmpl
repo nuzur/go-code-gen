@@ -229,6 +229,15 @@ func FlexibleUnmarshal(data json.RawMessage, target interface{}) error {
             }
             continue
         }
+
+		// Slice fields: coerce a JSON-encoded string (double-encoded) to the actual JSON array/object
+		if ft.Kind() == reflect.Slice && len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+			var inner string
+			if err := json.Unmarshal(raw, &inner); err == nil {
+				rawMap[key] = json.RawMessage(inner)
+			}
+			continue
+		}
     }
 
     fixed, err := json.Marshal(rawMap)

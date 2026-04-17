@@ -36,9 +36,9 @@ func (i *Implementation) BuildListEntityQuery(
 	}
 	if len(includeColumns) > 0 {
 		columns := []string{}
-		fieldMap := entity.FieldIdentifierToTypeMap()
-		for _, c := range includeColumns {
-			if _, found := fieldMap[c]; found {
+		fields := entity.OrderedFieldIdentifiers()
+		for _, c := range fields {
+			if slices.Contains(includeColumns, c) {
 				columns = append(columns, fmt.Sprintf("%s.%s", entity.EntityIdentifier(), c))
 			}
 		}
