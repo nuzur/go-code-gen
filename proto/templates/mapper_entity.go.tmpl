@@ -11,7 +11,7 @@ import (
     main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.OriginalIdentifier}}"
     pb "{{.Project.Module}}/{{.Project.ProtoConfig.Dir}}/gen"
     {{range $field := .Fields}}
-        {{if and (eq $field.GolangType "time.Time") (eq $timestampImport false)}}
+        {{if and (or (eq $field.GolangType "time.Time") (eq $field.GolangType "null.Time")) (eq $timestampImport false)}}
         "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        
         {{if and (eq $field.Enum true) (eq $enumImport false)}}
         "{{$projectModule}}/enum" {{$enumImport = true}}{{end}}
