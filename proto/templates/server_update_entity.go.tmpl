@@ -30,7 +30,7 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 	{{end}}
 
 	
-	err := fieldmask.Validate(req.UpdateMask, req)
+	err := fieldmask.Validate(req.UpdateMask, req.Get{{.Name}}())
 	if err != nil {
 		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{
@@ -52,18 +52,18 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 	{{$finalIdentifier := .FinalIdentifier}}
 	if !isFull && req.UpdateMask != nil {
 		{{range $primaryKey := .PrimaryKeys}}
-		if !strings.Contains(req.UpdateMask.String(), "{{$finalIdentifier}}.{{$primaryKey.Identifier}}") {
-			req.UpdateMask.Append(req, "{{$finalIdentifier}}.{{$primaryKey.Identifier}}")
+		if !strings.Contains(req.UpdateMask.String(), "{{$primaryKey.Identifier}}") {
+			req.UpdateMask.Append(req.Get{{$entityName}}(), "{{$primaryKey.Identifier}}")
 		}		
 		{{end}}
 		{{if eq .HasVersionField true}}
-		if !strings.Contains(req.UpdateMask.String(), "{{.FinalIdentifier}}.version") {
-			req.UpdateMask.Append(req, "{{.FinalIdentifier}}.version")
+		if !strings.Contains(req.UpdateMask.String(), "version") {
+			req.UpdateMask.Append(req.Get{{.Name}}(), "version")
 		}
 		{{end}}
-		newReq := &pb.Update{{.Name}}Request{}
-		fieldmask.Update(req.UpdateMask, newReq, req)
-		req = newReq
+		new{{.Name}} := &pb.{{.Name}}{}
+		fieldmask.Update(req.UpdateMask, new{{.Name}}, req.Get{{.Name}}())
+		req = &pb.Update{{.Name}}Request{{"{"}}{{.Name}}: new{{.Name}}, UpdateMask: req.UpdateMask}
 	}
 
 	res, err := s.core.{{.Name}}().Update(ctx, types.UpsertRequest{
