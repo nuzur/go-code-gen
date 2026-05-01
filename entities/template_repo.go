@@ -242,6 +242,19 @@ func (f FieldTemplate) PartialUpdateCheck() string {
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		return fmt.Sprintf("%s != 0", ref)
 	case nemgen.FieldType_FIELD_TYPE_JSON:
+		rel := f.Project.GetRelationshipFromField(f.Field)
+		if rel != nil && rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
+			return fmt.Sprintf("len(%s) > 0", ref)
+		}
+		// one-to-one JSON struct: serialize and check if non-empty ("{}" = 2 bytes)
+		if rel != nil {
+			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
+			if dependantEntity != nil {
+				depID := dependantEntity.Identifier
+				depName := gcgstrings.ToCamelCase(dependantEntity.Identifier)
+				return fmt.Sprintf("len(%s.%sToJSON(%s)) > 2", depID, depName, ref)
+			}
+		}
 		return fmt.Sprintf("len(%s) > 0", ref)
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return fmt.Sprintf("len(%s) > 0", ref)
