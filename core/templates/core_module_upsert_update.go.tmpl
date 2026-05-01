@@ -194,8 +194,16 @@ func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.Project
 
 	res := {{.Project.Identifier}}db.Update{{.EntityName}}Params{}
 	
-	{{range $field := .Fields}}						
-		res.{{$field.Name}} = {{$field.RepoToMapperUpsert}} 				
+	{{range $field := .Fields}}
+	{{- if $field.IsKey}}
+	res.{{$field.Name}} = {{$field.RepoToMapperUpsert}}
+	{{- else}}
+	if {{$field.PartialUpdateCheck}} {
+		res.{{$field.Name}} = {{$field.RepoToMapperUpsert}}
+	} else {
+		res.{{$field.Name}} = existing.{{$field.Name}}
+	}
+	{{- end}}
 	{{end}}
 
 	return res

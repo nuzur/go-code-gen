@@ -178,6 +178,90 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 	}
 }
 
+// PartialUpdateCheck returns the Go condition to determine if the incoming request
+// value is non-zero, so a partial update can fall back to the existing DB value otherwise.
+func (f FieldTemplate) PartialUpdateCheck() string {
+	entity := f.Entity
+	entityName := gcgstrings.ToCamelCase(entity.Identifier)
+	fieldName := gcgstrings.ToCamelCase(f.Identifier())
+	ref := fmt.Sprintf("req.%s.%s", entityName, fieldName)
+
+	switch f.Field.Type {
+	case nemgen.FieldType_FIELD_TYPE_UUID:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s != nil", ref)
+		}
+		return fmt.Sprintf("%s.String() != \"\"", ref)
+	case nemgen.FieldType_FIELD_TYPE_INTEGER:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("%s != 0", ref)
+	case nemgen.FieldType_FIELD_TYPE_FLOAT,
+		nemgen.FieldType_FIELD_TYPE_DECIMAL:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("%s != 0", ref)
+	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		// required bool: can't distinguish false from unset, always use new value
+		return "true"
+	case nemgen.FieldType_FIELD_TYPE_CHAR,
+		nemgen.FieldType_FIELD_TYPE_VARCHAR,
+		nemgen.FieldType_FIELD_TYPE_TEXT,
+		nemgen.FieldType_FIELD_TYPE_ENCRYPTED,
+		nemgen.FieldType_FIELD_TYPE_EMAIL,
+		nemgen.FieldType_FIELD_TYPE_PHONE,
+		nemgen.FieldType_FIELD_TYPE_URL,
+		nemgen.FieldType_FIELD_TYPE_LOCATION,
+		nemgen.FieldType_FIELD_TYPE_COLOR,
+		nemgen.FieldType_FIELD_TYPE_CODE,
+		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
+		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("%s != \"\"", ref)
+	case nemgen.FieldType_FIELD_TYPE_FILE,
+		nemgen.FieldType_FIELD_TYPE_IMAGE,
+		nemgen.FieldType_FIELD_TYPE_AUDIO,
+		nemgen.FieldType_FIELD_TYPE_VIDEO:
+		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+			return fmt.Sprintf("len(%s) > 0", ref)
+		}
+		if f.Field.TypeConfig.File.GetAllowMultiple() {
+			return fmt.Sprintf("len(%s) > 0", ref)
+		}
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("%s != \"\"", ref)
+	case nemgen.FieldType_FIELD_TYPE_ENUM:
+		return fmt.Sprintf("%s != 0", ref)
+	case nemgen.FieldType_FIELD_TYPE_JSON:
+		return fmt.Sprintf("len(%s) > 0", ref)
+	case nemgen.FieldType_FIELD_TYPE_ARRAY:
+		return fmt.Sprintf("len(%s) > 0", ref)
+	case nemgen.FieldType_FIELD_TYPE_DATE,
+		nemgen.FieldType_FIELD_TYPE_DATETIME,
+		nemgen.FieldType_FIELD_TYPE_TIME:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("!%s.IsZero()", ref)
+	case nemgen.FieldType_FIELD_TYPE_SLUG:
+		if !f.IsRequired() {
+			return fmt.Sprintf("%s.Valid", ref)
+		}
+		return fmt.Sprintf("%s != \"\"", ref)
+	default:
+		return "true"
+	}
+}
+
 func (f FieldTemplate) RepoFromMapper() string {
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
