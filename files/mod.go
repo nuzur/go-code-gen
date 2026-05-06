@@ -15,7 +15,11 @@ func CreateGoMod(goModPath, moduleName string) error {
 	}
 	cmd := exec.Command("go", "mod", "init", moduleName)
 	cmd.Dir = goModPath
-	return cmd.Run()
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("go mod init failed in %s: %w\noutput: %s", goModPath, err, string(out))
+	}
+	return nil
 }
 
 func ReadGoMod(goModPath string) (string, error) {

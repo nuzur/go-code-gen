@@ -23,28 +23,28 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	}
 
 	if err = entities.GenerateEntities(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating entities: %w", err)
 	}
 	if err = proto.GenerateProto(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating proto: %w", err)
 	}
 	if err = core.GenerateCoreModules(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating core modules: %w", err)
 	}
 	if err = auth.GenerateAuth(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating auth: %w", err)
 	}
 	if err = maingen.GenerateMain(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating main: %w", err)
 	}
 	if err = docker.GenerateDocker(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating docker: %w", err)
 	}
 	if err = helm.GenerateHelm(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating helm: %w", err)
 	}
 	if err = githubactions.GenerateGitHubActions(ctx, params); err != nil {
-		return err
+		return fmt.Errorf("generating github actions: %w", err)
 	}
 
 	if project.CoreConfig.Enabled && project.ProtoConfig.Server {

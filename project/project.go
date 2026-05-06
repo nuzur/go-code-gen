@@ -169,9 +169,9 @@ func (p *Project) Dir() string {
 func (p *Project) InstallDependency(dep string) error {
 	cmd := exec.Command("go", "get", dep)
 	cmd.Dir = p.Dir()
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("error running go get %s: %v | %v\n", dep, err, string(out))
+		fmt.Printf("error running go get %s in %s: %v\noutput: %s\n", dep, p.Dir(), err, string(out))
 	}
 	return err
 }
@@ -179,8 +179,8 @@ func (p *Project) InstallDependency(dep string) error {
 func (p *Project) GoModTidy(dir string) {
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = dir
-	out, err := cmd.Output()
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("error running go mod tidy: %v | %v\n", err, string(out))
+		fmt.Printf("error running go mod tidy in %s: %v\noutput: %s\n", dir, err, string(out))
 	}
 }
