@@ -114,26 +114,26 @@ func GenerateProto(ctx context.Context, params *project.ProjectParams) error {
 	// generate proto files
 	entityTemplates, err := generateProtoFiles(ctx, protoDir, project)
 	if err != nil {
-		return err
+		return fmt.Errorf("generating proto files: %w", err)
 	}
 	if project.ProtoConfig.Protoc || project.ProtoConfig.Server {
 		// generate base go code with protoc
 		err = generateProtoc(ctx, protoDir, project, entityTemplates)
 		if err != nil {
-			return err
+			return fmt.Errorf("running protoc: %w", err)
 		}
 	}
 	if project.CoreConfig.Enabled && project.ProtoConfig.Server {
 		// generate mappers to/from entity/proto
 		err = generateMappers(ctx, protoDir, project, entityTemplates)
 		if err != nil {
-			return err
+			return fmt.Errorf("generating proto mappers: %w", err)
 		}
 
 		// generate server
 		err = generateServer(ctx, protoDir, project, entityTemplates)
 		if err != nil {
-			return err
+			return fmt.Errorf("generating proto server: %w", err)
 		}
 
 	}
