@@ -54,21 +54,49 @@ func (s *server) Update{{.Name}}(ctx context.Context, req *pb.Update{{.Name}}Req
 		{{range $primaryKey := .PrimaryKeys}}
 		if !strings.Contains(req.UpdateMask.String(), "{{$primaryKey.Identifier}}") {
 			req.UpdateMask.Append(req.Get{{$entityName}}(), "{{$primaryKey.Identifier}}")
-		}		
+		}
 		{{end}}
 		{{if eq .HasVersionField true}}
 		if !strings.Contains(req.UpdateMask.String(), "version") {
 			req.UpdateMask.Append(req.Get{{.Name}}(), "version")
 		}
 		{{end}}
-		new{{.Name}} := &pb.{{.Name}}{}
-		fieldmask.Update(req.UpdateMask, new{{.Name}}, req.Get{{.Name}}())
-		req = &pb.Update{{.Name}}Request{{"{"}}{{.Name}}: new{{.Name}}, UpdateMask: req.UpdateMask}
+
+		pkEntity := pbmapper.{{.Name}}FromProto(req.Get{{.Name}}())
+		existingRes, err := s.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(ctx,
+			types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request{
+				{{range $primaryKey := .PrimaryKeys}}{{$primaryKey.Name}}: pkEntity.{{$primaryKey.Name}},
+				{{end}}
+			},
+			{{.FinalIdentifier}}module.WithSkipCache(),
+		)
+		if err != nil {
+			{{ if .Project.MonitoringConfig.Enabled }}
+			s.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "update_{{.FinalIdentifier}}",
+				Message: "error fetching existing for partial Update{{.Name}}",
+				EntityIdentifier: "{{.FinalIdentifier}}",
+				Layer: monitoring.ProtocolServiceLayer,
+				LayerSubtype: "protobuf",
+				Type: monitoring.EmitTypeError,
+				Data: req,
+				Error: err,
+			})
+			{{end}}
+			return nil, err
+		}
+		if len(existingRes.Results) == 0 {
+			return nil, errors.New("entity not found")
+		}
+
+		merged := pbmapper.{{.Name}}ToProto(existingRes.Results[0])
+		fieldmask.Update(req.UpdateMask, merged, req.Get{{.Name}}())
+		req = &pb.Update{{.Name}}Request{{"{"}}{{.Name}}: merged, UpdateMask: req.UpdateMask}
 	}
 
 	res, err := s.core.{{.Name}}().Update(ctx, types.UpsertRequest{
 		{{.Name}}: pbmapper.{{.Name}}FromProto(req.Get{{.Name}}()),
-	}, !isFull)
+	})
 	if err != nil {
 		{{ if .Project.MonitoringConfig.Enabled }}
 		s.monitoring.Emit(monitoring.EmitRequest{

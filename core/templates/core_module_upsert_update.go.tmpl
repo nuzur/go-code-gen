@@ -42,9 +42,8 @@ import (
 )
 
 func (m *module) Update(
-	ctx context.Context, 
-	req types.UpsertRequest, 
-	partial bool, 
+	ctx context.Context,
+	req types.UpsertRequest,
 	opts ...Option,
 ) (types.UpsertResponse, error) {
 	optConfig := applyAllOptions(opts)
@@ -117,7 +116,7 @@ func (m *module) Update(
 	{{end}}
 
 
-	params := mapUpsertRequestToUpdateParams(req, existing[0], partial)
+	params := mapUpsertRequestToUpdateParams(req)
 	err = qtx.Update{{.EntityName}}(
 		ctx,
 		params,
@@ -184,30 +183,11 @@ func buildUpdateResponse(req types.UpsertRequest) types.UpsertResponse {
 	}
 }
 
-func mapUpsertRequestToUpdateParams(req types.UpsertRequest, existing {{.Project.Identifier}}db.{{.EntityName}}, partial bool) {{.Project.Identifier}}db.Update{{.EntityName}}Params {	
-	if !partial {
-		return {{.Project.Identifier}}db.Update{{.EntityName}}Params{ {{range $field := .Fields}}			
-			{{$field.Name}}: {{$field.RepoToMapperUpsert}}, 			
-			{{end}}
-		}
+func mapUpsertRequestToUpdateParams(req types.UpsertRequest) {{.Project.Identifier}}db.Update{{.EntityName}}Params {
+	return {{.Project.Identifier}}db.Update{{.EntityName}}Params{ {{range $field := .Fields}}
+		{{$field.Name}}: {{$field.RepoToMapperUpsert}},
+		{{end}}
 	}
-
-	res := {{.Project.Identifier}}db.Update{{.EntityName}}Params{}
-	
-	{{range $field := .Fields}}
-	{{- if $field.IsKey}}
-	res.{{$field.Name}} = {{$field.RepoToMapperUpsert}}
-	{{- else}}
-	if {{$field.PartialUpdateCheck}} {
-		res.{{$field.Name}} = {{$field.RepoToMapperUpsert}}
-	} else {
-		res.{{$field.Name}} = existing.{{$field.Name}}
-	}
-	{{- end}}
-	{{end}}
-
-	return res
-
 }
 
 

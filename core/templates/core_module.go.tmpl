@@ -23,9 +23,9 @@ type Module interface {
 
 	List(ctx context.Context, req types.ListRequest, opts ...Option) (types.ListResponse, error)
 	
-	Upsert(ctx context.Context, req types.UpsertRequest, partial bool, opts ...Option) (types.UpsertResponse, error)
+	Upsert(ctx context.Context, req types.UpsertRequest, opts ...Option) (types.UpsertResponse, error)
 	Insert(ctx context.Context, req types.UpsertRequest, opts ...Option) (types.UpsertResponse, error)
-	Update(ctx context.Context, req types.UpsertRequest, partial bool, opts ...Option) (types.UpsertResponse, error)
+	Update(ctx context.Context, req types.UpsertRequest, opts ...Option) (types.UpsertResponse, error)
 
 }
 

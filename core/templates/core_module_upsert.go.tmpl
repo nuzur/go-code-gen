@@ -10,9 +10,8 @@ import (
 )
 
 func (m *module) Upsert(
-	ctx context.Context, 
-	req types.UpsertRequest, 
-	partial bool, 
+	ctx context.Context,
+	req types.UpsertRequest,
 	opts ...Option,
 ) (types.UpsertResponse, error) {
 	// check if primary keys are set to determine if this is an insert or update	
@@ -27,6 +26,6 @@ func (m *module) Upsert(
 		return m.Insert(ctx, req, opts...)
 	}
 
-	return m.Update(ctx, req, partial, opts...)
+	return m.Update(ctx, req, opts...)
 }
 
