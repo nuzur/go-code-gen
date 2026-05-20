@@ -153,7 +153,8 @@ func (f FieldTemplate) Import() *string {
 func mapArrayTypeConfigToFieldTemplate(project *project.Project, arrayTypeConfig *nemgen.FieldTypeArrayConfig) FieldTemplate {
 	return FieldTemplate{
 		Field: &nemgen.Field{
-			Type: mapArrayTypeToFieldType(arrayTypeConfig.Type),
+			Type:     mapArrayTypeToFieldType(arrayTypeConfig.Type),
+			Required: true, // array element types are always concrete (never nullable)
 			TypeConfig: &nemgen.FieldTypeConfig{
 				Integer:   arrayTypeConfig.TypeConfig.Integer,
 				Float:     arrayTypeConfig.TypeConfig.Float,
