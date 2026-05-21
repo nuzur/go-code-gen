@@ -259,5 +259,16 @@ func getEntityDeclarations(e *ProtoEntityTemplate, allEntities []*ProtoEntityTem
 	}
 
 	finalRes = append(finalRes, entityRes)
-	return finalRes
+
+	// Deduplicate by identifier to avoid re-declaring the same entity's fields
+	// when multiple JSON fields resolve to the same dependent entity.
+	seen := map[string]bool{}
+	deduped := []ProtoEntityDeclaration{}
+	for _, d := range finalRes {
+		if !seen[d.Identifier] {
+			seen[d.Identifier] = true
+			deduped = append(deduped, d)
+		}
+	}
+	return deduped
 }
