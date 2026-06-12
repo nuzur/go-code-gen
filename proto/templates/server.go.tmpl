@@ -33,7 +33,7 @@ type server struct {
 
 type Params struct {
 	fx.In
-	Logger *zap.Logger
+	Logger *zap.Logger `optional:"true"`
 	Lifecycle fx.Lifecycle
 	Core   *core.Implementation
 	Config config.Provider
@@ -56,6 +56,9 @@ func NewServer(params Params) pb.{{.Name}}Server {
 
 func New(params Params) *grpc.Server {	
 	log := params.Logger
+	if log == nil {
+		log = zap.NewNop()
+	}
 	s := grpc.NewServer(
 		{{ if ne .AuthImport ""}}
 		{{ if .Project.MonitoringConfig.Enabled }}

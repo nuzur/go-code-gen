@@ -6,6 +6,7 @@ import (
     base "{{.Module}}/auth"	
     "github.com/Nerzal/gocloak/v13"
 	"github.com/gofrs/uuid"
+	"go.uber.org/zap"
 )
 
 func New(params Params) (base.Interface, error) {
@@ -14,8 +15,12 @@ func New(params Params) (base.Interface, error) {
 		return nil, err
 	}
     
+	logger := params.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	i := Implementation{		
-		logger: params.Logger,	
+		logger: logger,	
         config: config,	
         client: gocloak.NewClient(config.Hostname),
 	}

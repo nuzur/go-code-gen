@@ -27,15 +27,19 @@ type Implementation struct {
 type Params struct {
 	fx.In
 	Core *core.Implementation
-	Logger *zap.Logger	
+	Logger *zap.Logger `optional:"true"`
 	Config config.Provider
 }
 
 func New(params Params) (base.Interface, error) {
 	key := params.Config.Get("auth.jwt.key").String()
+	logger := params.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	i := Implementation{
 		core: params.Core,
-		logger: params.Logger,
+		logger: logger,
 		key: []byte(key),
 	}
 
@@ -43,7 +47,6 @@ func New(params Params) (base.Interface, error) {
 	http.HandleFunc("/validate", i.Validate)
 	http.HandleFunc("/refresh", i.Refresh)
 
-	log := params.Logger
-	log.Info(`Serving JWT AUTH HTTP: /signin, /refresh, /validate`)
+	logger.Info(`Serving JWT AUTH HTTP: /signin, /refresh, /validate`)
 	return &i, nil
 }
