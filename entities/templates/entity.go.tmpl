@@ -3,7 +3,7 @@ package {{.Package}}
 {{$projectModule := .Project.Module}}
 {{$entityDir := .Project.EntitiesConfig.Dir}}
 import (
-    "fmt"
+    "log"
     "encoding/json"
          
     {{range $import := .Imports}}
@@ -41,7 +41,7 @@ func {{.EntityName}}FromJSON(data json.RawMessage) {{.EntityName}} {
 
     if err := json.Unmarshal(data, &entity); err != nil {        
         if err2 := mapper.FlexibleUnmarshal(data, &entity); err2 != nil {
-            fmt.Printf("flexible unmarshal error {{.EntityName}}FromJSON: %v\n", err2)
+            log.Printf("flexible unmarshal error {{.EntityName}}FromJSON: %v\n", err2)
         }
     }
     return entity
@@ -63,7 +63,7 @@ func {{.EntityName}}SliceFromJSON(data json.RawMessage)[]{{.EntityName}} {
             for _, raw := range rawSlice {
                 item := {{.EntityName}}{}
                 if err3 := mapper.FlexibleUnmarshal(raw, &item); err3 != nil {
-                    fmt.Printf("flexible unmarshal error {{.EntityName}}SliceFromJSON item: %v\n", err3)
+                    log.Printf("flexible unmarshal error {{.EntityName}}SliceFromJSON item: %v\n", err3)
                 }
                 entity = append(entity, item)
             }
@@ -75,7 +75,7 @@ func {{.EntityName}}SliceFromJSON(data json.RawMessage)[]{{.EntityName}} {
 func (e {{.EntityName}}) ToJSON() json.RawMessage {
     res, err := json.Marshal(e)
     if err != nil {
-        fmt.Printf("marshal error {{.EntityName}}ToJSON: %v\n", err)
+        log.Printf("marshal error {{.EntityName}}ToJSON: %v\n", err)
     }
     return res
 }
@@ -83,7 +83,7 @@ func (e {{.EntityName}}) ToJSON() json.RawMessage {
 func {{.EntityName}}ToJSON(e {{.EntityName}}) json.RawMessage {
     res, err := json.Marshal(e)
     if err != nil {
-        fmt.Printf("marshal error {{.EntityName}}ToJSON: %v\n", err)
+        log.Printf("marshal error {{.EntityName}}ToJSON: %v\n", err)
     }
     return res
 }
@@ -95,7 +95,7 @@ func {{.EntityName}}SliceToJSON(e []{{.EntityName}}) json.RawMessage {
     }
     res, err := json.Marshal(e)
     if err != nil {
-        fmt.Printf("marshal error {{.EntityName}}SliceToJSON: %v\n", err)
+        log.Printf("marshal error {{.EntityName}}SliceToJSON: %v\n", err)
     }
     return res
 }

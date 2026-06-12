@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -56,7 +57,7 @@ func NewWithPathAndEnvironment(p string, env string) (config.Provider, error) {
 	for _, pt := range paths {
 		fi, err := os.Stat(pt)
 		if err != nil {
-			fmt.Printf("error reading path: %v, error: %v\n", pt, err)
+			log.Printf("error reading path: %v, error: %v\n", pt, err)
 			return nil, err
 		}
 		switch mode := fi.Mode(); {
@@ -69,7 +70,7 @@ func NewWithPathAndEnvironment(p string, env string) (config.Provider, error) {
 			if _, err := os.Stat(basePath); err == nil {
 				configFiles = append(configFiles, config.File(basePath))
 			} else {
-				fmt.Printf("base config file does not exist: %s\n", basePath)
+				log.Printf("base config file does not exist: %s\n", basePath)
 			}
 
 			// check if the file exists before trying to load it
@@ -77,18 +78,18 @@ func NewWithPathAndEnvironment(p string, env string) (config.Provider, error) {
 			if _, err := os.Stat(envPath); err == nil {
 				configFiles = append(configFiles, config.File(envPath))
 			} else {
-				fmt.Printf("env config file does not exist: %s\n", envPath)
+				log.Printf("env config file does not exist: %s\n", envPath)
 			}
 					
 		case mode.IsRegular():
 			if !strings.HasSuffix(pt, ".yaml") && !strings.HasSuffix(pt, ".yml") {
-				fmt.Printf("skipping non-yaml config file: %s\n", pt)
+				log.Printf("skipping non-yaml config file: %s\n", pt)
 				continue
 			}
 			 
 			// check if the file exists before trying to load it
 			if _, err := os.Stat(pt); err != nil {
-				fmt.Printf("config file does not exist: %s\n", pt)
+				log.Printf("config file does not exist: %s\n", pt)
 				continue
 			}
 			configFiles = append(configFiles, config.File(pt))
@@ -97,14 +98,14 @@ func NewWithPathAndEnvironment(p string, env string) (config.Provider, error) {
 
 	
 	// print the config files being loaded for debugging purposes
-	fmt.Printf("Loading config files: %v\n", configFiles)
+	log.Printf("Loading config files: %v\n", configFiles)
 
 	yaml, err := config.NewYAML(
 		configFiles...,		
 	)
 
 	if err != nil {
-		fmt.Printf("error loading config: %v", err)
+		log.Printf("error loading config: %v", err)
 		return nil, err
 	}
 

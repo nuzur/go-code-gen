@@ -1,6 +1,7 @@
 package types 
 
 import (
+    "go.uber.org/zap"
     "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.RepoConfig.Dir}}"
     {{if eq .CoreConfig.EventsConfig.Enabled true}}
     "{{.Module}}/{{.CoreConfig.CoreDir}}/{{.CoreConfig.EventsConfig.Dir}}"
@@ -12,6 +13,7 @@ import (
 
 type ModuleParams struct {    
     Repository *repository.Implementation
+    Logger     *zap.Logger
     {{if eq .MonitoringConfig.Enabled true}}
     Monitoring *monitoring.Implementation
     {{end}}

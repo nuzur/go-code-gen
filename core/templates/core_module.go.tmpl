@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 	"golang.org/x/sync/singleflight"
+	"go.uber.org/zap"
 	gocache "github.com/patrickmn/go-cache"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}"
 	coretypes "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/types"
@@ -34,6 +35,7 @@ type module struct {
 	sg         singleflight.Group
 	cache      *gocache.Cache
 	repository *repository.Implementation
+	logger     *zap.Logger
 	{{if eq .Project.MonitoringConfig.Enabled true}}
 	monitoring *monitoring.Implementation
 	{{end}}
@@ -45,6 +47,7 @@ type module struct {
 func New(params coretypes.ModuleParams) Module {
 	return &module{
 		repository: params.Repository,
+		logger:     params.Logger,
 		cache:      gocache.New(30*time.Second, 5*time.Minute),
 		{{if eq .Project.MonitoringConfig.Enabled true}}
 		monitoring: params.Monitoring,

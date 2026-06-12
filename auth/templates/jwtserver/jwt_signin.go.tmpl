@@ -3,11 +3,11 @@ package jwtserver
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/user/types"
 )
@@ -30,7 +30,7 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// If the structure of the body is wrong, return an HTTP error
 		w.WriteHeader(http.StatusBadRequest)
-		fmt.Printf("error decoding: %v\n", err)
+		i.logger.Error("error decoding credentials", zap.Error(err))
 		return
 	}
 	ctx := context.Background()
@@ -43,13 +43,13 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Printf("error getting user: %v\n", err)
+		i.logger.Error("error getting user", zap.Error(err))
 		return
 	}
 
     if len(userRes.Results) == 0 {
         w.WriteHeader(http.StatusNotFound)
-		fmt.Printf("user not found: %s\n", creds.Email)
+		i.logger.Error("user not found", zap.String("email", creds.Email))
 		return
     }
 
@@ -71,7 +71,7 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	err = bcrypt.CompareHashAndPassword([]byte(passwordStr), []byte(creds.Password))
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Printf("error comparing pwd: %v\n", err)
+		i.logger.Error("error comparing password", zap.Error(err))
 		return
 	}
 
@@ -94,7 +94,7 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// If there is an error in creating the JWT return an internal server error
 		w.WriteHeader(http.StatusInternalServerError)
-		fmt.Printf("error generating token: %v\n", err)
+		i.logger.Error("error generating token", zap.Error(err))
 		return
 	}
 

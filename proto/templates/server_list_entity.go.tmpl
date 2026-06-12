@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	//"encoding/json"
 	
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
@@ -42,7 +43,7 @@ func BuildList{{.Name}}Request(ctx context.Context, request *pb.List{{.Name}}Req
 	/* // enable for debugging
 	if filter.CheckedExpr != nil {
 		b, _ := json.Marshal(filter.CheckedExpr.Expr)
-		fmt.Printf("filtering: %v \n", string(b))
+		log.Printf("filtering: %v \n", string(b))
 	}
 	*/
 
@@ -54,7 +55,7 @@ func BuildList{{.Name}}Request(ctx context.Context, request *pb.List{{.Name}}Req
 	/* // enable for debugging
 	if orderBy.Fields != nil {
 		b, _ := json.Marshal(orderBy.Fields)
-		fmt.Printf("ordering: %v \n", string(b))
+		log.Printf("ordering: %v \n", string(b))
 	}
 	*/
 
@@ -168,7 +169,7 @@ func {{.FinalIdentifier}}Declarations() *filtering.Declarations{
 		{{end}}
     )
     if err != nil {
-        fmt.Printf("error creating declarions:%v", err)
+        log.Printf("error creating declarations: %v", err)
     }
     return declarations
 }

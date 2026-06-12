@@ -15,6 +15,7 @@ import (
 	
 	"go.uber.org/config"
 	"go.uber.org/fx"	
+	"go.uber.org/zap"
 	{{.Identifier}}config "{{.Module}}/config"
 	coretypes "{{.Module}}/{{$coreDir}}/types"
     {{$projectIdentifier := .Module}}
@@ -34,6 +35,7 @@ import (
 type Implementation struct {
 	db 			   *sql.DB
 	repository     *repository.Implementation
+	logger         *zap.Logger
     {{range $entity := .StandaloneEntities}}
     {{$entity.Identifier}}       {{$entity.Identifier}}.Module
     {{end}}	
@@ -49,6 +51,7 @@ type Params struct {
 	fx.In
 	Provider config.Provider
 	Lifecycle fx.Lifecycle	
+	Logger *zap.Logger
 	{{if eq .MonitoringConfig.Enabled true}}
 	Monitoring *monitoring.Implementation
 	{{end}}
@@ -90,6 +93,7 @@ func New(params Params) (*Implementation, error) {
 	return &Implementation{
 		db: db,
 		repository: repository,
+		logger: params.Logger,
 		{{if eq .MonitoringConfig.Enabled true}}
 		monitoring: params.Monitoring,
 		{{end}}
@@ -115,6 +119,7 @@ func (i Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identif
 	if i.{{$entity.Identifier}} == nil {
 		i.{{$entity.Identifier}} = {{$entity.Identifier}}.New(coretypes.ModuleParams{
 		 Repository:i.repository,
+		 Logger: i.logger,
 		 {{if eq $monitoring.Enabled true}}
 		 Monitoring: i.monitoring,
 		 {{end}}

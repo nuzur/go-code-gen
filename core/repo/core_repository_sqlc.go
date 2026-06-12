@@ -49,10 +49,10 @@ func generateRepositorySQLCode(ctx context.Context, repoDir string, project *pro
 	}
 	cmd := exec.Command("go", "run", "github.com/sqlc-dev/sqlc/cmd/sqlc", "generate")
 	cmd.Dir = repoDir
-	res, err := cmd.Output()
+	res, err := cmd.CombinedOutput()
 	if err != nil {
 		if project.OnStatusChange != nil {
-			project.OnStatusChange(fmt.Sprintf("ERROR: Running sqlc generate: %v", err))
+			project.OnStatusChange(fmt.Sprintf("ERROR: Running sqlc generate: %v\nOutput: %s", err, string(res)))
 		}
 		return err
 	}
