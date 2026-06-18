@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 
+	"github.com/nuzur/go-code-gen/ai"
 	"github.com/nuzur/go-code-gen/auth"
 	"github.com/nuzur/go-code-gen/core"
 	"github.com/nuzur/go-code-gen/docker"
@@ -45,6 +46,9 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	}
 	if err = githubactions.GenerateGitHubActions(ctx, params); err != nil {
 		return fmt.Errorf("generating github actions: %w", err)
+	}
+	if err = ai.GenerateAIInfo(ctx, params); err != nil {
+		return fmt.Errorf("generating ai info: %w", err)
 	}
 
 	if project.CoreConfig.Enabled && project.ProtoConfig.Server {

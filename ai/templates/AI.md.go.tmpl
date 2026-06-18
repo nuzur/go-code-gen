@@ -1,0 +1,36 @@
+# Generated Project: {{.Project.Name}}
+
+This codebase has been automatically generated using [nuzur](https://nuzur.com) `go-code-gen`.
+
+## ⚠️ Important Note for AI Assistants & LLMs
+
+1. **Auto-Generated Code**: This project is completely managed by an automatic code generator.
+2. **Avoid Direct Modifications**: Do not modify, edit, or refactor any code in this repository unless the user explicitly instructs you to do so.
+3. **Overwrite Warning**: Direct edits to these files **will be overwritten** the next time the generator runs. Let the user know about this risk before applying changes.
+
+---
+
+## Codebase Structure
+
+Here is a summary of the generated directory structure and its purpose:
+
+* **`entity/`**: Houses Go struct definitions for data models, validation helpers, and entity-to-protobuf mapping utilities.
+* **`idl/`**: Contains Protocol Buffer definitions and the auto-generated gRPC/HTTP stubs.
+* **`core/`**: Contains the core business logic module.
+  * **`core/repository/`**: Database access layer generated via `sqlc`.
+  * **`core/module/`**: Handles the main CRUD operations (select, list with pagination, upsert/insert/update).
+* **`auth/`**: Standard authentication modules (JWT server / Keycloak middleware).
+* **`config/`**: Handles environment configurations, port setup, and database credentials parsing.
+* **`main.go`**: Entrypoint of the application, responsible for wiring up dependencies using Uber Fx.
+* **`Dockerfile` & `.helm/`**: Deployment and containerization assets.
+
+---
+
+## Project Specifications
+
+* **Project Identifier**: `{{.Identifier}}`
+* **Go Module**: `{{.Module}}`
+* **Database Type**: `{{.CoreConfig.RepoConfig.DatabaseType}}`
+* **Auth Integration**: `{{if .AuthConfig.Enabled}}{{.AuthConfig.Type}}{{else}}Disabled{{end}}`
+* **Monitoring**: `{{if .MonitoringConfig.Enabled}}Enabled{{else}}Disabled{{end}}`
+* **Events Config**: `{{if .CoreConfig.EventsConfig.Enabled}}Enabled{{else}}Disabled{{end}}`

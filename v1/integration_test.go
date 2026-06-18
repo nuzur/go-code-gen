@@ -126,6 +126,7 @@ func TestIntegrationGenerate(t *testing.T) {
 		"core/module/user/list.go",
 		"auth/jwtserver/signin.go",
 		"auth/jwtserver/validate.go",
+		"AI.md",
 	}
 
 	for _, ef := range expectedFiles {
