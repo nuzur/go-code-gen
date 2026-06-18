@@ -16,7 +16,7 @@ func TestToCamelCase(t *testing.T) {
 		{"url_path", "URLPath"},
 		{"https_url", "HTTPSURL"},
 		{"http_port", "HTTPPort"},
-		{"establecimiento", "Establecimiento"},
+		{"organization", "Organization"},
 		{"normal_field", "NormalField"},
 	}
 
@@ -44,7 +44,7 @@ func TestToSnakeCase(t *testing.T) {
 		{"URLPath", "url_path"},
 		{"HTTPSURL", "httpsurl"},
 		{"HTTPPort", "http_port"},
-		{"Establecimiento", "establecimiento"},
+		{"Organization", "organization"},
 		{"NormalField", "normal_field"},
 	}
 
