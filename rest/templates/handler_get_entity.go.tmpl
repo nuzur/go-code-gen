@@ -1,0 +1,50 @@
+package server
+
+import (
+	"fmt"
+	"net/http"
+	{{ if .HasIntPrimaryKey }}"strconv"{{ end }}
+
+	"github.com/go-chi/chi/v5"
+	{{ if .HasUUIDPrimaryKey }}"github.com/gofrs/uuid"{{ end }}
+
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+)
+
+func (h *handlers) Get{{.Name}}(w http.ResponseWriter, r *http.Request) {
+	{{range $pk := .PrimaryKeys}}
+	{{if $pk.IsUUID}}
+	{{$pk.Name}}Str := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{$pk.Name}}Val, err := uuid.FromString({{$pk.Name}}Str)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, fmt.Errorf("invalid path parameter {{$pk.Name}}: %w", err))
+		return
+	}
+	{{else if eq $pk.GolangType "int64"}}
+	{{$pk.Name}}Str := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{$pk.Name}}Val, err := strconv.ParseInt({{$pk.Name}}Str, 10, 64)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, fmt.Errorf("invalid path parameter {{$pk.Name}}: %w", err))
+		return
+	}
+	{{else}}
+	{{$pk.Name}}Val := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{end}}
+	{{end}}
+
+	fetchRes, err := h.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(r.Context(), types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request{
+		{{range $pk := .PrimaryKeys}}{{$pk.Name}}: {{$pk.Name}}Val,
+		{{end}}
+	})
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if len(fetchRes.Results) == 0 {
+		writeProblem(w, http.StatusNotFound, fmt.Errorf("entity not found"))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, fetchRes.Results[0])
+}

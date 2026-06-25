@@ -1,0 +1,48 @@
+package server
+
+import (
+	{{ if or .HasUUIDPrimaryKey .HasIntPrimaryKey }}"fmt"{{ end }}
+	"net/http"
+	{{ if .HasIntPrimaryKey }}"strconv"{{ end }}
+
+	"github.com/go-chi/chi/v5"
+	{{ if .HasUUIDPrimaryKey }}"github.com/gofrs/uuid"{{ end }}
+
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+)
+
+func (h *handlers) Delete{{.Name}}(w http.ResponseWriter, r *http.Request) {
+	{{range $pk := .PrimaryKeys}}
+	{{if $pk.IsUUID}}
+	{{$pk.Name}}Str := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{$pk.Name}}Val, err := uuid.FromString({{$pk.Name}}Str)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, fmt.Errorf("invalid path parameter {{$pk.Name}}: %w", err))
+		return
+	}
+	{{else if eq $pk.GolangType "int64"}}
+	{{$pk.Name}}Str := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{$pk.Name}}Val, err := strconv.ParseInt({{$pk.Name}}Str, 10, 64)
+	if err != nil {
+		writeProblem(w, http.StatusBadRequest, fmt.Errorf("invalid path parameter {{$pk.Name}}: %w", err))
+		return
+	}
+	{{else}}
+	{{$pk.Name}}Val := chi.URLParam(r, "{{if gt (len $.PrimaryKeys) 1}}{{$pk.Identifier}}{{else}}id{{end}}")
+	{{end}}
+	{{end}}
+
+	if delErr := h.core.{{.Name}}().Delete(r.Context(), types.DeleteRequest{
+		{{range $pk := .PrimaryKeys}}{{$pk.Name}}: {{$pk.Name}}Val,
+		{{end}}
+	}); delErr != nil {
+		if delErr.Error() == "entity not found" {
+			writeProblem(w, http.StatusNotFound, delErr)
+			return
+		}
+		writeProblem(w, http.StatusInternalServerError, delErr)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

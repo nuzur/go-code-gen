@@ -42,3 +42,16 @@ func ToSnakeCase(str string) string {
 func StringContains(haystack, needle string) bool {
 	return strings.Contains(haystack, needle)
 }
+
+func ToKebabPlural(str string) string {
+	kebab := ToSnakeCase(str)
+	kebab = strings.ReplaceAll(kebab, "_", "-")
+	if strings.HasSuffix(kebab, "y") {
+		return kebab[:len(kebab)-1] + "ies"
+	}
+	if strings.HasSuffix(kebab, "s") || strings.HasSuffix(kebab, "sh") || strings.HasSuffix(kebab, "ch") || strings.HasSuffix(kebab, "x") || strings.HasSuffix(kebab, "z") {
+		return kebab + "es"
+	}
+	return kebab + "s"
+}
+

@@ -106,6 +106,11 @@ func TestIntegrationGenerate(t *testing.T) {
 			Enabled: true,
 			Type:    project.JWT_SERVER_AUTH_TYPE,
 		},
+		RESTConfig: project.RESTConfig{
+			Enabled:   true,
+			OpenAPI:   true,
+			SwaggerUI: true,
+		},
 		OnStatusChange: func(status string) {
 			t.Logf("[gocodegen] %s", status)
 		},
@@ -127,6 +132,20 @@ func TestIntegrationGenerate(t *testing.T) {
 		"auth/jwtserver/signin.go",
 		"auth/jwtserver/validate.go",
 		"AI.md",
+		"rest/server/server.go",
+		"rest/server/router.go",
+		"rest/server/errors.go",
+		"rest/server/response.go",
+		"rest/server/list_params.go",
+		"rest/server/middleware_common.go",
+		"rest/server/auth.go",
+		"rest/server/swagger_ui.go",
+		"rest/server/create_user.go",
+		"rest/server/get_user.go",
+		"rest/server/list_user.go",
+		"rest/server/update_user.go",
+		"rest/server/delete_user.go",
+		"rest/openapi.yaml",
 	}
 
 	for _, ef := range expectedFiles {

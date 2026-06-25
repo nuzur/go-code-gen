@@ -1,14 +1,20 @@
 package main
 import (
+	{{ if not (and .RESTConfig.Enabled .CoreConfig.Enabled) }}
 	"net/http"
+	"go.uber.org/config"
+	{{ end }}
 	"go.uber.org/fx"
 	"go.uber.org/zap"
-	"go.uber.org/config"
 	{{.Identifier}}config "{{.Module}}/config"
 	"{{.Module}}/{{.CoreConfig.CoreDir}}"
 
 	{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}
 	pbserver "{{.Module}}/idl/server"		
+	{{end}}
+
+	{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
+	restserver "{{.Module}}/{{.RESTConfig.Dir}}/server"
 	{{end}}
 
 	{{ if .AuthConfig.Enabled }}
@@ -38,13 +44,18 @@ func main() {
 			{{ if ne .AuthImport ""}}auth.New,{{end}}			
 			{{ if eq .CoreConfig.EventsConfig.Enabled true}}events.New,{{end}}
 		),	
+		{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
+		fx.Invoke(restserver.New),
+		{{ else }}
 		fx.Invoke(httpServer),
+		{{ end }}
 		{{ if eq .KafkaEnabled true }}saramafx.Module,{{end}}		
 		{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}fx.Invoke(pbserver.New),{{end}}		
 	).Run()
 }
 
 
+{{ if not (and .RESTConfig.Enabled .CoreConfig.Enabled) }}
 func httpServer(config config.Provider, logger *zap.Logger){
 	// http port from config 
 	httpPort := config.Get("ports.http").String()
@@ -53,4 +64,6 @@ func httpServer(config config.Provider, logger *zap.Logger){
 
 	logger.Info(`Serving HTTP on PORT: %s`, zap.String("port", httpPort))
 }
+{{end}}
+
 

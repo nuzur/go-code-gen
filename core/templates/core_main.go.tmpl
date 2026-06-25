@@ -1,11 +1,12 @@
 package core
 
 {{$coreDir := .CoreConfig.CoreDir}}
-import (	
+import (
 	"database/sql"
 	"errors"
 	"fmt"
 	"context"
+	"time"
 
 	{{if eq .CoreConfig.RepoConfig.DatabaseType "postgresql"}}
 	_ "github.com/lib/pq"
@@ -81,18 +82,31 @@ func New(params Params) (*Implementation, error) {
 	db.SetMaxOpenConns(0)
 	repository := repository.New(db)
 
+	logger := params.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	if params.Lifecycle != nil {
 		params.Lifecycle.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				// Warm the connection pool and fail fast with a clear error if the
+				// database is unreachable or credentials/permissions are wrong,
+				// instead of surfacing it later as a request-time timeout.
+				pingCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+				defer cancel()
+				if err := db.PingContext(pingCtx); err != nil {
+					logger.Error("failed to connect to database on startup", zap.Error(err))
+					return fmt.Errorf("error connecting to DB: %w", err)
+				}
+				logger.Info("connected to database")
+				return nil
+			},
 			OnStop: func(ctx context.Context) error {
 				db.Close()
 				return nil
 			},
 		})
-	}
-
-	logger := params.Logger
-	if logger == nil {
-		logger = zap.NewNop()
 	}
 
 	return &Implementation{

@@ -1,0 +1,117 @@
+package {{.Package}}
+
+import (
+	"context"
+	"errors"
+
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
+	{{if eq .Project.MonitoringConfig.Enabled true}}
+	"{{.Project.Module}}/monitoring"
+	{{end}}
+)
+
+func (m *module) Delete(
+	ctx context.Context,
+	req types.DeleteRequest,
+	opts ...Option,
+) error {
+	optConfig := applyAllOptions(opts)
+
+	tx := optConfig.SQLTx
+	createdTx := false
+	if tx == nil {
+		ntx, err := m.repository.DB.Begin()
+		if err != nil {
+			return err
+		}
+		tx = ntx
+		defer tx.Rollback()
+		createdTx = true
+	}
+
+	qtx := m.repository.Queries.WithTx(tx)
+    
+	existing, err := qtx.Fetch{{.EntityName}}By{{.PrimaryKeysName}}ForUpdate(ctx,
+		{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}req.{{$pk.Name}}.String(){{else}}req.{{$pk.Name}}{{end}}, {{end}}
+	)
+	if err != nil {
+		{{if eq .Project.MonitoringConfig.Enabled true}}
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "delete_{{.EntityIdentifier}}",
+			Message: "error fetching existing record for Delete{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		{{end}}
+		return err
+	}
+
+	if len(existing) == 0 {
+		err := errors.New("entity not found")
+		{{if eq .Project.MonitoringConfig.Enabled true}}
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "delete_{{.EntityIdentifier}}",
+			Message: "not found existing record for Delete{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		{{end}}
+		return err
+	}
+
+	_, err = qtx.Delete{{.EntityName}}(
+		ctx,
+		{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}req.{{$pk.Name}}.String(){{else}}req.{{$pk.Name}}{{end}}, {{end}}
+	)
+	if err != nil {
+		{{if eq .Project.MonitoringConfig.Enabled true}}
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "delete_{{.EntityIdentifier}}",
+			Message: "error calling repository for Delete{{.EntityName}}",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.RepositoryServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})	
+		{{end}}		
+		return err
+	}
+
+	if createdTx {
+		err := tx.Commit()
+		if err != nil {
+			{{if eq .Project.MonitoringConfig.Enabled true}}
+			m.monitoring.Emit(monitoring.EmitRequest{
+				ActionIdentifier: "delete_{{.EntityIdentifier}}",
+				Message:          "error committing for Delete{{.EntityName}}",
+				EntityIdentifier: "{{.EntityIdentifier}}",
+				Layer:            monitoring.RepositoryServiceLayer,
+				Type:             monitoring.EmitTypeError,
+				Data:             req,
+				Error:            err,
+			})
+			{{end}}
+			return err
+		}
+	}
+	
+	{{if eq .Project.MonitoringConfig.Enabled true}}
+	m.monitoring.Emit(monitoring.EmitRequest{
+		ActionIdentifier: "delete_{{.EntityIdentifier}}",
+		Message: "successfully handled Delete{{.EntityName}}",
+		EntityIdentifier: "{{.EntityIdentifier}}",
+		Layer: monitoring.ModuleServiceLayer,
+		Type: monitoring.EmitTypeSuccess,
+		Data: req,			
+	})
+	{{end}}
+
+	return nil
+}

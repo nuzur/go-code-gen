@@ -1,0 +1,107 @@
+package server
+
+import (
+	"net/http"
+	"strings"
+	{{ if .Project.AuthConfig.Enabled }}
+	"errors"
+	"fmt"
+
+	"{{.Module}}/auth"
+	{{ end }}
+	{{ if .Project.MonitoringConfig.Enabled }}
+	"{{.Module}}/monitoring"
+	{{end}}
+)
+
+{{ if and .Project.MonitoringConfig.Enabled .Project.AuthConfig.Enabled }}
+func AuthMiddleware(auth auth.Interface, m *monitoring.Implementation, exceptions []string) func(http.Handler) http.Handler {
+{{else if .Project.AuthConfig.Enabled }}
+func AuthMiddleware(auth auth.Interface, exceptions []string) func(http.Handler) http.Handler {
+{{else}}
+func AuthMiddleware(exceptions []string) func(http.Handler) http.Handler {
+{{end}}
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			finalExceptions := []string{
+				"/healthz",
+				"/docs",
+				"/openapi.yaml",
+				{{ if .Project.HasJWTAuth }}
+				// JWT auth endpoints must be reachable without a token.
+				"/signin",
+				"/refresh",
+				"/validate",
+				{{ end }}
+			}
+			finalExceptions = append(exceptions, finalExceptions...)
+
+			path := r.URL.Path
+			isException := false
+			for _, exc := range finalExceptions {
+				if path == exc || strings.HasPrefix(path, exc+"/") {
+					isException = true
+					break
+				}
+			}
+
+			if isException {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			{{ if .Project.AuthConfig.Enabled }}
+			token, err := extractToken(r)
+			if err != nil {
+				{{ if .Project.MonitoringConfig.Enabled }}
+				m.Emit(monitoring.EmitRequest{
+					ActionIdentifier: "invalid_auth_token",
+					Message: "error parsing auth token",
+					Layer: monitoring.ProtocolServiceLayer,
+					LayerSubtype: "http",
+					Type: monitoring.EmitTypeError,
+					Error: err,
+				})
+				{{end}}
+				writeProblem(w, http.StatusUnauthorized, err)
+				return
+			}
+
+			err = auth.HandleToken(r.Context(), token)
+			if err != nil {
+				{{ if .Project.MonitoringConfig.Enabled }}
+				m.Emit(monitoring.EmitRequest{
+					ActionIdentifier: "invalid_auth",
+					Message: "error handling auth",
+					Layer: monitoring.ProtocolServiceLayer,
+					LayerSubtype: "http",
+					Type: monitoring.EmitTypeError,
+					Error: err,
+				})
+				{{end}}
+				writeProblem(w, http.StatusUnauthorized, fmt.Errorf("invalid token: %w", err))
+				return
+			}
+			{{end}}
+
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+{{ if .Project.AuthConfig.Enabled }}
+func extractToken(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("missing authorization header")
+	}
+	splitToken := strings.Split(authHeader, "Bearer ")
+	if len(splitToken) < 2 {
+		splitToken = strings.Split(authHeader, "bearer ")
+		if len(splitToken) < 2 {
+			return "", errors.New("invalid authorization header format")
+		}
+	}
+	return strings.TrimSpace(splitToken[1]), nil
+}
+{{end}}

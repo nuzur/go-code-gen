@@ -30,7 +30,7 @@ type ProtoEntityTemplate struct {
 	PrimaryKeys        []entities.FieldTemplate
 	Search             bool
 	Imports            map[string]interface{}
-	Declarations       []ProtoEntityDeclaration
+	Declarations       []entities.EntityFilterDeclaration
 	HasVersionField    bool
 }
 
@@ -44,19 +44,6 @@ func (et ProtoEntityTemplate) PrimaryKeysName() string {
 		}
 		return strings.Join(names, "And")
 	}
-}
-
-type ProtoEntityDeclaration struct {
-	Identifier  string
-	Fields      []ProtoFieldDeclaration
-	IsDependant bool
-}
-
-type ProtoFieldDeclaration struct {
-	Identifier string
-	Name       string
-	Filtering  string
-	IsEnum     bool
 }
 
 type ProtoEnumTemplate struct {

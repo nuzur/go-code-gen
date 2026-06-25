@@ -34,7 +34,10 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := context.Background()
-	ctx, cancelFn := context.WithTimeout(ctx, time.Millisecond*500)
+	// Allow headroom for the first (cold) DB connection, which establishes the
+	// TCP/TLS/handshake on first use and can exceed a sub-second budget against
+	// a remote database.
+	ctx, cancelFn := context.WithTimeout(ctx, time.Second*5)
 	userRes, err := i.core.User().FetchUserByEmail(ctx, types.FetchUserByEmailRequest{
 		Email: creds.Email,
 		Limit: 1,

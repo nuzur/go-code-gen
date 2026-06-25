@@ -15,6 +15,7 @@ import (
 	maingen "github.com/nuzur/go-code-gen/main"
 	"github.com/nuzur/go-code-gen/project"
 	"github.com/nuzur/go-code-gen/proto"
+	"github.com/nuzur/go-code-gen/rest"
 )
 
 func Generate(ctx context.Context, params *project.ProjectParams) error {
@@ -35,6 +36,9 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	if err = auth.GenerateAuth(ctx, params); err != nil {
 		return fmt.Errorf("generating auth: %w", err)
 	}
+	if err = rest.GenerateREST(ctx, params); err != nil {
+		return fmt.Errorf("generating rest: %w", err)
+	}
 	if err = maingen.GenerateMain(ctx, params); err != nil {
 		return fmt.Errorf("generating main: %w", err)
 	}
@@ -51,7 +55,7 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("generating ai info: %w", err)
 	}
 
-	if project.CoreConfig.Enabled && project.ProtoConfig.Server {
+	if project.CoreConfig.Enabled && (project.ProtoConfig.Server || project.RESTConfig.Enabled) {
 		project.GoModTidy(project.Dir())
 	} else {
 		project.GoModTidy(path.Join(project.Dir(), project.EntitiesConfig.Dir))

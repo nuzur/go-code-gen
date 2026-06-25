@@ -22,6 +22,7 @@ type Project struct {
 	MonitoringConfig    MonitoringConfig
 	AuthConfig          AuthConfig
 	APIConfig           APIConfig
+	RESTConfig          RESTConfig
 	DockerConfig        DockerConfig
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
@@ -40,6 +41,7 @@ type ProjectParams struct {
 	MonitoringConfig    MonitoringConfig
 	AuthConfig          AuthConfig
 	APIConfig           APIConfig
+	RESTConfig          RESTConfig
 	DockerConfig        DockerConfig
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
@@ -93,6 +95,23 @@ func New(params *ProjectParams) (*Project, error) {
 
 	if params.APIConfig.HTTPPort == "" {
 		params.APIConfig.HTTPPort = "8080"
+	}
+
+	if params.RESTConfig.Dir == "" {
+		params.RESTConfig.Dir = "rest"
+		params.RESTConfig.OpenAPI = true
+	}
+
+	if params.RESTConfig.BasePath == "" {
+		params.RESTConfig.BasePath = "/v1"
+	}
+
+	if params.RESTConfig.DefaultPageSize == 0 {
+		params.RESTConfig.DefaultPageSize = 10
+	}
+
+	if params.RESTConfig.MaxPageSize == 0 {
+		params.RESTConfig.MaxPageSize = 100
 	}
 
 	if params.DockerConfig.BaseImage == "" {
@@ -155,6 +174,7 @@ func New(params *ProjectParams) (*Project, error) {
 		MonitoringConfig:    params.MonitoringConfig,
 		AuthConfig:          params.AuthConfig,
 		APIConfig:           params.APIConfig,
+		RESTConfig:          params.RESTConfig,
 		DockerConfig:        params.DockerConfig,
 		HelmConfig:          params.HelmConfig,
 		GitHubActionsConfig: params.GitHubActionsConfig,

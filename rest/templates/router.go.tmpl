@@ -1,0 +1,66 @@
+package server
+
+import (
+	{{ if .Project.RESTConfig.OpenAPI }}
+	_ "embed"
+	{{ end }}
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+{{ if .Project.RESTConfig.OpenAPI }}
+//go:embed openapi.yaml
+var openapiYAML []byte
+{{ end }}
+
+func mountRoutes(r chi.Router, h *handlers) {
+	r.Route("{{.BasePath}}", func(r chi.Router) {
+		{{ if .Project.RESTConfig.OpenAPI }}
+		r.Get("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/yaml")
+			_, _ = w.Write(openapiYAML)
+		})
+		{{ end }}
+
+		{{ if .Project.RESTConfig.SwaggerUI }}
+		r.Get("/docs", swaggerUI)
+		{{ end }}
+
+		{{range $e := .Entities}}
+		r.Route("/{{$e.PluralPath}}", func(r chi.Router) {
+			r.Get("/", h.List{{$e.Name}})
+			r.Post("/", h.Create{{$e.Name}})
+			
+			{{if gt (len $e.PrimaryKeys) 1}}
+			r.Route("/{{range $index, $pk := $e.PrimaryKeys}}{{if $index}}/{{end}}{{"{"}}{{$pk.Identifier}}{{"}"}}{{end}}", func(r chi.Router) {
+				r.Get("/", h.Get{{$e.Name}})
+				r.Patch("/", h.Update{{$e.Name}})
+				r.Delete("/", h.Delete{{$e.Name}})
+			})
+			{{else}}
+			r.Route("/{id}", func(r chi.Router) {
+				r.Get("/", h.Get{{$e.Name}})
+				r.Patch("/", h.Update{{$e.Name}})
+				r.Delete("/", h.Delete{{$e.Name}})
+			})
+			{{end}}
+		})
+		{{end}}
+	})
+
+	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"OK"}`))
+	})
+
+	{{ if .Project.HasJWTAuth }}
+	// The JWT auth server registers /signin, /refresh and /validate on the
+	// default mux in auth.New. Forward those paths so they are served on the
+	// same port as the REST API (they are excepted from the auth middleware).
+	r.Handle("/signin", http.DefaultServeMux)
+	r.Handle("/refresh", http.DefaultServeMux)
+	r.Handle("/validate", http.DefaultServeMux)
+	{{ end }}
+}

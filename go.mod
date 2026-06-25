@@ -7,6 +7,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/nuzur/filetools v0.0.3
 	github.com/nuzur/nem v1.0.42
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -16,7 +17,7 @@ require (
 
 require (
 	github.com/nuzur/extension-sdk v0.0.67
-	github.com/nuzur/sql-gen v1.0.80
+	github.com/nuzur/sql-gen v1.0.81
 	github.com/otiai10/copy v1.14.1
 	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect

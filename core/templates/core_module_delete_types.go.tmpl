@@ -1,0 +1,14 @@
+package types
+
+import (
+    {{$addedUUIDImport := false}}
+    {{range $pk := .PrimaryKeys}}
+    {{if $pk.IsUUID}}{{if not $addedUUIDImport}}"github.com/gofrs/uuid"{{$addedUUIDImport = true}}{{end}}{{end}}    
+    {{end}}    
+)
+
+type DeleteRequest struct {
+    {{range $pk := .PrimaryKeys}}
+    {{$pk.Name}} {{$pk.GolangType}}
+    {{end}}
+}

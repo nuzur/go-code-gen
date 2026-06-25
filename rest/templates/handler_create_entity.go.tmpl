@@ -1,0 +1,47 @@
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+
+	main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.FinalIdentifier}}"
+	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}/types"
+	{{.FinalIdentifier}}module "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.FinalIdentifier}}"
+)
+
+func (h *handlers) Create{{.Name}}(w http.ResponseWriter, r *http.Request) {
+	var item main_entity.{{.Name}}
+	if err := json.NewDecoder(r.Body).Decode(&item); err != nil {
+		writeProblem(w, http.StatusBadRequest, err)
+		return
+	}
+
+	res, err := h.core.{{.Name}}().Insert(r.Context(), types.UpsertRequest{
+		{{.Name}}: item,
+	})
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	fetchRes, err := h.core.{{.Name}}().Fetch{{.Name}}By{{.PrimaryKeysName}}(r.Context(), types.Fetch{{.Name}}By{{.PrimaryKeysName}}Request(res), {{.FinalIdentifier}}module.WithSkipCache())
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if len(fetchRes.Results) == 0 {
+		writeProblem(w, http.StatusInternalServerError, errors.New("entity not found after insert"))
+		return
+	}
+
+	createdEntity := fetchRes.Results[0]
+
+	// Location header
+	location := fmt.Sprintf("%s/{{range $pk := .PrimaryKeys}}%v/{{end}}", r.URL.Path, {{range $pk := .PrimaryKeys}}createdEntity.{{$pk.Name}}, {{end}})
+	w.Header().Set("Location", location)
+
+	writeJSON(w, http.StatusCreated, createdEntity)
+}
