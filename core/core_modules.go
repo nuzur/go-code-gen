@@ -136,7 +136,7 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	if err != nil {
 		return fmt.Errorf("getting template bytes for core module types: %v", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(coreDir, "types", "types.go"),
 		TemplateBytes: typeTmplBytes,
 		Data:          project,
@@ -153,7 +153,7 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	if err != nil {
 		return fmt.Errorf("getting template bytes for core module types: %v", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(coreDir, "core.go"),
 		TemplateBytes: coreTmplBytes,
 		Data:          project,

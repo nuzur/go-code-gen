@@ -19,7 +19,7 @@ func generateRepositorySQLCode(ctx context.Context, repoDir string, project *pro
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(
+	_, err = files.GenerateFile(
 		ctx,
 		filetools.FileRequest{
 			OutputPath:    path.Join(repoDir, "sqlc.yaml"),

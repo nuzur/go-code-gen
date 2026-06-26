@@ -82,7 +82,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "types", "upsert.go"),
 		TemplateBytes: typeTmplBytes,
 		Data:          upsertTemplate,
@@ -95,7 +95,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "upsert_insert.go"),
 		TemplateBytes: insertTmplBytes,
 		Data:          upsertTemplate,
@@ -108,7 +108,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "upsert_update.go"),
 		TemplateBytes: updateTmplBytes,
 		Data:          upsertTemplate,
@@ -121,7 +121,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "upsert.go"),
 		TemplateBytes: upsertTmplBytes,
 		Data:          upsertTemplate,

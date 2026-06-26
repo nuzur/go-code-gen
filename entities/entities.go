@@ -72,7 +72,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 			}
 			continue
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(entityDir, fmt.Sprintf("%s.go", e.Identifier)),
 			TemplateBytes: templateBytes,
 			Data:          entityTemplate,
@@ -89,7 +89,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 				}
 				continue
 			}
-			_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+			_, err = files.GenerateFile(ctx, filetools.FileRequest{
 				OutputPath:    path.Join(entityDir, fmt.Sprintf("%s_list.go", e.Identifier)),
 				TemplateBytes: listTemplateBytes,
 				Data:          entityTemplate,
@@ -117,7 +117,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(entityTypesDir, "types.go"),
 		TemplateBytes: typeTmplBytes,
 	})
@@ -130,7 +130,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(entityMapperDir, "mapper.go"),
 		TemplateBytes: mapperTmplBytes,
 		Data:          project,

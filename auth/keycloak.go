@@ -24,7 +24,7 @@ func generateKeycloakClient(ctx context.Context, authDir string, project *projec
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for keycloak client: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(kcServerDir, "client.go"),
 		TemplateBytes: clientTmplBytes,
 		Data:          project,
@@ -37,7 +37,7 @@ func generateKeycloakClient(ctx context.Context, authDir string, project *projec
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for keycloak types: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(kcServerDir, "types.go"),
 		TemplateBytes: typesTmplBytes,
 		Data:          project,
@@ -50,7 +50,7 @@ func generateKeycloakClient(ctx context.Context, authDir string, project *projec
 	if err != nil {
 		return fmt.Errorf("ERROR: Getting template bytes for keycloak handle_http: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(kcServerDir, "handle_http.go"),
 		TemplateBytes: handleHttpTmplBytes,
 		Data:          project,

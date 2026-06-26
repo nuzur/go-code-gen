@@ -43,7 +43,7 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 			params.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for auth types: %v", err))
 		}
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(authDir, "types.go"),
 		TemplateBytes: typeTmplBytes,
 		Data:          p,

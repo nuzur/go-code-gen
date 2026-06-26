@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 
+	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
@@ -316,6 +317,8 @@ func GenerateOpenAPI(restDir string, proj *project.Project, entityTemplates []*R
 	if err != nil {
 		return err
 	}
+	// Mark as generated (this file is written directly, not via files.GenerateFile).
+	yamlBytes = append([]byte("# "+files.GeneratedMarker+"\n"), yamlBytes...)
 
 	// Canonical spec at the rest root for external consumers.
 	if err = os.WriteFile(path.Join(restDir, "openapi.yaml"), yamlBytes, 0644); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/nuzur/go-code-gen/core"
 	"github.com/nuzur/go-code-gen/docker"
 	"github.com/nuzur/go-code-gen/entities"
+	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/githubactions"
 	"github.com/nuzur/go-code-gen/helm"
 	maingen "github.com/nuzur/go-code-gen/main"
@@ -70,6 +71,16 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 				project.GoModTidy(path.Join(project.Dir(), project.ProtoConfig.Dir, "server"))
 			}
 		}
+	}
+
+	// Record every generated file in a manifest at the project root. Tooling can
+	// diff this against the previous run to remove files that are no longer
+	// generated, while leaving user-added (unmarked) files untouched.
+	if params.OnStatusChange != nil {
+		params.OnStatusChange("Writing generation manifest")
+	}
+	if _, err = files.WriteManifest(project.Dir()); err != nil {
+		return fmt.Errorf("writing generation manifest: %w", err)
 	}
 
 	return nil

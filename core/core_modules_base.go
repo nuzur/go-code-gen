@@ -36,7 +36,7 @@ func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, fmt.Sprintf("%s.go", req.Entity.Identifier)),
 		TemplateBytes: coreTmplBytes,
 		Data:          moduleTemplate,
@@ -49,7 +49,7 @@ func generateBaseCoreModule(ctx context.Context, req coreSubModuleRequest) error
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "option.go"),
 		TemplateBytes: optsTmplBytes,
 		Data:          moduleTemplate,

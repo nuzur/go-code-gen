@@ -28,7 +28,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt server: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "server.go"),
 		TemplateBytes: jwtTmplBytes,
 		Data:          project,
@@ -44,7 +44,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt types: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "types.go"),
 		TemplateBytes: jwtTypesTmplBytes,
 	})
@@ -59,7 +59,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt parse: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "parse.go"),
 		TemplateBytes: jwtParseTmplBytes,
 		Data:          project,
@@ -75,7 +75,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt refresh: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "refresh.go"),
 		TemplateBytes: jwtRefreshTmplBytes,
 		Data:          project,
@@ -91,7 +91,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt signin: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "signin.go"),
 		TemplateBytes: jwtSigninTmplBytes,
 		Data:          project,
@@ -107,7 +107,7 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for jwt validate: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(jwtServerDir, "validate.go"),
 		TemplateBytes: jwtValidateTmplBytes,
 		Data:          project,

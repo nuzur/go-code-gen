@@ -51,7 +51,7 @@ func generateEnum(ctx context.Context,
 		}
 		return
 	}
-	filetools.GenerateFile(
+	files.GenerateFile(
 		ctx,
 		filetools.FileRequest{
 			OutputPath:    path.Join(project.Dir(), "enum", fmt.Sprintf("%s.go", enum.Identifier)),

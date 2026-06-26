@@ -42,7 +42,7 @@ func GenerateMain(ctx context.Context, params *project.ProjectParams) error {
 	if err != nil {
 		return fmt.Errorf("%v", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(projectDir, "main.go"),
 		TemplateBytes: tplBytes,
 		Data:          project,

@@ -17,7 +17,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "list.go"),
 		TemplateBytes: listTmplBytes,
 		Data:          project,
@@ -31,7 +31,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "list_fields.go"),
 		TemplateBytes: listFieldsTmplBytes,
 		Data:          project,
@@ -45,7 +45,7 @@ func generateRepositoryListCode(ctx context.Context, repoDir string, project *pr
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(listDir, "types.go"),
 		TemplateBytes: typesTmplBytes,
 		Data:          project,

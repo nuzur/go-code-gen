@@ -19,7 +19,7 @@ func generateEntityMapper(ctx context.Context, dir string, et *ProtoEntityTempla
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(dir, fmt.Sprintf("%s.go", strcase.ToSnake(et.FinalIdentifier))),
 		TemplateBytes:   tmplBytes,
 		Data:            et,
@@ -43,7 +43,7 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(protoDir, "mapper", "mapper.go"),
 		TemplateBytes:   tmplBytes,
 		DisableGoFormat: false,
@@ -68,7 +68,7 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 	}
 
 	if len(enumTemplates) > 0 {
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(protoDir, "mapper", "enum.go"),
 			TemplateBytes: tmplEnumBytes,
 			Data: struct {

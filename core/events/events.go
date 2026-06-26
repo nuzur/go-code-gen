@@ -43,7 +43,7 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(eventsDir, "events.go"),
 		TemplateBytes: eventsTmplBytes,
 		Data:          project,
@@ -56,7 +56,7 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(eventsDir, "types.go"),
 		TemplateBytes: typesTmplBytes,
 		Data:          project,
@@ -69,7 +69,7 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(eventsDir, "produce.go"),
 		TemplateBytes: produceTmplBytes,
 		Data:          project,
@@ -82,7 +82,7 @@ func GenerateCoreEvents(ctx context.Context, project *project.Project) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(eventsDir, "entity.go"),
 		TemplateBytes: entityTmplBytes,
 		Data:          project,

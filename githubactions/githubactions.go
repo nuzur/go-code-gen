@@ -69,7 +69,7 @@ func GenerateGitHubActions(ctx context.Context, params *project.ProjectParams) e
 		if err != nil {
 			return fmt.Errorf("error getting template bytes for %s: %v", f.name, err)
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:      f.output,
 			TemplateBytes:   tplBytes,
 			Data:            p,

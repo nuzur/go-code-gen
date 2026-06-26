@@ -64,10 +64,12 @@ func generateRepositorySQL(ctx context.Context, project *projecttypes.Project, s
 	src := path.Join("executions", execID)
 	dst := sqlDir
 
-	err = copy.Copy(path.Join(src, "create.sql"), path.Join(dst, "schema", "create.sql"))
+	createDst := path.Join(dst, "schema", "create.sql")
+	err = copy.Copy(path.Join(src, "create.sql"), createDst)
 	if err != nil {
 		return err
 	}
+	files.MarkGeneratedFile(createDst)
 
 	// rest of the files
 	fileNames := []string{"delete.sql",
@@ -77,10 +79,12 @@ func generateRepositorySQL(ctx context.Context, project *projecttypes.Project, s
 		"select_indexed_simple.sql",
 	}
 	for _, fileName := range fileNames {
-		err = copy.Copy(path.Join(src, fileName), path.Join(dst, "queries", fileName))
+		queryDst := path.Join(dst, "queries", fileName)
+		err = copy.Copy(path.Join(src, fileName), queryDst)
 		if err != nil {
 			return err
 		}
+		files.MarkGeneratedFile(queryDst)
 	}
 
 	// delete the execution files

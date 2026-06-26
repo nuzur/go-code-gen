@@ -38,7 +38,7 @@ func GenerateAIInfo(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("getting AI.md template: %w", err)
 	}
 
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(projectDir, "AI.md"),
 		TemplateBytes:   tplBytes,
 		Data:            project,

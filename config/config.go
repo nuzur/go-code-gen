@@ -45,7 +45,7 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for config: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(configDir, "config.go"),
 		TemplateBytes: tmplBytes,
 		Data:          project,
@@ -61,7 +61,7 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for config base: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(configDir, "base.yaml"),
 		TemplateBytes:   baseTmplBytes,
 		Data:            project,
@@ -75,7 +75,7 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 		}
 		return fmt.Errorf("ERROR: Getting template bytes for config cli: %v\n", err)
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(configDir, "cli.yaml"),
 		TemplateBytes:   cliTmplBytes,
 		Data:            project,

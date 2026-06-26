@@ -25,7 +25,7 @@ func generateHandlers(ctx context.Context, restDir string, project *project.Proj
 			}
 
 			outputPath := path.Join(restDir, "server", fmt.Sprintf("%s_%s.go", action, se.FinalIdentifier))
-			_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+			_, err = files.GenerateFile(ctx, filetools.FileRequest{
 				OutputPath:      outputPath,
 				TemplateBytes:   tmplBytes,
 				Data:            se,

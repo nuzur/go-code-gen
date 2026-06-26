@@ -2,10 +2,12 @@ package gocodegen
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 
+	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
@@ -187,6 +189,37 @@ func TestGenerateConfigurations(t *testing.T) {
 			cmd.Dir = filepath.Join(root, id)
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("go build ./... failed for %s:\n%s", tc.name, string(out))
+			}
+
+			// Every run must produce a generation manifest listing the generated
+			// files (used by the CLI to remove stale files), excluding go.mod and
+			// the manifest itself.
+			dir := filepath.Join(root, id)
+			m, err := files.ReadManifest(dir)
+			if err != nil {
+				t.Fatalf("ReadManifest failed: %v", err)
+			}
+			if len(m.Files) == 0 {
+				t.Fatalf("manifest has no files for %s", tc.name)
+			}
+			for _, f := range m.Files {
+				if f == "go.mod" || f == files.ManifestFileName {
+					t.Errorf("manifest must not list %q", f)
+				}
+			}
+			// A user-added file must not appear in a re-scan (no marker => not generated).
+			userFile := filepath.Join(dir, "user_added.go")
+			if err := os.WriteFile(userFile, []byte("package extra\n"), 0644); err != nil {
+				t.Fatal(err)
+			}
+			m2, err := files.WriteManifest(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, f := range m2.Files {
+				if f == "user_added.go" {
+					t.Errorf("user-added file leaked into manifest for %s", tc.name)
+				}
 			}
 		})
 	}

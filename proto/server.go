@@ -21,7 +21,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(protoDir, "server", "server.go"),
 		TemplateBytes: tmplBytes,
 		Data: ProtoServiceTemplate{
@@ -44,7 +44,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(protoDir, "server", "auth.go"),
 		TemplateBytes: tmplBytesAuth,
 		Data: ProtoServiceTemplate{
@@ -71,7 +71,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		if err != nil {
 			return err
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:      path.Join(protoDir, "server", fmt.Sprintf("create_%s.go", se.FinalIdentifier)),
 			TemplateBytes:   tmplBytesCreate,
 			Data:            se,
@@ -88,7 +88,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		if err != nil {
 			return err
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:      path.Join(protoDir, "server", fmt.Sprintf("update_%s.go", se.FinalIdentifier)),
 			TemplateBytes:   tmplBytesUpdate,
 			Data:            se,
@@ -107,7 +107,7 @@ func generateServer(ctx context.Context, protoDir string, project *project.Proje
 		if err != nil {
 			return err
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:      path.Join(protoDir, "server", fmt.Sprintf("list_%s.go", se.FinalIdentifier)),
 			TemplateBytes:   tmplBytesList,
 			Data:            se,

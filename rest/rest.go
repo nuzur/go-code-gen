@@ -194,7 +194,7 @@ func generateShared(ctx context.Context, restDir string, project *project.Projec
 			filename = "swagger_ui.go"
 		}
 
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(restDir, "server", filename),
 			TemplateBytes: tmplBytes,
 			Data: RESTServiceTemplate{

@@ -33,7 +33,7 @@ func generateList(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "types", "list.go"),
 		TemplateBytes: typeTmplBytes,
 		Data:          listData,
@@ -46,7 +46,7 @@ func generateList(ctx context.Context, req coreSubModuleRequest) error {
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "list.go"),
 		TemplateBytes: listTmplBytes,
 		Data:          listData,

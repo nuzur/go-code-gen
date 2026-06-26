@@ -16,7 +16,7 @@ func generateRouter(ctx context.Context, restDir string, project *project.Projec
 		return err
 	}
 
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(restDir, "server", "router.go"),
 		TemplateBytes: tmplBytes,
 		Data: RESTServiceTemplate{
@@ -39,7 +39,7 @@ func generateServer(ctx context.Context, restDir string, project *project.Projec
 		return err
 	}
 
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(restDir, "server", "server.go"),
 		TemplateBytes: tmplBytes,
 		Data: RESTServiceTemplate{

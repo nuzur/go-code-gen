@@ -55,7 +55,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 		if err != nil {
 			return err
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, "types", fmt.Sprintf("fetch_%s.go", gcgstrings.ToSnakeCase(sel.Name))),
 			TemplateBytes: typeTmplBytes,
 			Data:          fetchTemplate,
@@ -69,7 +69,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 			return err
 		}
 		fetchTemplate.Imports = maps.MapKeys(importsFetch)
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:    path.Join(req.ModuleDir, req.Entity.Identifier, fmt.Sprintf("fetch_%s.go", gcgstrings.ToSnakeCase(sel.Name))),
 			TemplateBytes: fetchTmplBytes,
 			Data:          fetchTemplate,

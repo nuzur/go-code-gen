@@ -42,7 +42,7 @@ func GenerateDocker(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:      path.Join(projectDir, "Dockerfile"),
 		TemplateBytes:   tplBytes,
 		Data:            project,

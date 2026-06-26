@@ -87,7 +87,7 @@ func generateEntityProtoFile(
 		if err != nil {
 			return nil, err
 		}
-		_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
 			OutputPath:      path.Join(protoDir, "proto", fmt.Sprintf("%s.proto", finalIdentifier)),
 			TemplateBytes:   tmplBytes,
 			Data:            protoEntityTemplate,
@@ -121,7 +121,7 @@ func generateEnumsProtoFile(ctx context.Context, protoDir string, project *proje
 		return err
 	}
 
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(protoDir, "proto", "enum.proto"),
 		TemplateBytes: tmplBytes,
 		Data: struct {
@@ -169,7 +169,7 @@ func generateProtoFiles(ctx context.Context, protoDir string, project *projectty
 	if err != nil {
 		return nil, err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(protoDir, "proto", fmt.Sprintf("service_%s.proto", project.Identifier)),
 		TemplateBytes: tmplBytes,
 		Data: ProtoServiceTemplate{

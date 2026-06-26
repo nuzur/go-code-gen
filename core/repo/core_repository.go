@@ -62,7 +62,7 @@ func GenerateCoreRepository(ctx context.Context, project *projectypes.Project) e
 	if err != nil {
 		return err
 	}
-	_, err = filetools.GenerateFile(ctx, filetools.FileRequest{
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
 		OutputPath:    path.Join(repoDir, "repository.go"),
 		TemplateBytes: tmplBytes,
 		Data:          project,
