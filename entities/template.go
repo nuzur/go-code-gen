@@ -49,6 +49,18 @@ func (e EntityTemplate) VersionField() *FieldTemplate {
 	return nil
 }
 
+// Indexes returns the entity's secondary indexes, or nil when the entity is
+// not standalone / has no index config.
+func (e EntityTemplate) Indexes() []*nemgen.Index {
+	if e.Entity.Type != nemgen.EntityType_ENTITY_TYPE_STANDALONE {
+		return nil
+	}
+	if e.Entity.TypeConfig == nil || e.Entity.TypeConfig.Standalone == nil {
+		return nil
+	}
+	return e.Entity.TypeConfig.Standalone.Indexes
+}
+
 func (e EntityTemplate) IndexOnField(field *nemgen.Field) *nemgen.Index {
 	if e.Entity.Type != nemgen.EntityType_ENTITY_TYPE_STANDALONE {
 		return nil

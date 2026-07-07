@@ -28,55 +28,63 @@ func ResolveSelectStatements(project *project.Project, e *nemgen.Entity) []Schem
 		primaryKeyNames = append(primaryKeyNames, strcase.ToCamel(primaryKey.Identifier()))
 	}
 
-	nameByID := fmt.Sprintf("%sBy%s", strcase.ToCamel(e.Identifier), strings.Join(primaryKeyNames, "And"))
+	primaryNameByID := fmt.Sprintf("%sBy%s", strcase.ToCamel(e.Identifier), strings.Join(primaryKeyNames, "And"))
 	selects = append(selects, SchemaSelectStatement{
-		Name:             nameByID,
-		Identifier:       strcase.ToSnake(nameByID),
+		Name:             primaryNameByID,
+		Identifier:       strcase.ToSnake(primaryNameByID),
 		EntityIdentifier: e.Identifier,
 		Fields:           primaryKeyFields,
 		IsPrimary:        true,
 		SortSupported:    false,
 	})
 
-	for _, f := range e.Fields {
-		if f.Key {
+	// Generate one select per index. We iterate the indexes directly (rather
+	// than per field via IndexOnField) so that a composite index yields a
+	// single select instead of one per field it covers, and so that every
+	// index — including a single-field index whose field is also part of a
+	// composite index — gets its own select. seenNames guards against emitting
+	// the same select (and thus the same module/repo method) twice, e.g. from
+	// duplicate indexes over the same field set.
+	seenNames := map[string]bool{primaryNameByID: true}
+	for _, index := range entityTemplate.Indexes() {
+		if index == nil || (index.Type != nemgen.IndexType_INDEX_TYPE_INDEX && index.Type != nemgen.IndexType_INDEX_TYPE_UNIQUE) {
 			continue
 		}
-		index := entityTemplate.IndexOnField(f)
-		if index != nil && (index.Type == nemgen.IndexType_INDEX_TYPE_INDEX || index.Type == nemgen.IndexType_INDEX_TYPE_UNIQUE) {
-			indexFields := []SchemaSelectStatementField{}
-			indexFieldNames := []string{}
-			for i, indexField := range index.Fields {
-				indexFieldTemplate := entityTemplate.GetFieldTemplateById(indexField.FieldUuid)
-				if indexFieldTemplate == nil {
-					continue
-				}
-				if indexFieldTemplate.Field.Type == nemgen.FieldType_FIELD_TYPE_DATETIME || indexFieldTemplate.Field.Type == nemgen.FieldType_FIELD_TYPE_DATE {
-					// skip datetime and date fields for non primary key indexes for now since we don't have a good way to handle them in the repo layer yet
-					continue
-				}
-				isLast := i == len(index.Fields)-1
-				indexFields = append(indexFields, SchemaSelectStatementField{
-					Name:   indexFieldTemplate.Identifier(),
-					Field:  indexFieldTemplate,
-					IsLast: isLast,
-				})
-				indexFieldNames = append(indexFieldNames, strcase.ToCamel(indexFieldTemplate.Identifier()))
-			}
-			if len(indexFields) == 0 {
+		indexFields := []SchemaSelectStatementField{}
+		indexFieldNames := []string{}
+		for _, indexField := range index.Fields {
+			indexFieldTemplate := entityTemplate.GetFieldTemplateById(indexField.FieldUuid)
+			if indexFieldTemplate == nil {
 				continue
-				// if all the index fields were datetime or date fields, we skip generating the select statement since we don't have a good way to handle them in the repo layer yet
 			}
-			nameByID := fmt.Sprintf("%sBy%s", strcase.ToCamel(e.Identifier), strings.Join(indexFieldNames, "And"))
-			selects = append(selects, SchemaSelectStatement{
-				Name:             nameByID,
-				Identifier:       strcase.ToSnake(nameByID),
-				EntityIdentifier: e.Identifier,
-				Fields:           indexFields,
-				IsPrimary:        false,
-				SortSupported:    false,
+			if indexFieldTemplate.Field.Type == nemgen.FieldType_FIELD_TYPE_DATETIME || indexFieldTemplate.Field.Type == nemgen.FieldType_FIELD_TYPE_DATE {
+				// skip datetime and date fields for non primary key indexes for now since we don't have a good way to handle them in the repo layer yet
+				continue
+			}
+			indexFields = append(indexFields, SchemaSelectStatementField{
+				Name:  indexFieldTemplate.Identifier(),
+				Field: indexFieldTemplate,
 			})
+			indexFieldNames = append(indexFieldNames, strcase.ToCamel(indexFieldTemplate.Identifier()))
 		}
+		if len(indexFields) == 0 {
+			continue
+			// if all the index fields were datetime or date fields, we skip generating the select statement since we don't have a good way to handle them in the repo layer yet
+		}
+		indexFields[len(indexFields)-1].IsLast = true
+		nameByID := fmt.Sprintf("%sBy%s", strcase.ToCamel(e.Identifier), strings.Join(indexFieldNames, "And"))
+		if seenNames[nameByID] {
+			continue
+		}
+		seenNames[nameByID] = true
+		selects = append(selects, SchemaSelectStatement{
+			Name:             nameByID,
+			Identifier:       strcase.ToSnake(nameByID),
+			EntityIdentifier: e.Identifier,
+			Fields:           indexFields,
+			IsPrimary:        false,
+			SortSupported:    false,
+		})
 	}
 
 	return selects

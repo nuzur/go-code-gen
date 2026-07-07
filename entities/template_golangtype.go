@@ -148,6 +148,14 @@ func (f FieldTemplate) IsNullable() bool {
 	return strings.Contains(f.GolangType(), "null.") || strings.HasPrefix(f.GolangType(), "*")
 }
 
+// UsesNullType reports whether the field's Go type is a guregu/null type
+// (e.g. null.String, null.Time). Nullable pointer types such as *uuid.UUID are
+// also considered nullable by IsNullable but do not reference the null package,
+// so template imports of guregu/null must be guarded on this instead.
+func (f FieldTemplate) UsesNullType() bool {
+	return strings.Contains(f.GolangType(), "null.")
+}
+
 func (f FieldTemplate) ZeroValue() string {
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
