@@ -60,6 +60,11 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
 				// todo support
 			}
+			// A nullable enum column is a null.Int in the sqlc params, so the
+			// fetch value must be wrapped rather than a bare int64.
+			if !f.IsRequired() {
+				return fmt.Sprintf("req.%s.ToNullInt()", gcgstrings.ToCamelCase(f.Identifier()))
+			}
 			return fmt.Sprintf("req.%s.ToInt64()", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
