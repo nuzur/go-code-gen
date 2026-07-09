@@ -22,8 +22,10 @@ func (m *module) Upsert(
 	}
 	{{end}}
 
-	if isInsert {		
-		return m.Insert(ctx, req, opts...)
+	if isInsert {
+		// auto-generate primary-key UUIDs for new records
+		{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}req.{{$.EntityName}}.{{$pk.Name}} = uuid.Must(uuid.NewV4())
+		{{end}}{{end}}return m.Insert(ctx, req, opts...)
 	}
 
 	return m.Update(ctx, req, opts...)
