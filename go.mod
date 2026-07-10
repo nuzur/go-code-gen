@@ -1,28 +1,29 @@
 module github.com/nuzur/go-code-gen
 
-go 1.24.0
+go 1.26.5
 
 require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/iancoleman/strcase v0.3.0
 	github.com/nuzur/filetools v0.0.3
-	github.com/nuzur/nem v1.0.42
+	github.com/nuzur/nem v1.1.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	github.com/kr/text v0.2.0 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
-	golang.org/x/sync v0.16.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 )
 
 require (
 	github.com/nuzur/extension-sdk v0.0.67
 	github.com/nuzur/sql-gen v1.0.83
 	github.com/otiai10/copy v1.14.1
-	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
-	google.golang.org/grpc v1.75.0
-	google.golang.org/protobuf v1.36.8 // indirect
+	golang.org/x/net v0.49.0 // indirect
+	golang.org/x/sys v0.43.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260120221211-b8f7ae30c516 // indirect
+	google.golang.org/grpc v1.80.0
+	google.golang.org/protobuf v1.36.11 // indirect
 )
