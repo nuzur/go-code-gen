@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/iancoleman/strcase"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
@@ -36,11 +36,11 @@ type ProtoEntityTemplate struct {
 
 func (et ProtoEntityTemplate) PrimaryKeysName() string {
 	if len(et.PrimaryKeys) == 1 {
-		return strcase.ToCamel(et.PrimaryKeys[0].Identifier())
+		return gcgstrings.ToCamelCase(et.PrimaryKeys[0].Identifier())
 	} else {
 		names := []string{}
 		for _, pk := range et.PrimaryKeys {
-			names = append(names, strcase.ToCamel(pk.Identifier()))
+			names = append(names, gcgstrings.ToCamelCase(pk.Identifier()))
 		}
 		return strings.Join(names, "And")
 	}

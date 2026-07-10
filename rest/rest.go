@@ -8,7 +8,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/iancoleman/strcase"
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
@@ -37,11 +36,11 @@ type RESTEntityTemplate struct {
 
 func (et RESTEntityTemplate) PrimaryKeysName() string {
 	if len(et.PrimaryKeys) == 1 {
-		return strcase.ToCamel(et.PrimaryKeys[0].Identifier())
+		return gcgstrings.ToCamelCase(et.PrimaryKeys[0].Identifier())
 	} else {
 		names := []string{}
 		for _, pk := range et.PrimaryKeys {
-			names = append(names, strcase.ToCamel(pk.Identifier()))
+			names = append(names, gcgstrings.ToCamelCase(pk.Identifier()))
 		}
 		return strings.Join(names, "And")
 	}
