@@ -309,7 +309,7 @@ func (f FieldTemplate) ProtoFromMapper() string {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), strcase.ToCamel(f.Identifier()))
 			}
-			return fmt.Sprintf("enum.%s(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
+			return fmt.Sprintf("enums.%s(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
 		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:

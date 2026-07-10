@@ -20,7 +20,7 @@ import (
 	{{range $field := .Fields}}				
 		{{if eq $firstJSON true}}
 			{{if eq $field.JSON true}}
-				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid") (ne $import (printf "%s/enum" $projectModule)) (ne $import "github.com/guregu/null/v6")}} 
+				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid") (ne $import (printf "%s/enums" $projectModule)) (ne $import "github.com/guregu/null/v6")}}
     			"{{$import}}" {{end}}{{end}}
 				{{$firstJSON = false}}
 			{{end}}

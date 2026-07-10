@@ -50,7 +50,7 @@ func generateEntityProtoFile(
 			if f.Type == nemgen.FieldType_FIELD_TYPE_ENUM && f.TypeConfig.Enum != nil && f.TypeConfig.Enum.EnumUuid != "" && f.TypeConfig.Enum.EnumUuid != "00000000-0000-0000-0000-000000000000" {
 				enum := project.GetEnum(f.TypeConfig.Enum.EnumUuid)
 				if enum != nil {
-					imports["enum.proto"] = nil
+					imports["enums.proto"] = nil
 				}
 			}
 
@@ -122,7 +122,7 @@ func generateEnumsProtoFile(ctx context.Context, protoDir string, project *proje
 	}
 
 	_, err = files.GenerateFile(ctx, filetools.FileRequest{
-		OutputPath:    path.Join(protoDir, "proto", "enum.proto"),
+		OutputPath:    path.Join(protoDir, "proto", "enums.proto"),
 		TemplateBytes: tmplBytes,
 		Data: struct {
 			Project *projecttypes.Project

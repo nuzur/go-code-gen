@@ -7,6 +7,8 @@ import (
 	"html/template"
 	"os"
 	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/config"
@@ -41,8 +43,13 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	projectDir := project.Dir()
 	coreDir := path.Join(projectDir, project.CoreConfig.CoreDir)
 	moduleDir := path.Join(coreDir, "module")
+	entitiesDir := path.Join(projectDir, project.EntitiesConfig.Dir)
 
-	err = os.RemoveAll(coreDir)
+	// Clear the core dir before regenerating, but preserve the entities dir when
+	// it is nested inside the core dir (e.g. EntitiesConfig.Dir == "core/entity").
+	// Entities are generated in an earlier pipeline stage, so a blind
+	// os.RemoveAll(coreDir) would wipe them.
+	err = removeCoreDirPreservingEntities(coreDir, entitiesDir)
 	if err != nil {
 		if project.OnStatusChange != nil {
 			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting core directory: %v", err))
@@ -163,4 +170,38 @@ func GenerateCoreModules(ctx context.Context, params *project.ProjectParams) err
 	})
 
 	return err
+}
+
+// removeCoreDirPreservingEntities clears the core directory before regeneration.
+// When the entities directory is nested inside the core directory (e.g.
+// EntitiesConfig.Dir == "core/entity"), it removes every child of the core dir
+// except the top-level component of the entities path, since entities are
+// generated in an earlier stage and must not be wiped. When the entities dir is
+// outside the core dir (the default "entity" layout), it removes the core dir
+// wholesale, preserving the previous behaviour.
+func removeCoreDirPreservingEntities(coreDir, entitiesDir string) error {
+	rel, err := filepath.Rel(coreDir, entitiesDir)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		// entities dir is not inside the core dir
+		return os.RemoveAll(coreDir)
+	}
+
+	// entities dir is nested under core dir: preserve its top-level component
+	keep := strings.Split(rel, string(filepath.Separator))[0]
+	entries, err := os.ReadDir(coreDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	for _, entry := range entries {
+		if entry.Name() == keep {
+			continue
+		}
+		if err := os.RemoveAll(path.Join(coreDir, entry.Name())); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -58,7 +58,7 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 	enumTemplates := []ProtoEnumTemplate{}
 	for _, e := range project.Enums() {
 		enumTemplates = append(enumTemplates, ProtoEnumTemplate{
-			GolangType: "enum." + gcgstrings.ToCamelCase(e.Identifier),
+			GolangType: "enums." + gcgstrings.ToCamelCase(e.Identifier),
 			ProtoType:  gcgstrings.ToCamelCase(e.Identifier),
 		})
 	}

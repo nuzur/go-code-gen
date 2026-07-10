@@ -70,9 +70,9 @@ func (f FieldTemplate) GolangType() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return "[] enum." + gcgstrings.ToCamelCase(enum.Identifier)
+				return "[] enums." + gcgstrings.ToCamelCase(enum.Identifier)
 			}
-			return "enum." + gcgstrings.ToCamelCase(enum.Identifier)
+			return "enums." + gcgstrings.ToCamelCase(enum.Identifier)
 		}
 		return "int64"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -219,9 +219,9 @@ func (f FieldTemplate) ZeroValue() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return "[] enum." + gcgstrings.ToCamelCase(enum.Identifier)
+				return "[] enums." + gcgstrings.ToCamelCase(enum.Identifier)
 			}
-			return "enum." + gcgstrings.ToCamelCase(enum.Identifier)
+			return "enums." + gcgstrings.ToCamelCase(enum.Identifier)
 		}
 		return "0"
 	case nemgen.FieldType_FIELD_TYPE_JSON:

@@ -347,9 +347,9 @@ func (f FieldTemplate) RepoFromMapper() string {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			if !f.IsRequired() {
-				return fmt.Sprintf("enum.%s(m.%s.Int64)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("enums.%s(m.%s.Int64)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
-			return fmt.Sprintf("enum.%s(m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("enums.%s(m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:

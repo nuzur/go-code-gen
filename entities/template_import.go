@@ -11,7 +11,7 @@ func (f FieldTemplate) Import() *string {
 	timeImp := "time"
 	uuidImp := "github.com/gofrs/uuid"
 	nullImp := "github.com/guregu/null/v6"
-	enumsImp := f.Project.Module + "/enum"
+	enumsImp := f.Project.Module + "/enums"
 	switch f.Field.Type {
 	case nemgen.FieldType_FIELD_TYPE_INVALID:
 		return nil

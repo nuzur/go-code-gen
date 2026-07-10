@@ -37,7 +37,7 @@ func generateEnum(ctx context.Context,
 		Project: project,
 		Enum:    enum,
 
-		Package:       "enum",
+		Package:       "enums",
 		EnumName:      gcgstrings.ToCamelCase(enum.Identifier),
 		EnumNameUpper: strings.ToUpper(enum.Identifier),
 		Values:        values,
@@ -54,7 +54,7 @@ func generateEnum(ctx context.Context,
 	files.GenerateFile(
 		ctx,
 		filetools.FileRequest{
-			OutputPath:    path.Join(project.Dir(), "enum", fmt.Sprintf("%s.go", enum.Identifier)),
+			OutputPath:    path.Join(project.Dir(), "enums", fmt.Sprintf("%s.go", enum.Identifier)),
 			TemplateBytes: templateBytes,
 			Data:          enumTemplate,
 		},
