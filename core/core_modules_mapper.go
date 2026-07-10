@@ -22,6 +22,7 @@ type mapperModuleTemplate struct {
 	HasArrayField bool
 	HasNullString bool
 	HasNullUUID   bool
+	HasMultiEnum  bool
 }
 
 func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
@@ -30,6 +31,7 @@ func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 	}
 	hasArrayField := false
 	hasNullUUID := false
+	hasMultiEnum := false
 	for _, f := range req.Fields {
 		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
 			hasArrayField = true
@@ -37,6 +39,10 @@ func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 
 		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID {
 			hasNullUUID = true
+		}
+
+		if f.EnumMany() {
+			hasMultiEnum = true
 		}
 	}
 	mapperTemplate := mapperModuleTemplate{
@@ -47,6 +53,7 @@ func generateMapper(ctx context.Context, req coreSubModuleRequest) error {
 		Imports:       maps.MapKeys(req.Imports),
 		HasArrayField: hasArrayField,
 		HasNullUUID:   hasNullUUID,
+		HasMultiEnum:  hasMultiEnum,
 	}
 
 	mapperTmplBytes, err := files.GetTemplateBytes(templates, "core_module_mapper")

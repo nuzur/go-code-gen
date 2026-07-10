@@ -58,7 +58,8 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				// todo support
+				// a multi-enum is persisted as a JSON array column
+				return fmt.Sprintf("mapper.SliceToJSON(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			// A nullable enum column is a null.Int in the sqlc params, so the
 			// fetch value must be wrapped rather than a bare int64.
@@ -139,7 +140,8 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				// todo support
+				// a multi-enum is persisted as a JSON array column
+				return fmt.Sprintf("mapper.SliceToJSON(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			if !f.IsRequired() {
 				return fmt.Sprintf("req.%s.%s.ToNullInt()", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
@@ -344,7 +346,8 @@ func (f FieldTemplate) RepoFromMapper() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
+				// a multi-enum is read back from its JSON array column
+				return fmt.Sprintf("mapper.JSONToEnumSlice[enums.%s](m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			if !f.IsRequired() {
 				return fmt.Sprintf("enums.%s(m.%s.Int64)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))

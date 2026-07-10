@@ -69,7 +69,10 @@ func generateMappers(ctx context.Context, protoDir string, project *projecttypes
 
 	if len(enumTemplates) > 0 {
 		_, err = files.GenerateFile(ctx, filetools.FileRequest{
-			OutputPath:    path.Join(protoDir, "mapper", "enum.go"),
+			// enums.go (plural): the enum-type slice helpers must not collide with
+			// the "enum" entity's own mapper file (mapper/enum.go), which would
+			// otherwise overwrite them.
+			OutputPath:    path.Join(protoDir, "mapper", "enums.go"),
 			TemplateBytes: tmplEnumBytes,
 			Data: struct {
 				Project *projecttypes.Project

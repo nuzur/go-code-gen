@@ -3,7 +3,7 @@ package {{.Package}}
 import (    
     main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.Package}}"
     {{.Project.Identifier}}db "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"  
-	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
+	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true)}}
 		"{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/mapper"
 	{{end}}
 	{{range $import := .Imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid")}} 

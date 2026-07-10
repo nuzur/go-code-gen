@@ -23,9 +23,9 @@ func (m *module) Upsert(
 	{{end}}
 
 	if isInsert {
-		// auto-generate primary-key UUIDs for new records
-		{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}req.{{$.EntityName}}.{{$pk.Name}} = uuid.Must(uuid.NewV4())
-		{{end}}{{end}}return m.Insert(ctx, req, opts...)
+		// PK UUIDs are auto-generated inside Insert when not supplied, so the
+		// gRPC Create path (which calls Insert directly) also gets a valid UUID.
+		return m.Insert(ctx, req, opts...)
 	}
 
 	return m.Update(ctx, req, opts...)

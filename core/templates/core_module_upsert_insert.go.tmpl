@@ -17,11 +17,12 @@ import (
 	{{end}}
 
 	"{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"	
-	{{.Project.Identifier}}db "{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"  
-		
+	{{.Project.Identifier}}db "{{$projectModule}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"
+	{{$addedInsertUUIDImport := false}}
+	{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}{{if not $addedInsertUUIDImport}}"github.com/gofrs/uuid"
+	{{$addedInsertUUIDImport = true}}{{end}}{{end}}{{end}}
 	{{$firstJSON := true}}
-	{{$firstEnumMany := true}}
-	{{range $field := .Fields}}				
+	{{range $field := .Fields}}
 		{{if eq $firstJSON true}}
 			{{if eq $field.JSON true }}
 				{{range $import := $imports}} {{if and (ne $import "time") (ne $import "github.com/gofrs/uuid") (ne $import (printf "%s/enums" $projectModule)) (ne $import "github.com/guregu/null/v6")}}
@@ -29,19 +30,13 @@ import (
 				{{$firstJSON = false}}
 			{{end}}
 		{{end}}
-		{{if eq $firstEnumMany true}}
-			{{if eq $field.EnumMany true}}
-				main_entity "{{$projectModule}}/{{$entityDir}}/{{$entityIdentifier}}"
-				{{$firstEnumMany = false}}
-			{{end}}
-		{{end}}
 	{{end}}
 	{{if eq .HasVersionField true}}
 	"time"
 	{{end}}
-	{{if or (eq .HasArrayField true) (eq .HasNullUUID true)}}
+	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true)}}
 	"{{$projectModule}}/{{$entityDir}}/mapper"
-	{{end}}	
+	{{end}}
 )
 
 
@@ -51,6 +46,11 @@ func (m *module) Insert(
 	opts ...Option,
 ) (types.UpsertResponse, error) {
 
+	// auto-generate primary-key UUIDs for new records when not supplied by the caller
+	{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}if req.{{$entityName}}.{{$pk.Name}} == {{$pk.ZeroValue}} {
+		req.{{$entityName}}.{{$pk.Name}} = uuid.Must(uuid.NewV4())
+	}
+	{{end}}{{end}}
 	optConfig := applyAllOptions(opts)
 
 	tx := optConfig.SQLTx
