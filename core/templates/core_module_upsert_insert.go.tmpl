@@ -31,7 +31,7 @@ import (
 			{{end}}
 		{{end}}
 	{{end}}
-	{{if eq .HasVersionField true}}
+	{{if or (eq .HasVersionField true) (eq .HasGeneratedTimestamp true)}}
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true) (eq .HasRawJSON true)}}
@@ -50,6 +50,9 @@ func (m *module) Insert(
 	{{range $pk := .PrimaryKeys}}{{if $pk.IsUUID}}if req.{{$entityName}}.{{$pk.Name}} == {{$pk.ZeroValue}} {
 		req.{{$entityName}}.{{$pk.Name}} = uuid.Must(uuid.NewV4())
 	}
+	{{end}}{{end}}
+	// server-managed timestamps (generated created_at/updated_at)
+	{{range $field := .Fields}}{{if $field.IsGeneratedTimestamp}}req.{{$entityName}}.{{$field.Name}} = {{$field.TimestampNowExpr}}
 	{{end}}{{end}}
 	optConfig := applyAllOptions(opts)
 

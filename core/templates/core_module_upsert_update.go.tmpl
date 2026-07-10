@@ -25,7 +25,7 @@ import (
 			{{end}}
 		{{end}}
 	{{end}}
-	{{if eq .HasVersionField true}}
+	{{if or (eq .HasVersionField true) (eq .HasGeneratedTimestamp true)}}
 	"time"
 	{{end}}
 	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true) (eq .HasRawJSON true)}}
@@ -108,6 +108,9 @@ func (m *module) Update(
 	req.{{.EntityName}}.Version = time.Now().Unix()
 	{{end}}
 
+	// refresh server-managed timestamps that update on every write (updated_at)
+	{{range $field := .Fields}}{{if $field.GeneratedTimestampSetOnUpdate}}req.{{$.EntityName}}.{{$field.Name}} = {{$field.TimestampNowExpr}}
+	{{end}}{{end}}
 
 	params := mapUpsertRequestToUpdateParams(req)
 	err = qtx.Update{{.EntityName}}(

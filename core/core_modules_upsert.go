@@ -32,6 +32,7 @@ type upsertModuleTemplate struct {
 	HasNullUUID         bool
 	HasMultiEnum        bool
 	HasRawJSON          bool
+	HasGeneratedTimestamp bool
 }
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
@@ -48,6 +49,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	hasNullUUID := false
 	hasMultiEnum := false
 	hasRawJSON := false
+	hasGeneratedTimestamp := false
 	for _, f := range req.Fields {
 		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
 			hasArrayField = true
@@ -68,6 +70,10 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		if f.IsRawJSON() && !f.IsRequired() {
 			hasRawJSON = true
 		}
+
+		if f.IsGeneratedTimestamp() {
+			hasGeneratedTimestamp = true
+		}
 	}
 	upsertTemplate := upsertModuleTemplate{
 		Package:             req.Entity.Identifier,
@@ -83,6 +89,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		HasNullUUID:         hasNullUUID,
 		HasMultiEnum:        hasMultiEnum,
 		HasRawJSON:          hasRawJSON,
+		HasGeneratedTimestamp: hasGeneratedTimestamp,
 		Project:             req.Project,
 	}
 
@@ -148,7 +155,10 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 
 func VersionField(fields []entities.FieldTemplate) *entities.FieldTemplate {
 	for _, f := range fields {
-		if f.Identifier() == "version" && f.Field.Type == nemgen.FieldType_FIELD_TYPE_INTEGER {
+		// The optimistic-concurrency version token is only special when it is
+		// server-generated; otherwise a field named "version" is an ordinary
+		// caller-supplied integer.
+		if f.Identifier() == "version" && f.Field.Type == nemgen.FieldType_FIELD_TYPE_INTEGER && f.Field.Generated {
 			return &f
 		}
 	}
