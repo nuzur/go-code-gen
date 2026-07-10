@@ -198,7 +198,7 @@ func (f FieldTemplate) ProtoToMapper() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return fmt.Sprintf("%sSliceToProto(e.%s)", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			return fmt.Sprintf("pb.%s(e.%s)", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
 		}
@@ -307,7 +307,7 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
 		if enum != nil {
 			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", f.ProtoType(), strcase.ToCamel(f.Identifier()))
+				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
 			}
 			return fmt.Sprintf("enums.%s(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
 		}

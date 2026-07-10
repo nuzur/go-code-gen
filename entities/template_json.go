@@ -41,6 +41,12 @@ func (f FieldTemplate) DependantEntity() *nemgen.Entity {
 }
 
 func (f FieldTemplate) Tags() string {
+	// Raw json.RawMessage fields marshal as empty []byte when unset, which fails
+	// json.RawMessage.MarshalJSON ("unexpected end of JSON input") and aborts the
+	// whole entity marshal. omitempty drops the unset variants so it round-trips.
+	if f.IsRawJSON() {
+		return fmt.Sprintf("`json:\"%s,omitempty\"`", f.Identifier())
+	}
 	return fmt.Sprintf("`json:\"%s\"`", f.Identifier())
 }
 

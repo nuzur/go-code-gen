@@ -11,5 +11,5 @@ package {{.Project.Identifier}};
 import "{{$imp}}";{{end}}
 
 message {{.Name}} {  {{range $index, $field := .Fields}}
-    {{if or (eq $field.EnumMany true) (eq $field.JSONMany true)}}repeated {{end}}{{$field.ProtoType}} {{$field.ProtoName}} = {{Inc $index}};{{end}}    
+    {{$field.ProtoType}} {{$field.ProtoName}} = {{Inc $index}};{{end}}    
 }

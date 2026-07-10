@@ -13,7 +13,7 @@ import (
     {{range $field := .Fields}}
         {{if and (or (eq $field.GolangType "time.Time") (eq $field.GolangType "null.Time")) (eq $timestampImport false)}}
         "google.golang.org/protobuf/types/known/timestamppb" {{$timestampImport = true}} {{end}}        
-        {{if and (eq $field.Enum true) (eq $enumImport false)}}
+        {{if and (eq $field.Enum true) (eq $field.EnumMany false) (eq $enumImport false)}}
         "{{$projectModule}}/enums" {{$enumImport = true}}{{end}}
         {{if and (eq $field.UsesNullType true) (eq $nullImport false)}}
         "github.com/guregu/null/v6" {{$nullImport = true}}{{end}}
