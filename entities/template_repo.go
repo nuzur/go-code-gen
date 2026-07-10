@@ -168,6 +168,11 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 					gcgstrings.ToCamelCase(f.Identifier()))
 			}
 		}
+		// A raw json.RawMessage written empty becomes an empty string, which a
+		// nullable JSON column rejects (MySQL error 3140). Coerce empty -> SQL NULL.
+		if !f.IsRequired() {
+			return fmt.Sprintf("mapper.NullifyEmptyJSON(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+		}
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		return fmt.Sprintf("mapper.SliceToJSON(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))

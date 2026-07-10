@@ -31,6 +31,7 @@ type upsertModuleTemplate struct {
 	HasNullString       bool
 	HasNullUUID         bool
 	HasMultiEnum        bool
+	HasRawJSON          bool
 }
 
 func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
@@ -46,6 +47,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	hasNullString := false
 	hasNullUUID := false
 	hasMultiEnum := false
+	hasRawJSON := false
 	for _, f := range req.Fields {
 		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
 			hasArrayField = true
@@ -62,6 +64,10 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		if f.EnumMany() {
 			hasMultiEnum = true
 		}
+
+		if f.IsRawJSON() && !f.IsRequired() {
+			hasRawJSON = true
+		}
 	}
 	upsertTemplate := upsertModuleTemplate{
 		Package:             req.Entity.Identifier,
@@ -76,6 +82,7 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		HasNullString:       hasNullString,
 		HasNullUUID:         hasNullUUID,
 		HasMultiEnum:        hasMultiEnum,
+		HasRawJSON:          hasRawJSON,
 		Project:             req.Project,
 	}
 

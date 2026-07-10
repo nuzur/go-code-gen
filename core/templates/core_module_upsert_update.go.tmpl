@@ -28,7 +28,7 @@ import (
 	{{if eq .HasVersionField true}}
 	"time"
 	{{end}}
-	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true)}}
+	{{if or (eq .HasArrayField true) (eq .HasNullUUID true) (eq .HasMultiEnum true) (eq .HasRawJSON true)}}
 	"{{$projectModule}}/{{$entityDir}}/mapper"
 	{{end}}
 	
