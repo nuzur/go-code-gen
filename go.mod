@@ -11,14 +11,13 @@ require (
 )
 
 require (
-	github.com/kr/text v0.2.0 // indirect
 	github.com/otiai10/mint v1.6.3 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 )
 
 require (
 	github.com/nuzur/extension-sdk v0.0.67
-	github.com/nuzur/sql-gen v1.0.83
+	github.com/nuzur/sql-gen v1.0.85
 	github.com/otiai10/copy v1.14.1
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect

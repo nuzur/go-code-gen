@@ -1,6 +1,5 @@
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
 github.com/cespare/xxhash/v2 v2.3.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
-github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/go-logr/logr v1.4.3 h1:CjnDlHq8ikf6E492q6eKboGOC0T8CDaOvkHCIg8idEI=
@@ -27,8 +26,8 @@ github.com/nuzur/filetools v0.0.3 h1:Ns2g9/f9SqZUujZa0hkt4rbLfDpQJLcA30d7rKCZ8PE
 github.com/nuzur/filetools v0.0.3/go.mod h1:jRAy/C7ilpw0HBDFYhXGv5+IS3WIen468z8XsFEVAdw=
 github.com/nuzur/nem v1.1.1 h1:3LcKvHAIsnBcrD0TTq7sbSOL7zWY9NKhFBa38kNzzBc=
 github.com/nuzur/nem v1.1.1/go.mod h1:LLzJY9L+vrxeO9Uhtz3Lkpq+F2ww9Gi9Jpm23Gfos6c=
-github.com/nuzur/sql-gen v1.0.83 h1:XrpDKGvuQ2cTiewJEDAjl04mxdt0ajUWlx83N7H1xrs=
-github.com/nuzur/sql-gen v1.0.83/go.mod h1:dZzhfpGOxegjYW7nd63f1ui0dQIMd1h2QYnw7eQVhJI=
+github.com/nuzur/sql-gen v1.0.85 h1:cRiIJyLo8WRModvqSqVbLVoxtJoU79xBi7KpN0RTl7o=
+github.com/nuzur/sql-gen v1.0.85/go.mod h1:oYhaPLIGEy50nhqph38GV+pMdR5i4ZH9VYX4JeQI7Fg=
 github.com/otiai10/copy v1.14.1 h1:5/7E6qsUMBaH5AnQ0sSLzzTg1oTECmcCmT6lvF45Na8=
 github.com/otiai10/copy v1.14.1/go.mod h1:oQwrEDDOci3IM8dJF0d8+jnbfPDllW6vUjNc3DoZm9I=
 github.com/otiai10/mint v1.6.3 h1:87qsV/aw1F5as1eH1zS/yqHY85ANKVMgkDrf9rcxbQs=
