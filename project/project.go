@@ -26,6 +26,7 @@ type Project struct {
 	DockerConfig        DockerConfig
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
+	ValidationConfig    ValidationConfig
 	OnStatusChange      func(status string)
 }
 
@@ -45,6 +46,7 @@ type ProjectParams struct {
 	DockerConfig        DockerConfig
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
+	ValidationConfig    ValidationConfig
 	OnStatusChange      func(status string)
 }
 
@@ -178,6 +180,7 @@ func New(params *ProjectParams) (*Project, error) {
 		DockerConfig:        params.DockerConfig,
 		HelmConfig:          params.HelmConfig,
 		GitHubActionsConfig: params.GitHubActionsConfig,
+		ValidationConfig:    params.ValidationConfig,
 		OnStatusChange:      params.OnStatusChange,
 	}, nil
 }

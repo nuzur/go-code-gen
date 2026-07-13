@@ -99,6 +99,24 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 			}
 		}
 
+		if project.ValidationEnabled() {
+			validateTemplateBytes, err := files.GetTemplateBytes(templates, "entity_validate")
+			if err != nil {
+				if params.OnStatusChange != nil {
+					params.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for entity validate: %s", e.Identifier))
+				}
+				continue
+			}
+			_, err = files.GenerateFile(ctx, filetools.FileRequest{
+				OutputPath:    path.Join(entityDir, fmt.Sprintf("%s_validate.go", e.Identifier)),
+				TemplateBytes: validateTemplateBytes,
+				Data:          entityTemplate,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
 	}
 
 	for imp := range allImports {
@@ -135,6 +153,24 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 		TemplateBytes: mapperTmplBytes,
 		Data:          project,
 	})
+	if err != nil {
+		return err
+	}
+
+	if project.ValidationEnabled() {
+		validationDir := path.Join(entitiesDir, "validation")
+		validationTmplBytes, err := files.GetTemplateBytes(templates, "entity_validation_helper")
+		if err != nil {
+			return err
+		}
+		_, err = files.GenerateFile(ctx, filetools.FileRequest{
+			OutputPath:    path.Join(validationDir, "validation.go"),
+			TemplateBytes: validationTmplBytes,
+		})
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }

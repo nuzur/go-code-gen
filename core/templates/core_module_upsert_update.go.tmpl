@@ -112,6 +112,24 @@ func (m *module) Update(
 	{{range $field := .Fields}}{{if $field.GeneratedTimestampSetOnUpdate}}req.{{$.EntityName}}.{{$field.Name}} = {{$field.TimestampNowExpr}}
 	{{end}}{{end}}
 
+	{{if .Project.ValidationEnabled}}
+	// validate the merged entity against the schema's field type/type-config rules
+	if err := req.{{.EntityName}}.Validate(); err != nil {
+		{{if eq .Project.MonitoringConfig.Enabled true}}
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "validation failed for Upsert{{.EntityName}} - with uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		{{end}}
+		return types.UpsertResponse{}, err
+	}
+	{{end}}
+
 	params := mapUpsertRequestToUpdateParams(req)
 	err = qtx.Update{{.EntityName}}(
 		ctx,

@@ -54,6 +54,25 @@ func (m *module) Insert(
 	// server-managed timestamps (generated created_at/updated_at)
 	{{range $field := .Fields}}{{if $field.IsGeneratedTimestamp}}req.{{$entityName}}.{{$field.Name}} = {{$field.TimestampNowExpr}}
 	{{end}}{{end}}
+
+	{{if .Project.ValidationEnabled}}
+	// validate the new record against the schema's field type/type-config rules
+	if err := req.{{$entityName}}.Validate(); err != nil {
+		{{if eq .Project.MonitoringConfig.Enabled true}}
+		m.monitoring.Emit(monitoring.EmitRequest{
+			ActionIdentifier: "upsert_{{.EntityIdentifier}}",
+			Message: "validation failed for Upsert{{.EntityName}} - no uuid",
+			EntityIdentifier: "{{.EntityIdentifier}}",
+			Layer: monitoring.ModuleServiceLayer,
+			Type: monitoring.EmitTypeError,
+			Data: req,
+			Error: err,
+		})
+		{{end}}
+		return types.UpsertResponse{}, err
+	}
+	{{end}}
+
 	optConfig := applyAllOptions(opts)
 
 	tx := optConfig.SQLTx

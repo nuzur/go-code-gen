@@ -127,6 +127,8 @@ func TestIntegrationGenerate(t *testing.T) {
 		"go.mod",
 		"entity/user/user.go",
 		"entity/user/user_list.go",
+		"entity/user/user_validate.go",
+		"entity/validation/validation.go",
 		"core/core.go",
 		"core/module/user/list.go",
 		"auth/jwtserver/signin.go",
