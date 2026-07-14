@@ -6,7 +6,7 @@ require (
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/iancoleman/strcase v0.3.0
 	github.com/nuzur/filetools v0.0.3
-	github.com/nuzur/nem v1.1.6
+	github.com/nuzur/nem v1.1.7
 	gopkg.in/yaml.v3 v3.0.1
 )
 
