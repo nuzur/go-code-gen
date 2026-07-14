@@ -9,6 +9,7 @@ import (
 	"github.com/nuzur/go-code-gen/auth"
 	"github.com/nuzur/go-code-gen/core"
 	customgen "github.com/nuzur/go-code-gen/custom"
+	infogen "github.com/nuzur/go-code-gen/info"
 	"github.com/nuzur/go-code-gen/docker"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
@@ -49,6 +50,11 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	// (above) keeps wiring every transport (gRPC/REST/JWT). No-op when disabled.
 	if err = customgen.GenerateCustom(ctx, params); err != nil {
 		return fmt.Errorf("generating custom zone: %w", err)
+	}
+	// Self-documenting "what's deployed" info page served at the app's HTTP
+	// root. On by default; no-op when InfoConfig.Disabled.
+	if err = infogen.GenerateInfo(ctx, params); err != nil {
+		return fmt.Errorf("generating info page: %w", err)
 	}
 	if err = docker.GenerateDocker(ctx, params); err != nil {
 		return fmt.Errorf("generating docker: %w", err)

@@ -1,0 +1,86 @@
+package info
+
+import "net/http"
+
+// infoHTML is the self-documenting "what's deployed" page for {{.AppName}},
+// describing the API surface for whoever hits the app's HTTP root.
+const infoHTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.AppName}} — API</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; }
+  h1 { margin-bottom: .25rem; }
+  .sub { color: #888; margin-top: 0; }
+  .card { border: 1px solid #8883; border-radius: 10px; padding: 1rem 1.25rem; margin: 1rem 0; }
+  .card h2 { margin: 0 0 .5rem; font-size: 1.05rem; }
+  code, pre { background: #8881; border-radius: 6px; font-family: ui-monospace, monospace; }
+  code { padding: .1rem .35rem; }
+  pre { padding: .75rem; overflow-x: auto; }
+  .tag { display:inline-block; font-size:.7rem; padding:.1rem .5rem; border-radius:999px; background:#6C72DB22; color:#6C72DB; margin-left:.4rem; vertical-align:middle; }
+  ul { padding-left: 1.2rem; margin:.25rem 0; }
+</style>
+</head>
+<body>
+<h1>{{.AppName}} <span class="tag">nuzur</span></h1>
+<p class="sub">Deployed API — how to reach it.</p>
+{{ if .GRPCEnabled }}
+<div class="card">
+  <h2>gRPC API</h2>
+  <p>Port <code>{{.GRPCPort}}</code>. List services:</p>
+  <pre><code>grpcurl -plaintext <span class="host">HOST</span>:{{.GRPCPort}} list</code></pre>
+</div>
+{{ end }}
+{{ if .RESTEnabled }}
+<div class="card">
+  <h2>REST API</h2>
+  <p>Base <code>http://<span class="host">HOST</span>:{{.HTTPPort}}{{.RESTBasePath}}</code>. Example:</p>
+  <pre><code>curl http://<span class="host">HOST</span>:{{.HTTPPort}}{{.RESTBasePath}}/{{ if .Entities }}{{ index .Entities 0 }}{{ else }}&lt;entity&gt;{{ end }}</code></pre>
+</div>
+{{ end }}
+{{ if .AuthType }}
+<div class="card">
+  <h2>Authentication</h2>
+  {{ if eq .AuthType "jwt" }}
+  <p>JWT — sign in for a token, then send <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+  <pre><code>curl -X POST http://<span class="host">HOST</span>:{{.HTTPPort}}/signin -d '{"email":"...","password":"..."}'</code></pre>
+  <p>Also <code>/refresh</code> and <code>/validate</code>.</p>
+  {{ else }}
+  <p>Keycloak (OpenID Connect) — get a token from your realm and send <code>Authorization: Bearer &lt;token&gt;</code>.</p>
+  {{ end }}
+</div>
+{{ end }}
+{{ if .Entities }}
+<div class="card">
+  <h2>Entities</h2>
+  <ul>{{ range .Entities }}
+    <li><code>{{ . }}</code></li>{{ end }}
+  </ul>
+</div>
+{{ end }}
+<script>
+  document.querySelectorAll('.host').forEach(function(el){ el.textContent = location.hostname || 'HOST'; });
+</script>
+</body>
+</html>
+`
+
+// Handler serves the info page at the HTTP root only (other paths 404, so it
+// never shadows real routes on the default mux).
+func Handler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(infoHTML))
+}
+
+// Register mounts the info page at "/" on the default mux. The gRPC-only
+// httpServer serves it directly; the REST server forwards "/" to the default mux.
+func Register() {
+	http.HandleFunc("/", Handler)
+}

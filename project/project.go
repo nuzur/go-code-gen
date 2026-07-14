@@ -28,6 +28,7 @@ type Project struct {
 	GitHubActionsConfig GitHubActionsConfig
 	ValidationConfig    ValidationConfig
 	CustomConfig        CustomConfig
+	InfoConfig          InfoConfig
 	OnStatusChange      func(status string)
 }
 
@@ -49,6 +50,7 @@ type ProjectParams struct {
 	GitHubActionsConfig GitHubActionsConfig
 	ValidationConfig    ValidationConfig
 	CustomConfig        CustomConfig
+	InfoConfig          InfoConfig
 	OnStatusChange      func(status string)
 }
 
@@ -188,6 +190,7 @@ func New(params *ProjectParams) (*Project, error) {
 		GitHubActionsConfig: params.GitHubActionsConfig,
 		ValidationConfig:    params.ValidationConfig,
 		CustomConfig:        params.CustomConfig,
+		InfoConfig:          params.InfoConfig,
 		OnStatusChange:      params.OnStatusChange,
 	}, nil
 }

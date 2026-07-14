@@ -63,4 +63,10 @@ func mountRoutes(r chi.Router, h *handlers) {
 	r.Handle("/refresh", http.DefaultServeMux)
 	r.Handle("/validate", http.DefaultServeMux)
 	{{ end }}
+
+	{{ if not .Project.InfoConfig.Disabled }}
+	// Serve the info page at the root by forwarding to the default mux, where
+	// info.Register mounted it.
+	r.Handle("/", http.DefaultServeMux)
+	{{ end }}
 }
