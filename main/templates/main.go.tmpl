@@ -30,8 +30,12 @@ import (
 	{{end}}
 
 	{{if eq .KafkaEnabled true}}
-	saramafx "github.com/mklfarha/sarama-fx"	
+	saramafx "github.com/mklfarha/sarama-fx"
 	{{end}}
+
+	{{ if .CustomConfig.Enabled }}
+	"{{.Module}}/{{.CustomConfig.Dir}}"
+	{{ end }}
 )
 
 func main() {
@@ -41,9 +45,18 @@ func main() {
 			{{.Identifier}}config.New,
 			core.New,	
 			{{ if .MonitoringConfig.Enabled }}monitoring.New,{{end}}
-			{{ if ne .AuthImport ""}}auth.New,{{end}}			
+			{{ if ne .AuthImport ""}}auth.New,{{end}}
 			{{ if eq .CoreConfig.EventsConfig.Enabled true}}events.New,{{end}}
-		),	
+			{{ if .CustomConfig.Enabled }}
+			{{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}
+			pbserver.NewServer,          // generated impl, wrapped by the app override
+			{{.CustomConfig.Dir}}.NewOverride,
+			{{ end }}
+			{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
+			{{.CustomConfig.Dir}}.ProvideCustomRoutes,
+			{{ end }}
+			{{ end }}
+		),
 		{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
 		fx.Invoke(restserver.New),
 		{{ else }}

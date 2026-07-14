@@ -31,7 +31,18 @@ type Params struct {
 	{{ if ne .AuthImport "" }}
 	Auth       auth.Interface
 	{{ end }}
+	{{ if .Project.CustomConfig.Enabled }}
+	// Optional custom routes provided by the app package; mounted after the
+	// generated CRUD routes so you can add or override endpoints.
+	CustomRoutes CustomRoutesFn `optional:"true"`
+	{{ end }}
 }
+
+{{ if .Project.CustomConfig.Enabled }}
+// CustomRoutesFn registers custom REST routes on the server's chi router. The
+// app package supplies one via fx; edit your routes in app/rest.go.
+type CustomRoutesFn func(r chi.Router)
+{{ end }}
 
 type handlers struct {
 	core       *core.Implementation
@@ -72,6 +83,12 @@ func New(params Params) *http.Server {
 	}
 
 	mountRoutes(r, h)
+
+	{{ if .Project.CustomConfig.Enabled }}
+	if params.CustomRoutes != nil {
+		params.CustomRoutes(r)
+	}
+	{{ end }}
 
 	port := params.Config.Get("ports.http").String()
 	if port == "" {

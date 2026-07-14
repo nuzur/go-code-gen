@@ -26,10 +26,20 @@ import (
 type server struct {
 	pb.Unimplemented{{.Name}}Server
 	core *core.Implementation
-	{{ if .Project.MonitoringConfig.Enabled }}	
+	{{ if .Project.MonitoringConfig.Enabled }}
 	monitoring *monitoring.Implementation
 	{{ end }}
 }
+
+{{ if .Project.CustomConfig.Enabled }}
+// Override lets the custom application layer (the app package) supply its own
+// implementation of the {{.Name}} service — typically the generated server
+// wrapped with custom endpoints / custom logic. When one is provided via fx it
+// is registered in place of the default generated implementation.
+type Override interface {
+	pb.{{.Name}}Server
+}
+{{ end }}
 
 type Params struct {
 	fx.In
@@ -42,6 +52,11 @@ type Params struct {
 	{{ end }}
 	{{ if ne .AuthImport ""}}
 	Auth   auth.Interface
+	{{ end }}
+	{{ if .Project.CustomConfig.Enabled }}
+	// Optional custom implementation provided by the app package. Registered in
+	// place of the generated server when present.
+	Override Override `optional:"true"`
 	{{ end }}
 }
 
@@ -82,7 +97,17 @@ func New(params Params) *grpc.Server {
 						
 			// register grpc servers
 			grpc_health_v1.RegisterHealthServer(s, health.NewServer())
+			{{- if .Project.CustomConfig.Enabled }}
+			var impl pb.{{.Name}}Server
+			if params.Override != nil {
+				impl = params.Override
+			} else {
+				impl = NewServer(params)
+			}
+			pb.Register{{.Name}}Server(s, impl)
+			{{- else }}
 			pb.Register{{.Name}}Server(s, NewServer(params))
+			{{- end }}
 			reflection.Register(s)
 
 			log.Info("GRPC Server listening at %v", zap.Any("addr", lis.Addr()))

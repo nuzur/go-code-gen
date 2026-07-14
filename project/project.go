@@ -27,6 +27,7 @@ type Project struct {
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
 	ValidationConfig    ValidationConfig
+	CustomConfig        CustomConfig
 	OnStatusChange      func(status string)
 }
 
@@ -47,6 +48,7 @@ type ProjectParams struct {
 	HelmConfig          HelmConfig
 	GitHubActionsConfig GitHubActionsConfig
 	ValidationConfig    ValidationConfig
+	CustomConfig        CustomConfig
 	OnStatusChange      func(status string)
 }
 
@@ -140,6 +142,10 @@ func New(params *ProjectParams) (*Project, error) {
 		params.GitHubActionsConfig.MainBranch = "main"
 	}
 
+	if params.CustomConfig.Dir == "" {
+		params.CustomConfig.Dir = "app"
+	}
+
 	// check for go module in root path, if not present, add it
 	// read go.mod if exists and check if module name matches, if not, return error
 	// if go.mod does not exist, create one with the module name
@@ -181,6 +187,7 @@ func New(params *ProjectParams) (*Project, error) {
 		HelmConfig:          params.HelmConfig,
 		GitHubActionsConfig: params.GitHubActionsConfig,
 		ValidationConfig:    params.ValidationConfig,
+		CustomConfig:        params.CustomConfig,
 		OnStatusChange:      params.OnStatusChange,
 	}, nil
 }

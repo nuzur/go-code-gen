@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package {{.Identifier}}custom;
+
+option go_package = "{{.Module}}/{{.CustomDir}}/idl/gen";
+
+// Declare your custom gRPC endpoints here, then run ./gen.sh in this directory
+// to generate the Go stubs into ../gen. Implement the generated
+// {{.Name}}CustomServer in the app package (next to grpc.go) and register it on
+// the gRPC server with a small fx invoke.
+//
+// This file is generated ONCE and is yours to edit — regeneration will not
+// overwrite it.
+service {{.Name}}Custom {
+  // rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+// message PingRequest {}
+// message PingResponse {
+//   string message = 1;
+// }

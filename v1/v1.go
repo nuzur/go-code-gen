@@ -8,6 +8,7 @@ import (
 	"github.com/nuzur/go-code-gen/ai"
 	"github.com/nuzur/go-code-gen/auth"
 	"github.com/nuzur/go-code-gen/core"
+	customgen "github.com/nuzur/go-code-gen/custom"
 	"github.com/nuzur/go-code-gen/docker"
 	"github.com/nuzur/go-code-gen/entities"
 	"github.com/nuzur/go-code-gen/files"
@@ -42,6 +43,12 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	}
 	if err = maingen.GenerateMain(ctx, params); err != nil {
 		return fmt.Errorf("generating main: %w", err)
+	}
+	// The custom application zone (opt-in) emits a user-owned app/ package that
+	// plugs into the generated servers via gated fx hooks; the generated main.go
+	// (above) keeps wiring every transport (gRPC/REST/JWT). No-op when disabled.
+	if err = customgen.GenerateCustom(ctx, params); err != nil {
+		return fmt.Errorf("generating custom zone: %w", err)
 	}
 	if err = docker.GenerateDocker(ctx, params); err != nil {
 		return fmt.Errorf("generating docker: %w", err)

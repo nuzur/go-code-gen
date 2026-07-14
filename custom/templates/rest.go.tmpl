@@ -1,0 +1,26 @@
+package {{.CustomDir}}
+
+import (
+	"github.com/go-chi/chi/v5"
+
+	restserver "{{.Module}}/{{.RESTConfig.Dir}}/server"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}"
+)
+
+// ProvideCustomRoutes is wired in main.go; it hands your custom REST routes to
+// the generated REST server, which mounts them after the generated CRUD routes
+// (so you can add new endpoints or override generated ones on the same path).
+//
+// Add your routes below — this file is generated ONCE and will not be
+// overwritten. Adding a REST endpoint needs no code generation.
+func ProvideCustomRoutes(coreImpl *core.Implementation) restserver.CustomRoutesFn {
+	return func(r chi.Router) {
+		// Example — add "net/http" to the imports and uncomment:
+		//
+		// r.Get("/v1/custom/ping", func(w http.ResponseWriter, req *http.Request) {
+		// 	w.WriteHeader(http.StatusOK)
+		// 	_, _ = w.Write([]byte("pong"))
+		// })
+		_ = coreImpl
+	}
+}

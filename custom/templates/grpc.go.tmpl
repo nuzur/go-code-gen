@@ -1,0 +1,38 @@
+package {{.CustomDir}}
+
+import (
+	pb "{{.Module}}/{{.ProtoConfig.Dir}}/gen"
+	pbserver "{{.Module}}/{{.ProtoConfig.Dir}}/server"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}"
+)
+
+// Server is your gRPC application server. It embeds the generated {{.Name}}
+// service, so every generated CRUD endpoint works out of the box, and gives you
+// one place to override generated endpoints with custom logic. Add a method to
+// override an endpoint; anything you don't override falls through to the
+// generated implementation:
+//
+//	func (s *Server) CreateFoo(ctx context.Context, req *pb.CreateFooRequest) (*pb.CreateFooResponse, error) {
+//		// ... your custom logic ...
+//		return s.{{.Name}}Server.CreateFoo(ctx, req) // delegate for base behavior
+//	}
+//
+// To add a BRAND-NEW gRPC endpoint, declare it in app/idl/proto/custom.proto,
+// run app/idl/proto/gen.sh, implement it here, and register the generated
+// custom service on the gRPC server via a small fx invoke.
+//
+// This file is generated ONCE — regeneration will not overwrite it.
+type Server struct {
+	pb.{{.Name}}Server
+	core *core.Implementation
+}
+
+// NewOverride wraps the generated server so main.go registers it in place of the
+// default {{.Name}} implementation. `generated` is provided by
+// pbserver.NewServer; `coreImpl` gives your overrides access to the data layer.
+func NewOverride(generated pb.{{.Name}}Server, coreImpl *core.Implementation) pbserver.Override {
+	return &Server{
+		{{.Name}}Server: generated,
+		core:            coreImpl,
+	}
+}
