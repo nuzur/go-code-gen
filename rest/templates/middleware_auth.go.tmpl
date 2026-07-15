@@ -33,6 +33,12 @@ func AuthMiddleware(exceptions []string) func(http.Handler) http.Handler {
 				"/refresh",
 				"/validate",
 				{{ end }}
+				{{ if not .Project.InfoConfig.Disabled }}
+				// The public info page is served at the exact root path (the
+				// handler 404s everything else), so except "/" alone — "/"+"/"
+				// is "//", which no other request path prefixes.
+				"/",
+				{{ end }}
 			}
 			finalExceptions = append(exceptions, finalExceptions...)
 
