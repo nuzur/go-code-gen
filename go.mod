@@ -17,7 +17,7 @@ require (
 
 require (
 	github.com/nuzur/extension-sdk v0.0.67
-	github.com/nuzur/sql-gen v1.0.87
+	github.com/nuzur/sql-gen v1.0.88
 	github.com/otiai10/copy v1.14.1
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.43.0 // indirect
