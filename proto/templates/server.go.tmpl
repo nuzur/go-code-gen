@@ -60,16 +60,29 @@ type Params struct {
 	{{ end }}
 }
 
+{{ if .Project.CustomConfig.Enabled }}
+// NewServer builds the default generated implementation. With the custom layer
+// enabled it is provided to fx and wrapped by the app-level Override, so it must
+// depend ONLY on its own inputs — never on Override — otherwise fx sees
+// NewServer -> Override -> NewServer and rejects the graph as a cycle.
+func NewServer(core *core.Implementation{{ if .Project.MonitoringConfig.Enabled }}, monitoring *monitoring.Implementation{{ end }}) pb.{{.Name}}Server {
+	return &server{
+		core: core,
+		{{ if .Project.MonitoringConfig.Enabled }}monitoring: monitoring,{{ end }}
+	}
+}
+{{ else }}
 func NewServer(params Params) pb.{{.Name}}Server {
 	return &server{
 		core: params.Core,
-		{{ if .Project.MonitoringConfig.Enabled }}	
+		{{ if .Project.MonitoringConfig.Enabled }}
 		monitoring: params.Monitoring,
 		{{ end }}
 	}
 }
+{{ end }}
 
-func New(params Params) *grpc.Server {	
+func New(params Params) *grpc.Server {
 	log := params.Logger
 	if log == nil {
 		log = zap.NewNop()
@@ -102,7 +115,7 @@ func New(params Params) *grpc.Server {
 			if params.Override != nil {
 				impl = params.Override
 			} else {
-				impl = NewServer(params)
+				impl = NewServer(params.Core{{ if .Project.MonitoringConfig.Enabled }}, params.Monitoring{{ end }})
 			}
 			pb.Register{{.Name}}Server(s, impl)
 			{{- else }}

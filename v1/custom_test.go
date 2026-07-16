@@ -191,3 +191,78 @@ func TestGenerateCustomZone_EmitOnce(t *testing.T) {
 		t.Fatal("custom edit was clobbered on regeneration (emit-once broken)")
 	}
 }
+
+// TestGenerateCustomZone_FxGraphAcyclic guards against the fx dependency cycle
+// that made a --custom gRPC app crash at startup: the generated NewServer must
+// depend only on its own inputs, never on the app-level Override (which wraps
+// NewServer's output) — otherwise fx sees NewServer -> Override -> NewServer.
+// It generates a custom+gRPC app and runs fx.ValidateApp over the wiring (which
+// builds the graph without running it and errors on a cycle) via a test
+// compiled inside the generated module.
+func TestGenerateCustomZone_FxGraphAcyclic(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in -short mode")
+	}
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip("protoc not installed")
+	}
+
+	id := "cfg_custom_fxgraph"
+	root := t.TempDir()
+	params := &project.ProjectParams{
+		Project:        &nemgen.Project{Name: "ConfigMatrix"},
+		ProjectVersion: configurationsSchema(),
+		RootPath:       root,
+		Identifier:     id,
+		Module:         "github.com/mklfarha/" + id,
+		EntitiesConfig: project.EntitiesConfig{Enabled: true, Dir: "entity", IncludeListInterface: true},
+		CoreConfig:     project.CoreConfig{Enabled: true, CoreDir: "core", RepoConfig: project.RepoConfig{DatabaseType: project.MYSQL}},
+		ProtoConfig:    project.ProtoConfig{Enabled: true, Server: true, Dir: "idl"},
+		CustomConfig:   project.CustomConfig{Enabled: true},
+		OnStatusChange: func(status string) { t.Logf("[gen] %s", status) },
+	}
+	if err := Generate(context.Background(), params); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	dir := filepath.Join(root, id)
+
+	fxTest := `package main
+
+import (
+	"testing"
+
+	"go.uber.org/config"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
+
+	"` + params.Module + `/app"
+	"` + params.Module + `/core"
+	server "` + params.Module + `/idl/server"
+)
+
+// fx.ValidateApp builds the dependency graph without invoking constructors and
+// returns an error on a cycle or missing dependency. Stubs are never called.
+func TestFxGraphAcyclic(t *testing.T) {
+	if err := fx.ValidateApp(
+		fx.Provide(
+			func() *core.Implementation { return nil },
+			func() config.Provider { return nil },
+			func() *zap.Logger { return nil },
+			server.NewServer,
+			app.NewOverride,
+		),
+		fx.Invoke(server.New),
+	); err != nil {
+		t.Fatalf("fx graph invalid (dependency cycle?): %v", err)
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(dir, "fxgraph_test.go"), []byte(fxTest), 0o644); err != nil {
+		t.Fatalf("write fx graph test: %v", err)
+	}
+	cmd := exec.Command("go", "test", "-run", "TestFxGraphAcyclic", ".")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("fx graph validation failed (dependency cycle in the --custom gRPC wiring?):\n%s", string(out))
+	}
+}
