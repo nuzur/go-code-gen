@@ -1,8 +1,9 @@
+# syntax=docker/dockerfile:1
 ############################
 # STEP 1 build executable binary
 ############################
 
-FROM golang:alpine as builder
+FROM golang:alpine AS builder
 
 # Install git.
 # Git is required for fetching the dependencies.
@@ -11,14 +12,23 @@ RUN apk add --no-cache git
 # set directory for all go code
 WORKDIR $GOPATH/src/{{.Identifier}}
 
-# copy all code into working directory
+# Fetch dependencies first, keyed only on the module files. This layer is reused
+# across rebuilds while go.mod/go.sum are unchanged (the common case — a code
+# change rarely touches dependencies), so a re-deploy skips re-downloading every
+# module. The cache mount also persists the module cache on the box between builds.
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+# Now the rest of the source; a code change only invalidates from here down.
 COPY . .
 
-# Fetch dependencies
-RUN go mod tidy
-
-# Build the binary.
-RUN go build .
+# Reconcile go.mod with the source (adds any modules the custom app zone imports;
+# already-fetched modules come from the cache, so this hits the network only for
+# genuinely new dependencies), then build reusing the module + compile caches.
+RUN --mount=type=cache,target=/go/pkg/mod go mod tidy
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build .
 
 ############################
 # STEP 2 final thin build
