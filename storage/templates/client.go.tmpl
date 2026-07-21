@@ -1,0 +1,93 @@
+package storage
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/url"
+	"strings"
+	"time"
+
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+)
+
+// Client is a small, self-contained S3 wrapper: it uploads objects and issues
+// presigned GET URLs. Credentials come from the app's `aws:` config block.
+type Client struct {
+	uploader *manager.Uploader
+	presign  *s3.PresignClient
+	bucket   string
+	region   string
+}
+
+// NewClient builds an S3 client from static credentials. It returns an error
+// when the bucket is not configured, so callers can degrade to a 503 until the
+// `aws:` config is filled in (e.g. at deploy time).
+func NewClient(ctx context.Context, region, keyID, secret, bucket string) (*Client, error) {
+	if strings.TrimSpace(bucket) == "" {
+		return nil, fmt.Errorf("storage: bucket is not configured")
+	}
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(
+			credentials.NewStaticCredentialsProvider(keyID, secret, ""),
+		),
+	)
+	if err != nil {
+		return nil, err
+	}
+	c := s3.NewFromConfig(cfg)
+	return &Client{
+		uploader: manager.NewUploader(c),
+		presign:  s3.NewPresignClient(c),
+		bucket:   bucket,
+		region:   region,
+	}, nil
+}
+
+// Upload streams body to s3://<bucket>/<key> and returns the object URL.
+func (c *Client) Upload(ctx context.Context, key, contentType string, body io.Reader) (string, error) {
+	input := &s3.PutObjectInput{
+		Bucket: &c.bucket,
+		Key:    &key,
+		Body:   body,
+	}
+	if contentType != "" {
+		input.ContentType = &contentType
+	}
+	if _, err := c.uploader.Upload(ctx, input); err != nil {
+		return "", err
+	}
+	return c.objectURL(key), nil
+}
+
+// SignURL returns a presigned GET URL for key, valid for expiry.
+func (c *Client) SignURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	req, err := c.presign.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: &c.bucket,
+		Key:    &key,
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", err
+	}
+	return req.URL, nil
+}
+
+// objectURL builds the virtual-hosted-style URL for a key.
+func (c *Client) objectURL(key string) string {
+	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucket, c.region, key)
+}
+
+// keyFromURL extracts the object key from a URL previously returned by Upload
+// (the path minus its leading slash). Non-URL input is returned unchanged so a
+// caller may pass either a key or a url.
+func keyFromURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return raw
+	}
+	return strings.TrimPrefix(u.Path, "/")
+}

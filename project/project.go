@@ -29,6 +29,7 @@ type Project struct {
 	ValidationConfig    ValidationConfig
 	CustomConfig        CustomConfig
 	InfoConfig          InfoConfig
+	StorageConfig       StorageConfig
 	OnStatusChange      func(status string)
 }
 
@@ -51,6 +52,7 @@ type ProjectParams struct {
 	ValidationConfig    ValidationConfig
 	CustomConfig        CustomConfig
 	InfoConfig          InfoConfig
+	StorageConfig       StorageConfig
 	OnStatusChange      func(status string)
 }
 
@@ -191,6 +193,7 @@ func New(params *ProjectParams) (*Project, error) {
 		ValidationConfig:    params.ValidationConfig,
 		CustomConfig:        params.CustomConfig,
 		InfoConfig:          params.InfoConfig,
+		StorageConfig:       params.StorageConfig,
 		OnStatusChange:      params.OnStatusChange,
 	}, nil
 }

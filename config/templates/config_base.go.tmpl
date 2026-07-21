@@ -34,5 +34,13 @@ db:
     params: << Database Params Here>>
     driver: "<< Database Driver Here >>"
 
+{{if eq .StorageConfig.Enabled true}}
+aws:
+  region: << S3 Region Here >>
+  key_id: << S3 Access Key ID Here >>
+  secret: << S3 Secret Access Key Here >>
+  bucket: << S3 Bucket Here >>
+{{end}}
+
 monitoring:
   enabled: {{.MonitoringConfig.Enabled}}

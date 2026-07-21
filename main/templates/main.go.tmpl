@@ -40,6 +40,10 @@ import (
 	{{ if not .InfoConfig.Disabled }}
 	"{{.Module}}/info"
 	{{ end }}
+
+	{{ if .StorageConfig.Enabled }}
+	"{{.Module}}/storage"
+	{{ end }}
 )
 
 func main() {
@@ -63,6 +67,9 @@ func main() {
 		),
 		{{ if not .InfoConfig.Disabled }}
 		fx.Invoke(info.Register),
+		{{ end }}
+		{{ if .StorageConfig.Enabled }}
+		fx.Invoke(storage.Register),
 		{{ end }}
 		{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
 		fx.Invoke(restserver.New),

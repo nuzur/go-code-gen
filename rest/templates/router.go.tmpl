@@ -64,6 +64,14 @@ func mountRoutes(r chi.Router, h *handlers) {
 	r.Handle("/validate", http.DefaultServeMux)
 	{{ end }}
 
+	{{ if .Project.StorageConfig.Enabled }}
+	// The storage package registers /upload and /sign on the default mux in
+	// storage.Register. Forward those paths so they are served on the same port
+	// as the REST API.
+	r.Handle("/upload", http.DefaultServeMux)
+	r.Handle("/sign", http.DefaultServeMux)
+	{{ end }}
+
 	{{ if not .Project.InfoConfig.Disabled }}
 	// Serve the info page at the root by forwarding to the default mux, where
 	// info.Register mounted it.

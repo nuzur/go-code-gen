@@ -19,6 +19,7 @@ import (
 	"github.com/nuzur/go-code-gen/project"
 	"github.com/nuzur/go-code-gen/proto"
 	"github.com/nuzur/go-code-gen/rest"
+	storagegen "github.com/nuzur/go-code-gen/storage"
 )
 
 func Generate(ctx context.Context, params *project.ProjectParams) error {
@@ -51,6 +52,11 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 	if err = customgen.GenerateCustom(ctx, params); err != nil {
 		return fmt.Errorf("generating custom zone: %w", err)
 	}
+	// The S3 storage zone (opt-in) emits a `storage` package exposing generic
+	// /upload and /sign HTTP endpoints on the default mux. No-op when disabled.
+	if err = storagegen.GenerateStorage(ctx, params); err != nil {
+		return fmt.Errorf("generating storage zone: %w", err)
+	}
 	// Self-documenting "what's deployed" info page served at the app's HTTP
 	// root. On by default; no-op when InfoConfig.Disabled.
 	if err = infogen.GenerateInfo(ctx, params); err != nil {
@@ -69,7 +75,7 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("generating ai info: %w", err)
 	}
 
-	if project.CoreConfig.Enabled && (project.ProtoConfig.Server || project.RESTConfig.Enabled) {
+	if project.CoreConfig.Enabled && (project.ProtoConfig.Server || project.RESTConfig.Enabled || project.StorageConfig.Enabled) {
 		project.GoModTidy(project.Dir())
 	} else {
 		project.GoModTidy(path.Join(project.Dir(), project.EntitiesConfig.Dir))
