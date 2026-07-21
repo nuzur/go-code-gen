@@ -1,5 +1,23 @@
 # Plan: S3 file upload in go-code-gen (config-builder driven, deploy pulls team creds)
 
+## Update — enable decoupled from store (2026-07-21)
+Storage generation is now driven by an explicit **`storage_enabled`** switch, NOT by an object
+store being selected — so a project can enable `/upload` + `/sign` and supply credentials
+manually, without ever storing S3 creds in nuzur. Two credential sources (mirrors the DB
+`--connection` vs `--db-dsn` split):
+- **Team ObjectStore** (`storage` / `object_store` UUID) → creds resolved from nuzur (KMS) at deploy.
+- **Manual** (CLI-only `--s3-bucket/--s3-region/--s3-access-key/--s3-secret`, or edit `prod.yaml`).
+Web-authored configs never carry raw S3 secrets (same stance as `db_dsn`). If storage is enabled
+with no creds yet, the endpoints return 503 until `prod.yaml`'s `aws:` block is set.
+
+Implemented across: extension (`configvalues.go` `StorageEnabled` + `execute.go`
+`Enabled = StorageEnabled || ObjectStore != ""`); CLI (`--storage-enabled` implied by `--storage`
+or any `--s3-*`; manual creds flag-only, never in a config file); web execution form (enable
+toggle + optional store selector); deploy config builder (enable toggle + optional store selector).
+Verified: CLI `go build` OK, web `tsc --noEmit` = 0 errors, extension builds against go-code-gen
+HEAD. Schema follow-up now needs **two** fields on the ConfigurationEntity: `storage_enabled`
+(bool) + `object_store` (UUID / ENTITY_TYPE_DB_STORE).
+
 ## Implementation status (2026-07-21)
 All four layers implemented and verified locally:
 - **A — go-code-gen (DONE, verified):** `project/storage.go` `StorageConfig`; new `storage/`
