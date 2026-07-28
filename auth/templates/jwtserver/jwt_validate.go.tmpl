@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"errors"
-	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/user/types"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/{{.UserEntityIdentifier}}/types"
 	"github.com/gofrs/uuid"
 	"go.uber.org/zap"
 	{{ if ne .UserPasswordField nil }}
@@ -39,8 +39,8 @@ func (i *Implementation) Validate(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	// Allow headroom for the first (cold) DB connection against a remote database.
 	ctx, cancelFn := context.WithTimeout(ctx, time.Second*5)
-	userRes, err := i.core.User().FetchUserByEmail(ctx, types.FetchUserByEmailRequest{
-		Email: claims.Email,
+	userRes, err := i.core.{{.UserEntityName}}().{{.UserFetchByEmailMethod}}(ctx, types.{{.UserFetchByEmailMethod}}Request{
+		{{.UserEmailFieldName}}: claims.Email,
 		Limit: 1,
 	})
 	defer cancelFn()

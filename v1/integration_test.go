@@ -77,6 +77,18 @@ func TestIntegrationGenerate(t *testing.T) {
 									},
 								},
 							},
+							{
+								// Generates FetchUserByEmail, used by JWT signin.
+								Uuid:       "idx-email",
+								Identifier: "by_email",
+								Type:       nemgen.IndexType_INDEX_TYPE_INDEX,
+								Status:     nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+								Fields: []*nemgen.IndexField{
+									{
+										FieldUuid: "d1682705-1a89-4cc1-9b1f-e9a888c00002",
+									},
+								},
+							},
 						},
 					},
 				},

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"fmt"
 	"slices"
 
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
@@ -36,26 +37,66 @@ func (p *Project) StandaloneEntities() []*nemgen.Entity {
 	return res
 }
 
+// The entity and fields the generated JWT server is built around. Nuzur models
+// are authored in English or Spanish, so each accepts the identifiers of both.
+// The jwtserver templates render the module path, the core accessor and the
+// select name from whichever identifier the schema actually uses.
+var (
+	UserEntityIdentifiers     = []string{"user", "usuario"}
+	UserEmailFieldIdentifiers = []string{"email", "correo", "correo_electronico"}
+	UserPasswordFieldIdentifiers = []string{
+		"password", "pass", "pwd", "password_hash",
+		"contrasena", "contraseña", "clave",
+	}
+)
+
 func (p *Project) UserEntity() *nemgen.Entity {
-	for _, e := range p.ProjectVersion.Entities {
-		if e.Identifier == "user" {
-			return e
+	for _, id := range UserEntityIdentifiers {
+		for _, e := range p.ProjectVersion.Entities {
+			if e.Identifier == id {
+				return e
+			}
 		}
 	}
 	return nil
 }
 
-func (p *Project) UserPasswordField() *nemgen.Field {
+// UserEntityIdentifier is the identifier of the resolved user entity, used as
+// the core module directory and package name in the generated auth code.
+func (p *Project) UserEntityIdentifier() string {
 	userEntity := p.UserEntity()
 	if userEntity == nil {
-		return nil
+		return ""
 	}
-	for _, f := range userEntity.Fields {
-		if f.Identifier == "password" || f.Identifier == "pass" || f.Identifier == "pwd" || f.Identifier == "password_hash" {
-			return f
-		}
+	return userEntity.Identifier
+}
+
+// UserEntityName is the camel-cased user entity, matching the core accessor
+// emitted by core_main.go.tmpl (core.User(), core.Usuario(), ...).
+func (p *Project) UserEntityName() string {
+	return gcgstrings.ToCamelCase(p.UserEntityIdentifier())
+}
+
+func (p *Project) UserEmailField() *nemgen.Field {
+	return userEntityFieldNamed(p.UserEntity(), UserEmailFieldIdentifiers)
+}
+
+func (p *Project) UserEmailFieldName() string {
+	emailField := p.UserEmailField()
+	if emailField == nil {
+		return ""
 	}
-	return nil
+	return gcgstrings.ToCamelCase(emailField.Identifier)
+}
+
+// UserFetchByEmailMethod is the repo select the signin and validate templates
+// call. It mirrors the name core/repo builds for a single-field index.
+func (p *Project) UserFetchByEmailMethod() string {
+	return fmt.Sprintf("Fetch%sBy%s", p.UserEntityName(), p.UserEmailFieldName())
+}
+
+func (p *Project) UserPasswordField() *nemgen.Field {
+	return userEntityFieldNamed(p.UserEntity(), UserPasswordFieldIdentifiers)
 }
 
 func (p *Project) UserPasswordFieldName() string {
@@ -64,6 +105,20 @@ func (p *Project) UserPasswordFieldName() string {
 		return ""
 	}
 	return gcgstrings.ToCamelCase(passwordField.Identifier)
+}
+
+func userEntityFieldNamed(entity *nemgen.Entity, identifiers []string) *nemgen.Field {
+	if entity == nil {
+		return nil
+	}
+	for _, id := range identifiers {
+		for _, f := range entity.Fields {
+			if f.Identifier == id {
+				return f
+			}
+		}
+	}
+	return nil
 }
 
 func (p *Project) Enums() []*nemgen.Enum {

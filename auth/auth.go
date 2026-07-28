@@ -53,6 +53,11 @@ func GenerateAuth(ctx context.Context, params *project.ProjectParams) error {
 	}
 
 	if p.AuthConfig.Enabled && p.AuthConfig.Type == project.JWT_SERVER_AUTH_TYPE {
+		// Guard for callers that reach GenerateAuth directly rather than through
+		// v1.Generate, which runs the same check up front.
+		if reqs := p.ValidateJWTAuthRequirements(); !reqs.OK() {
+			return fmt.Errorf("%s", reqs.Error())
+		}
 		err := generateBasicJWTServer(ctx, authDir, p)
 		if err != nil {
 			return err

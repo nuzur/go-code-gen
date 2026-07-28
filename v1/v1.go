@@ -28,6 +28,19 @@ func Generate(ctx context.Context, params *project.ProjectParams) error {
 		return fmt.Errorf("%v", err)
 	}
 
+	// Fail before writing anything: the jwtserver templates depend on schema the
+	// generator cannot synthesize, and a partial workspace would only fail later
+	// at go build (or, on deploy, on the remote host).
+	jwtReqs := project.ValidateJWTAuthRequirements()
+	if !jwtReqs.OK() {
+		return fmt.Errorf("%s", jwtReqs.Error())
+	}
+	if params.OnStatusChange != nil {
+		for _, w := range jwtReqs.Warnings {
+			params.OnStatusChange(fmt.Sprintf("WARNING: %s", w))
+		}
+	}
+
 	if err = entities.GenerateEntities(ctx, params); err != nil {
 		return fmt.Errorf("generating entities: %w", err)
 	}

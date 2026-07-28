@@ -9,7 +9,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
-	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/user/types"
+	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/{{.UserEntityIdentifier}}/types"
 )
 
 func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
@@ -38,8 +38,8 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	// TCP/TLS/handshake on first use and can exceed a sub-second budget against
 	// a remote database.
 	ctx, cancelFn := context.WithTimeout(ctx, time.Second*5)
-	userRes, err := i.core.User().FetchUserByEmail(ctx, types.FetchUserByEmailRequest{
-		Email: creds.Email,
+	userRes, err := i.core.{{.UserEntityName}}().{{.UserFetchByEmailMethod}}(ctx, types.{{.UserFetchByEmailMethod}}Request{
+		{{.UserEmailFieldName}}: creds.Email,
 		Limit: 1,
 	})
 	defer cancelFn()
