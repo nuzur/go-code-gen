@@ -196,26 +196,20 @@ func normalizeGoType(s string) string {
 // knownBroken records (engine, field type, DDL type) combinations that cannot be
 // fixed from repo_yaml.go.tmpl, because sqlc matches overrides on the db_type
 // NAME while the break comes from two different nuzur field types sharing one
-// SQL type.
+// SQL type. Such a case needs a fix in sql-gen (give one of the two its own SQL
+// type), so it is parked here rather than failing the build.
 //
-// A narrow INTEGER is the whole list, and it affects BOTH engines. sql-gen maps
-// a 1-bit INTEGER onto the same SQL type as BOOLEAN (MySQL TINYINT(1), Postgres
-// BOOLEAN) and an 8-bit INTEGER onto MySQL TINYINT — see sql-gen/tosql/
-// mysql_types.go and pg_types.go. sqlc then reads those columns as bool /
-// sql.NullBool, so the single `tinyint` / `pg_catalog.bool` override key cannot
-// serve BOOLEAN (wants bool / null.Bool) and INTEGER (wants int64 / null.Int) at
-// the same time. The override is pinned to BOOLEAN, the overwhelmingly common
-// case; a narrow INTEGER generates a project that does not compile.
+// Entries are self-retiring: assertNoStaleExceptions fails once an entry stops
+// matching anything, so a sql-gen bump forces the exception to be deleted instead
+// of silently disabling a check.
 //
-// This is not fixable from repo_yaml.go.tmpl. The fix belongs in sql-gen — give
-// narrow INTEGERs their own SQL type (e.g. SMALLINT) instead of overloading the
-// boolean one — and needs a released sql-gen version. When that lands, delete the
-// entry and this test starts enforcing it.
-var knownBroken = map[string]string{
-	"mysql/FIELD_TYPE_INTEGER/TINYINT(1)":   "sql-gen emits TINYINT(1) for both BOOLEAN and 1-bit INTEGER",
-	"mysql/FIELD_TYPE_INTEGER/TINYINT":      "sql-gen emits TINYINT for 8-bit INTEGER, colliding with BOOLEAN's tinyint override",
-	"postgresql/FIELD_TYPE_INTEGER/BOOLEAN": "sql-gen emits BOOLEAN for 1-bit INTEGER, colliding with BOOLEAN's pg_catalog.bool override",
-}
+// Empty is the desired state. It held the narrow-INTEGER collision — sql-gen
+// mapped a 1-bit INTEGER onto BOOLEAN's own SQL type (MySQL TINYINT(1), Postgres
+// BOOLEAN) and an 8-bit INTEGER onto MySQL TINYINT, so the single `tinyint` /
+// `pg_catalog.bool` override key could not serve BOOLEAN (bool / null.Bool) and
+// INTEGER (int64 / null.Int) at once. Fixed in sql-gen v1.0.91 by mapping both
+// widths to SMALLINT; every INTEGER width is now enforced normally.
+var knownBroken = map[string]string{}
 
 // --- the override table as rendered ----------------------------------------
 
