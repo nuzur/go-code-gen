@@ -65,6 +65,13 @@ func New(params *ProjectParams) (*Project, error) {
 		return nil, fmt.Errorf("error initializing project: module is required")
 	}
 
+	// Resolve every implicit type_config once, before anything reads it. The Go
+	// type and the SQL column type are derived by two different code paths
+	// (this package's templates and sql-gen), and an omitted config defaulted
+	// differently on each side is exactly how a field ends up with three
+	// disagreeing types. See NormalizeProjectVersion.
+	normalizedVersion := NormalizeProjectVersion(params.ProjectVersion)
+
 	if params.RootPath == "" {
 		params.RootPath = "."
 	}
@@ -179,7 +186,7 @@ func New(params *ProjectParams) (*Project, error) {
 		Identifier:          params.Identifier,
 		Module:              params.Module,
 		Project:             params.Project,
-		ProjectVersion:      params.ProjectVersion,
+		ProjectVersion:      normalizedVersion,
 		EntitiesConfig:      params.EntitiesConfig,
 		ProtoConfig:         params.ProtoConfig,
 		CoreConfig:          params.CoreConfig,

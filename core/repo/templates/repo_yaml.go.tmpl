@@ -195,6 +195,39 @@ sql:
               import: "github.com/guregu/null/v6"
               package: "null"
               type: "Bool"
+          # A file/image/audio/video field with BINARY storage is []byte in the
+          # domain layer for both nullabilities. sqlc's default for a NULLABLE
+          # blob is sql.NullString, which neither the entity struct ([]byte) nor
+          # the mapper can use — the non-null case needs no override, the
+          # nullable one does. MySQL tiers BLOB by max_size the same way it
+          # tiers TEXT, so every width needs the entry.
+{{- if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}
+          - db_type: "blob"
+            nullable: true
+            go_type:
+              type: "[]byte"
+          - db_type: "tinyblob"
+            nullable: true
+            go_type:
+              type: "[]byte"
+          - db_type: "mediumblob"
+            nullable: true
+            go_type:
+              type: "[]byte"
+          - db_type: "longblob"
+            nullable: true
+            go_type:
+              type: "[]byte"
+{{- else}}
+          - db_type: "pg_catalog.bytea"
+            nullable: true
+            go_type:
+              type: "[]byte"
+          - db_type: "bytea"
+            nullable: true
+            go_type:
+              type: "[]byte"
+{{- end}}
 overrides:
   go: 
     rename:{{range $identifier, $camelCase := .Entities}}

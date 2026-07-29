@@ -89,11 +89,11 @@ func (f FieldTemplate) Import() *string {
 		}
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+		if f.IsBinaryFile() {
 			return nil
 		}
 
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+		if f.AllowsMultipleFiles() {
 			return nil
 		}
 
@@ -102,7 +102,7 @@ func (f FieldTemplate) Import() *string {
 		}
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if !f.IsRequired() && enum == nil {
 			return &nullImp
 		} else if enum != nil {
@@ -122,7 +122,7 @@ func (f FieldTemplate) Import() *string {
 		return nil
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
 		// we want to get the import of type of array
-		arrayTypeConfig := f.Field.TypeConfig.Array
+		arrayTypeConfig := f.ArrayConfig()
 		arrayFieldTemplate := mapArrayTypeConfigToFieldTemplate(f.Project, arrayTypeConfig)
 		return arrayFieldTemplate.Import()
 	case nemgen.FieldType_FIELD_TYPE_DATE:
@@ -150,23 +150,28 @@ func (f FieldTemplate) Import() *string {
 	}
 }
 
+// mapArrayTypeConfigToFieldTemplate views an array's ELEMENT type as if it were
+// a field of its own, so the scalar helpers (Import, GolangType, ...) can be
+// reused for it. The nested type_config is read through getters because the
+// platform may send an array with no nested config at all.
 func mapArrayTypeConfigToFieldTemplate(project *project.Project, arrayTypeConfig *nemgen.FieldTypeArrayConfig) FieldTemplate {
+	nested := arrayTypeConfig.GetTypeConfig()
 	return FieldTemplate{
 		Field: &nemgen.Field{
-			Type:     mapArrayTypeToFieldType(arrayTypeConfig.Type),
+			Type:     mapArrayTypeToFieldType(arrayTypeConfig.GetType()),
 			Required: true, // array element types are always concrete (never nullable)
 			TypeConfig: &nemgen.FieldTypeConfig{
-				Integer:   arrayTypeConfig.TypeConfig.Integer,
-				Float:     arrayTypeConfig.TypeConfig.Float,
-				Decimal:   arrayTypeConfig.TypeConfig.Decimal,
-				Char:      arrayTypeConfig.TypeConfig.Char,
-				Varchar:   arrayTypeConfig.TypeConfig.Varchar,
-				Email:     arrayTypeConfig.TypeConfig.Email,
-				Phone:     arrayTypeConfig.TypeConfig.Phone,
-				Url:       arrayTypeConfig.TypeConfig.Url,
-				Date:      arrayTypeConfig.TypeConfig.Date,
-				Encrypted: arrayTypeConfig.TypeConfig.Encrypted,
-				Enum:      arrayTypeConfig.TypeConfig.Enum,
+				Integer:   nested.GetInteger(),
+				Float:     nested.GetFloat(),
+				Decimal:   nested.GetDecimal(),
+				Char:      nested.GetChar(),
+				Varchar:   nested.GetVarchar(),
+				Email:     nested.GetEmail(),
+				Phone:     nested.GetPhone(),
+				Url:       nested.GetUrl(),
+				Date:      nested.GetDate(),
+				Encrypted: nested.GetEncrypted(),
+				Enum:      nested.GetEnum(),
 			},
 		},
 		Project: project,

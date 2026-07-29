@@ -53,11 +53,11 @@ func (f FieldTemplate) GolangType() string {
 		}
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+		if f.IsBinaryFile() {
 			return "[]byte"
 		}
 
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+		if f.AllowsMultipleFiles() {
 			return "[]string"
 		}
 
@@ -67,12 +67,19 @@ func (f FieldTemplate) GolangType() string {
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				return "[] enums." + gcgstrings.ToCamelCase(enum.Identifier)
 			}
 			return "enums." + gcgstrings.ToCamelCase(enum.Identifier)
+		}
+		// No enum to name: the field is the plain integer column it is backed
+		// by, and follows the same nullability rule as FIELD_TYPE_INTEGER. It
+		// used to be int64 for both, which does not match the null.Int a
+		// nullable INT column produces.
+		if !f.IsRequired() {
+			return "null.Int64"
 		}
 		return "int64"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -103,45 +110,87 @@ func (f FieldTemplate) GolangType() string {
 	}
 }
 
-func (f FieldTemplate) ArrayGolangType() string {
+// arrayElement is everything the three layers need to know about an array's
+// ELEMENT type: the Go type it becomes, the entitytypes constant the list/filter
+// layer keys on, and the mapper function that reads it back out of its JSON
+// column. They are resolved together, in one switch, because a value that is
+// right in one layer and missing in another is exactly how an array field ends
+// up with an entity type the mapper cannot produce.
+type arrayElement struct {
+	// GolangType is the ELEMENT type; the field's type is a slice of it.
+	GolangType string
+	// ListType is the entitytypes.* constant NAME (no package qualifier) that
+	// buildArrayClause switches on to build a JSON containment clause.
+	ListType string
+	// MapperFunc is the mapper package function that decodes the JSON column
+	// into []GolangType.
+	MapperFunc string
+	// ProtoType is the element's protobuf type; the field is declared
+	// `repeated <ProtoType>`.
+	ProtoType string
+}
+
+// ArrayElement resolves an array field's element type. Every branch of
+// FieldTypeArrayConfigType is handled, and the default is a concrete type
+// rather than `interface{}`: an unresolved element type used to reach the
+// templates as the literal string "interface{}", which the entity-types
+// template rendered as `entitytypes.interface{}` — not valid Go, and it took
+// the whole generated package down with it. VARCHAR/string is the fallback
+// because every JSON scalar round-trips through it.
+func (f FieldTemplate) ArrayElement() arrayElement {
+	str := arrayElement{GolangType: "string", ListType: "StringFieldType", MapperFunc: "JSONToStringSlice", ProtoType: "string"}
 	if f.Field.Type != nemgen.FieldType_FIELD_TYPE_ARRAY {
-		return "interface{}"
+		return str
 	}
 
-	arrayType := f.Field.TypeConfig.Array.Type
-
-	switch arrayType {
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID:
-		return "interface{}"
+	switch f.ArrayConfig().Type {
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
-		return "[]uuid.UUID"
+		return arrayElement{GolangType: "uuid.UUID", ListType: "StringFieldType", MapperFunc: "JSONToUUIDSlice", ProtoType: "string"}
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
-		return "[]int64"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
-		return "[]float64"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
-		return "[]float64"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
-		return "[]string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
-		return "[]time.Time"
+		return arrayElement{GolangType: "int64", ListType: "IntFieldType", MapperFunc: "JSONToIntSlice", ProtoType: "int64"}
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
+		return arrayElement{GolangType: "float64", ListType: "FloatFieldType", MapperFunc: "JSONToFloatSlice", ProtoType: "double"}
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
+		return str
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
-		return "[]time.Time"
+		return arrayElement{GolangType: "time.Time", ListType: "TimestampFieldType", MapperFunc: "JSONToDateSlice", ProtoType: "google.protobuf.Timestamp"}
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
+		return arrayElement{GolangType: "time.Time", ListType: "TimestampFieldType", MapperFunc: "JSONToDatetimeSlice", ProtoType: "google.protobuf.Timestamp"}
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
-		return "[]time.Time"
-	default:
-		return "[]interface{}"
+		return arrayElement{GolangType: "time.Time", ListType: "TimestampFieldType", MapperFunc: "JSONToTimeSlice", ProtoType: "google.protobuf.Timestamp"}
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM:
+		// Enum members serialize as JSON numbers, so the filter layer treats
+		// them as ints; only the Go type is enum-flavoured.
+		enum := f.Project.GetEnum(f.ArrayConfig().GetTypeConfig().GetEnum().GetEnumUuid())
+		if enum == nil {
+			return arrayElement{GolangType: "int64", ListType: "IntFieldType", MapperFunc: "JSONToIntSlice", ProtoType: "int64"}
+		}
+		enumType := "enums." + gcgstrings.ToCamelCase(enum.Identifier)
+		return arrayElement{
+			GolangType: enumType,
+			ListType:   "IntFieldType",
+			MapperFunc: "JSONToEnumSlice[" + enumType + "]",
+			ProtoType:  gcgstrings.ToCamelCase(enum.Identifier),
+		}
 	}
+	return str
+}
+
+func (f FieldTemplate) ArrayGolangType() string {
+	return "[]" + f.ArrayElement().GolangType
+}
+
+// ArrayFromJSON is the mapper call that turns the field's JSON column into its
+// slice type.
+func (f FieldTemplate) ArrayFromJSON(arg string) string {
+	return "mapper." + f.ArrayElement().MapperFunc + "(" + arg + ")"
 }
 
 func (f FieldTemplate) IsNullable() bool {
@@ -202,11 +251,11 @@ func (f FieldTemplate) ZeroValue() string {
 		}
 		return "\"\""
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+		if f.IsBinaryFile() {
 			return "[]byte{}"
 		}
 
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+		if f.AllowsMultipleFiles() {
 			return "[]string{}"
 		}
 
@@ -216,12 +265,12 @@ func (f FieldTemplate) ZeroValue() string {
 		return "\"\""
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
-				return "[] enums." + gcgstrings.ToCamelCase(enum.Identifier)
+			if f.EnumConfig().AllowMultiple {
+				return "[]enums." + gcgstrings.ToCamelCase(enum.Identifier) + "{}"
 			}
-			return "enums." + gcgstrings.ToCamelCase(enum.Identifier)
+			return "enums." + gcgstrings.ToCamelCase(enum.Identifier) + "(0)"
 		}
 		return "0"
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -229,12 +278,13 @@ func (f FieldTemplate) ZeroValue() string {
 		if rel != nil {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
-				return gcgstrings.ToCamelCase(dependantEntity.Identifier)
+				return gcgstrings.ToCamelCase(dependantEntity.Identifier) + "{}"
 			}
 		}
 		return "nil"
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return f.ArrayGolangType()
+		// a zero VALUE, not a type: `[]string` alone is not an expression.
+		return f.ArrayGolangType() + "{}"
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
@@ -248,7 +298,7 @@ func (f FieldTemplate) ZeroValue() string {
 		}
 		return "\"\""
 	default:
-		return "interface{}"
+		return "nil"
 	}
 }
 
@@ -278,20 +328,23 @@ func (f FieldTemplate) ListType() string {
 		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
 		return "StringFieldType"
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			return "[]byte"
+		if f.IsBinaryFile() {
+			// A blob is not filterable or sortable; it gets its own constant so
+			// the filter layer rejects it explicitly. This used to return the Go
+			// type "[]byte", which the template emitted as `entitytypes.[]byte`.
+			return "BinaryFieldType"
 		}
-
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			return "[]string"
+		if f.AllowsMultipleFiles() {
+			// a JSON array of urls: it matches by containment, like any other
+			// array. (This used to return "[]string" -> `entitytypes.[]string`.)
+			return "ArrayFieldType"
 		}
-
 		return "StringFieldType"
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				return "MultiEnumFieldType"
 			}
 			return "SingleEnumFieldType"
@@ -310,7 +363,12 @@ func (f FieldTemplate) ListType() string {
 		}
 		return "RawJSONFieldType"
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return f.ArrayListType()
+		// An array field IS an array as far as the list/filter layer is
+		// concerned; its element type is published separately through
+		// ArrayFieldIdentifierToType. Returning the element type here instead
+		// sent array filters down the scalar clause builders, which compare a
+		// JSON array to a scalar and therefore never match.
+		return "ArrayFieldType"
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:
@@ -318,47 +376,15 @@ func (f FieldTemplate) ListType() string {
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
 		return "StringFieldType"
 	default:
-		return "interface{}"
+		// Never `interface{}`: this value is emitted with an `entitytypes.`
+		// prefix, so anything that is not a constant name is a syntax error in
+		// the generated package.
+		return "StringFieldType"
 	}
 }
 
+// ArrayListType is the entitytypes constant for an array's ELEMENT type, used
+// by buildArrayClause to pick a JSON containment comparison.
 func (f FieldTemplate) ArrayListType() string {
-	if f.Field.Type != nemgen.FieldType_FIELD_TYPE_ARRAY {
-		return "interface{}"
-	}
-
-	arrayType := f.Field.TypeConfig.Array.Type
-
-	switch arrayType {
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID:
-		return "interface{}"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
-		return "IntFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
-		return "FloatFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
-		return "FloatFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
-		return "StringFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
-		return "TimestampFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
-		return "TimestampFieldType"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
-		return "TimestampFieldType"
-	default:
-		return "[]interface{}"
-	}
+	return f.ArrayElement().ListType
 }

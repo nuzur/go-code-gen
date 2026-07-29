@@ -40,13 +40,9 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			// todo: implement this
-		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			if !f.IsRequired() {
-				return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
-			}
+		// []byte and []string are already the proto wire types; only the single
+		// optional url needs unwrapping from null.String.
+		if f.IsBinaryFile() || f.AllowsMultipleFiles() {
 			return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		if !f.IsRequired() {
@@ -55,9 +51,9 @@ func (f FieldTemplate) RepoToMapperFetch() string {
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				// a multi-enum is persisted as a JSON array column
 				return fmt.Sprintf("mapper.SliceToJSON(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 			}
@@ -128,18 +124,20 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			// todo: implement this
+		ref := fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+		// A binary file is []byte on both sides (BLOB/BYTEA) and a single url is
+		// string/null.String on both sides — both pass straight through. A
+		// multi-file field is a list of urls in a JSON column, so it is written
+		// exactly like any other list.
+		if f.AllowsMultipleFiles() {
+			return fmt.Sprintf("mapper.SliceToJSON(%s)", ref)
 		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
-		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+		return ref
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				// a multi-enum is persisted as a JSON array column
 				return fmt.Sprintf("mapper.SliceToJSON(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
@@ -243,10 +241,10 @@ func (f FieldTemplate) PartialUpdateCheck() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+		if f.IsBinaryFile() {
 			return fmt.Sprintf("len(%s) > 0", ref)
 		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() {
+		if f.AllowsMultipleFiles() {
 			return fmt.Sprintf("len(%s) > 0", ref)
 		}
 		if !f.IsRequired() {
@@ -335,14 +333,14 @@ func (f FieldTemplate) RepoFromMapper() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			// todo: implement this
-		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			if !f.IsRequired() {
-				return fmt.Sprintf("null.NewString(m.%s.String, m.%s.Valid)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))
-			}
+		// A binary file is []byte in the model and in the entity: read it
+		// straight through. Reaching the null.String branch below with a []byte
+		// model field is what produced `m.X.String undefined (type []byte ...)`.
+		if f.IsBinaryFile() {
 			return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		}
+		if f.AllowsMultipleFiles() {
+			return fmt.Sprintf("mapper.JSONToStringSlice(m.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		if !f.IsRequired() {
 			return fmt.Sprintf("null.NewString(m.%s.String, m.%s.Valid)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))
@@ -350,9 +348,9 @@ func (f FieldTemplate) RepoFromMapper() string {
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				// a multi-enum is read back from its JSON array column
 				return fmt.Sprintf("mapper.JSONToEnumSlice[enums.%s](m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
@@ -360,6 +358,11 @@ func (f FieldTemplate) RepoFromMapper() string {
 				return fmt.Sprintf("enums.%s(m.%s.Int64)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			return fmt.Sprintf("enums.%s(m.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+		}
+		// No enum to name: it is the plain integer column, so it converts like
+		// FIELD_TYPE_INTEGER does.
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.NewInt(m.%s.Int64, m.%s.Valid)", gcgstrings.ToCamelCase(f.Identifier()), gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -381,39 +384,11 @@ func (f FieldTemplate) RepoFromMapper() string {
 		}
 		return fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		typeStr := ""
-		switch f.Field.TypeConfig.Array.Type {
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
-			typeStr = "UUID"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
-			typeStr = "Int"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
-			typeStr = "Float"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
-			typeStr = "Float"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
-			typeStr = "String"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
-			typeStr = "Datetime"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
-			typeStr = "Date"
-		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
-			typeStr = "Time"
-		}
-		return fmt.Sprintf("mapper.JSONTo%sSlice(%s)",
-			typeStr,
-			fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier())),
-		)
+		// The decoder is picked by ArrayElement, the same place the entity's
+		// slice type comes from, so the two cannot disagree. Enumerating the
+		// element types a second time here is what left an unresolved element
+		// type calling the non-existent mapper.JSONToSlice.
+		return f.ArrayFromJSON(fmt.Sprintf("m.%s", gcgstrings.ToCamelCase(f.Identifier())))
 	case nemgen.FieldType_FIELD_TYPE_DATE,
 		nemgen.FieldType_FIELD_TYPE_DATETIME,
 		nemgen.FieldType_FIELD_TYPE_TIME:

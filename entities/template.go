@@ -150,10 +150,62 @@ func (f FieldTemplate) IsSearchable() bool {
 	return false
 }
 
+// Array reports whether the field is stored as a JSON array, and so needs an
+// entry in ArrayFieldIdentifierToType naming its element type. That covers the
+// array type itself and a multi-file field, which is a JSON array of
+// object-store urls.
 func (f FieldTemplate) Array() bool {
-	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY
+	if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
+		return true
+	}
+	switch f.Field.Type {
+	case nemgen.FieldType_FIELD_TYPE_FILE,
+		nemgen.FieldType_FIELD_TYPE_IMAGE,
+		nemgen.FieldType_FIELD_TYPE_AUDIO,
+		nemgen.FieldType_FIELD_TYPE_VIDEO:
+		return !f.IsBinaryFile() && f.AllowsMultipleFiles()
+	}
+	return false
 }
 
 func (f FieldTemplate) IsUUID() bool {
 	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID
+}
+
+// --- type_config accessors ---------------------------------------------------
+//
+// Templates reach into a field's type_config constantly. Going through these
+// accessors instead of indexing the message directly matters for two reasons:
+// the config a field's type actually uses is per-type (an image field's config
+// is type_config.image, not type_config.file — reading .file for all four
+// file-shaped types dereferences nil on three of them), and the platform is
+// free to omit a config entirely, which a bare index would turn into a panic
+// mid-generation. project.NormalizeProjectVersion resolves these once up front;
+// the accessors keep the templates correct even for a hand-built schema.
+
+// FileConfig returns the storage config of a file/image/audio/video field.
+func (f FieldTemplate) FileConfig() *nemgen.FieldTypeFileConfig {
+	return project.FileConfig(f.Field)
+}
+
+// IsBinaryFile reports whether the field stores its bytes in the column
+// (BLOB/BYTEA -> []byte) rather than an object-store url (VARCHAR -> string).
+func (f FieldTemplate) IsBinaryFile() bool {
+	return project.IsBinaryFile(f.Field)
+}
+
+// AllowsMultipleFiles reports whether the field holds a list of object-store
+// urls rather than a single one.
+func (f FieldTemplate) AllowsMultipleFiles() bool {
+	return f.FileConfig().GetAllowMultiple()
+}
+
+// ArrayConfig returns an array field's config, with the element type resolved.
+func (f FieldTemplate) ArrayConfig() *nemgen.FieldTypeArrayConfig {
+	return project.ArrayConfig(f.Field)
+}
+
+// EnumConfig returns an enum field's config.
+func (f FieldTemplate) EnumConfig() *nemgen.FieldTypeEnumConfig {
+	return project.EnumConfig(f.Field)
 }

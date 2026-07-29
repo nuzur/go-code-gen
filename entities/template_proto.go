@@ -44,18 +44,20 @@ func (f FieldTemplate) ProtoType() string {
 		nemgen.FieldType_FIELD_TYPE_RICHTEXT:
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			return "repeated bytes"
+		if f.IsBinaryFile() {
+			// one blob -> `bytes` ([]byte). `repeated bytes` is [][]byte, which
+			// is not what the entity struct or the column holds.
+			return "bytes"
 		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
+		if f.AllowsMultipleFiles() {
 			return "repeated string"
 		}
 		return "string"
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				return "repeated " + gcgstrings.ToCamelCase(enum.Identifier)
 			}
 			return gcgstrings.ToCamelCase(enum.Identifier)
@@ -86,45 +88,16 @@ func (f FieldTemplate) ProtoType() string {
 	}
 }
 
+// ArrayProtoType declares an array field as `repeated <element>`. The element
+// comes from ArrayElement, the same resolver the Go type and the mapper use, so
+// a newly added element type cannot be handled in one and missed in the other —
+// which is what left an array-of-enum field emitting a proto line with no type
+// at all (` t24_array_enum = 120;`), failing protoc before anything compiled.
 func (f FieldTemplate) ArrayProtoType() string {
 	if f.Field.Type != nemgen.FieldType_FIELD_TYPE_ARRAY {
 		return ""
 	}
-
-	arrayType := f.Field.TypeConfig.Array.Type
-
-	switch arrayType {
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID:
-		return ""
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
-		return "repeated int64"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
-		return "repeated double"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
-		return "repeated double"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
-		return "repeated string"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME:
-		return "repeated google.protobuf.Timestamp"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE:
-		return "repeated google.protobuf.Timestamp"
-	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
-		return "repeated google.protobuf.Timestamp"
-	default:
-		return ""
-	}
+	return "repeated " + f.ArrayElement().ProtoType
 }
 
 func (f FieldTemplate) ProtoName() string {
@@ -180,13 +153,11 @@ func (f FieldTemplate) ProtoToMapper() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			// todo: implement this
-		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			if !f.IsRequired() {
-				return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
-			}
+		// []byte (bytes) and []string (repeated string) are already the wire
+		// types and carry their own emptiness — only the single optional url is
+		// a null.String that has to be unwrapped. Falling through to
+		// .ValueOrZero() for the slice shapes called a method they do not have.
+		if f.IsBinaryFile() || f.AllowsMultipleFiles() {
 			return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		if !f.IsRequired() {
@@ -195,12 +166,16 @@ func (f FieldTemplate) ProtoToMapper() string {
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 			}
 			return fmt.Sprintf("pb.%s(e.%s)", f.ProtoType(), gcgstrings.ToCamelCase(f.Identifier()))
+		}
+		// No enum to name: it is a plain integer, nullable or not.
+		if !f.IsRequired() {
+			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
 		}
 		return fmt.Sprintf("int64(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -216,13 +191,18 @@ func (f FieldTemplate) ProtoToMapper() string {
 		}
 		return fmt.Sprintf("string(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		switch f.Field.TypeConfig.Array.Type {
+		switch f.ArrayConfig().Type {
 		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
 			return fmt.Sprintf("UUIDSliceToStringSlice(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
 		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
 			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
 			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
 			return fmt.Sprintf("TimeSliceToProtoTimeSlice(e.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM:
+			enum := f.Project.GetEnum(f.ArrayConfig().GetTypeConfig().GetEnum().GetEnumUuid())
+			if enum != nil {
+				return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(enum.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+			}
 		}
 
 		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
@@ -289,13 +269,9 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
-			// todo: implement this
-		}
-		if f.Field.TypeConfig.File.GetAllowMultiple() == true {
-			if !f.IsRequired() {
-				return fmt.Sprintf("null.StringFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
-			}
+		// Same shapes as ProtoToMapper, in reverse: only the single optional
+		// url needs wrapping in null.String.
+		if f.IsBinaryFile() || f.AllowsMultipleFiles() {
 			return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 		}
 		if !f.IsRequired() {
@@ -304,12 +280,16 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
 			}
 			return fmt.Sprintf("enums.%s(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
+		}
+		// No enum to name: it is a plain integer, nullable or not.
+		if !f.IsRequired() {
+			return fmt.Sprintf("null.IntFrom(m.Get%s())", strcase.ToCamel(f.Identifier()))
 		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_JSON:
@@ -325,13 +305,18 @@ func (f FieldTemplate) ProtoFromMapper() string {
 		}
 		return fmt.Sprintf("json.RawMessage([]byte(m.Get%s()))", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		switch f.Field.TypeConfig.Array.Type {
+		switch f.ArrayConfig().Type {
 		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
 			return fmt.Sprintf("StringSliceToUUIDSlice(m.Get%s())", strcase.ToCamel(f.Identifier()))
 		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
 			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
 			nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
 			return fmt.Sprintf("ProtoTimeSliceToTimeSlice(m.Get%s())", strcase.ToCamel(f.Identifier()))
+		case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM:
+			enum := f.Project.GetEnum(f.ArrayConfig().GetTypeConfig().GetEnum().GetEnumUuid())
+			if enum != nil {
+				return fmt.Sprintf("%sSliceFromProto(m.Get%s())", gcgstrings.ToCamelCase(enum.Identifier), strcase.ToCamel(f.Identifier()))
+			}
 		}
 		return fmt.Sprintf("m.Get%s()", strcase.ToCamel(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_DATE,

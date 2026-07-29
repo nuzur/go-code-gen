@@ -4,7 +4,7 @@ import nemgen "github.com/nuzur/nem/idl/gen"
 
 func (f FieldTemplate) Enum() bool {
 	if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ENUM {
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
 			return true
 		}
@@ -13,5 +13,5 @@ func (f FieldTemplate) Enum() bool {
 }
 
 func (f FieldTemplate) EnumMany() bool {
-	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_ENUM && f.Field.TypeConfig.Enum.AllowMultiple
+	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_ENUM && f.EnumConfig().AllowMultiple
 }

@@ -58,11 +58,11 @@ func fieldToOpenAPISchema(f entities.FieldTemplate) map[string]any {
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
 		schema["type"] = "string"
 	case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
-		if f.Field.TypeConfig.File.StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY {
+		if f.IsBinaryFile() {
 			schema["type"] = "string"
 			schema["format"] = "byte"
 		} else {
-			if f.Field.TypeConfig.File.GetAllowMultiple() {
+			if f.AllowsMultipleFiles() {
 				schema["type"] = "array"
 				schema["items"] = map[string]any{"type": "string"}
 			} else {
@@ -70,10 +70,10 @@ func fieldToOpenAPISchema(f entities.FieldTemplate) map[string]any {
 			}
 		}
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
-		enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
 			refName := fmt.Sprintf("#/components/schemas/%s", gcgstrings.ToCamelCase(enum.Identifier))
-			if f.Field.TypeConfig.Enum.AllowMultiple {
+			if f.EnumConfig().AllowMultiple {
 				schema["type"] = "array"
 				schema["items"] = map[string]any{"$ref": refName}
 			} else {
@@ -116,7 +116,7 @@ func fieldToOpenAPISchema(f entities.FieldTemplate) map[string]any {
 
 func arrayItemsSchema(f entities.FieldTemplate) map[string]any {
 	items := make(map[string]any)
-	arrayType := f.Field.TypeConfig.Array.Type
+	arrayType := f.ArrayConfig().Type
 
 	switch arrayType {
 	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
@@ -139,6 +139,16 @@ func arrayItemsSchema(f entities.FieldTemplate) map[string]any {
 		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL,
 		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
 		items["type"] = "string"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
+		nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_TIME:
+		// the element is a time.Time, which marshals as an RFC3339 string
+		items["type"] = "string"
+		items["format"] = "date-time"
+	case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM:
+		// enum members are int64-backed and marshal as JSON numbers
+		items["type"] = "integer"
+		items["format"] = "int64"
 	default:
 		items["type"] = "string"
 	}

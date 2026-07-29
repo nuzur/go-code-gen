@@ -78,7 +78,7 @@ func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
 		case nemgen.FieldType_FIELD_TYPE_FILE, nemgen.FieldType_FIELD_TYPE_IMAGE, nemgen.FieldType_FIELD_TYPE_AUDIO, nemgen.FieldType_FIELD_TYPE_VIDEO:
 			// do nothing for now
 		case nemgen.FieldType_FIELD_TYPE_ENUM:
-			enum := f.Project.GetEnum(f.Field.TypeConfig.Enum.EnumUuid)
+			enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 			if enum != nil {
 				enumType := gcgstrings.ToCamelCase(enum.Identifier)
 				entityRes.Fields = append(entityRes.Fields, FieldFilterDeclaration{
@@ -104,30 +104,21 @@ func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
 				}
 			}
 		case nemgen.FieldType_FIELD_TYPE_ARRAY:
+			// Derived from the element type the rest of the generator resolved,
+			// rather than a second enumeration of the element types: the copy
+			// that used to live here had no case for date/datetime/time/enum
+			// elements, so those arrays were silently left out of the filter
+			// declarations and could not be filtered at all.
 			filtering := ""
-			arrayType := f.Field.TypeConfig.Array.Type
-
-			switch arrayType {
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_UUID:
+			switch f.ArrayElement().ListType {
+			case "StringFieldType":
 				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER:
+			case "IntFieldType":
 				filtering = "filtering.TypeInt"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT:
+			case "FloatFieldType":
 				filtering = "filtering.TypeFloat"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL:
-				filtering = "filtering.TypeFloat"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR, nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR:
-				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED:
-				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL:
-				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE:
-				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL:
-				filtering = "filtering.TypeString"
-			case nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_COLOR:
-				filtering = "filtering.TypeString"
+			case "TimestampFieldType":
+				filtering = "filtering.TypeTimestamp"
 			}
 			if filtering != "" {
 				entityRes.Fields = append(entityRes.Fields, FieldFilterDeclaration{
