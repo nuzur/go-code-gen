@@ -266,6 +266,7 @@ func overrideIndex(t *testing.T, engine projecttypes.DatabaseType) map[string]st
 // a pass-through field can produce, the type sqlc will emit must equal the type
 // the entity struct holds. A miss here is a generated project that fails to build.
 func TestSQLCOverrides_MatchEntityTypes(t *testing.T) {
+	hit := map[string]bool{}
 	for _, engine := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
 		idx := overrideIndex(t, engine)
 
@@ -287,6 +288,7 @@ func TestSQLCOverrides_MatchEntityTypes(t *testing.T) {
 					key := fmt.Sprintf("%s/%t", dbType, !required)
 
 					if reason, broken := knownBroken[fmt.Sprintf("%s/%v/%s", engine, ft, ddl)]; broken {
+						hit[fmt.Sprintf("%s/%v/%s", engine, ft, ddl)] = true
 						t.Logf("known gap, not enforced: %s %v -> %s (%s)", engine, ft, ddl, reason)
 						continue
 					}
@@ -318,6 +320,20 @@ func TestSQLCOverrides_MatchEntityTypes(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+	assertNoStaleExceptions(t, hit)
+}
+
+// A knownBroken entry stops matching the moment sql-gen stops emitting the
+// colliding type, and a stale exception silently stops guarding anything. Fail
+// on it so the sql-gen bump forces the entry to be deleted rather than left to rot.
+func assertNoStaleExceptions(t *testing.T, hit map[string]bool) {
+	t.Helper()
+	for key, reason := range knownBroken {
+		if !hit[key] {
+			t.Errorf("knownBroken entry %q (%s) no longer matches anything — sql-gen has presumably "+
+				"been fixed and bumped. Delete the entry so this case is enforced again.", key, reason)
 		}
 	}
 }
