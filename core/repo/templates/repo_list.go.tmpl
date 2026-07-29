@@ -275,6 +275,10 @@ func buildOrderByClause(request ListRequest, entity ListEntity, jsonTables map[s
 					dependantFieldIdentifier: f.dependantFieldIdentifier,
 					isDependant:             f.isDependant,
 					isDependantMulti:        f.isDependantMulti,
+					// entity is required: buildJSONExtract qualifies the column with
+					// it. Leaving it nil panicked on any order-by over a dependant
+					// field.
+					entity:                  entity,
 				})
 				orderByPairs = append(orderByPairs, fmt.Sprintf("%s %s", left, order))
 			}
@@ -339,5 +343,10 @@ func isValidOrderby(request ListRequest, entity ListEntity) ([]OrderByField, err
 }
 
 func buildLimit(request ListRequest) string {
-	return fmt.Sprintf("LIMIT %d, %d ", request.GetOffset(), request.GetPageSize())
+	// `LIMIT <count> OFFSET <offset>` is the portable spelling: Postgres accepts
+	// only this form, while MySQL accepts it alongside its own `LIMIT <offset>,
+	// <count>`. The comma form is MySQL-only, and it made every generated Postgres
+	// list endpoint fail with `pq: LIMIT #,# syntax is not supported`.
+	// Note the operands are in the opposite order to the comma form.
+	return fmt.Sprintf("LIMIT %d OFFSET %d ", request.GetPageSize(), request.GetOffset())
 }

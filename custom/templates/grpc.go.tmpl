@@ -12,13 +12,13 @@ import (
 // override an endpoint; anything you don't override falls through to the
 // generated implementation:
 //
-//	func (s *Server) CreateFoo(ctx context.Context, req *pb.CreateFooRequest) (*pb.CreateFooResponse, error) {
+//	func (s *Server) CreateFoo(ctx context.Context, req *pb.CreateFooRequest) (*pb.Foo, error) {
 //		// ... your custom logic ...
 //		return s.{{.Name}}Server.CreateFoo(ctx, req) // delegate for base behavior
 //	}
 //
-// To add a BRAND-NEW gRPC endpoint, declare it in app/idl/proto/custom.proto,
-// run app/idl/proto/gen.sh, implement it here, and register the generated
+// To add a BRAND-NEW gRPC endpoint, declare it in {{.CustomDir}}/idl/proto/custom.proto,
+// run {{.CustomDir}}/idl/proto/gen.sh, implement it here, and register the generated
 // custom service on the gRPC server via a small fx invoke.
 //
 // This file is generated ONCE — regeneration will not overwrite it.
