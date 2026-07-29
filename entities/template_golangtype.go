@@ -355,10 +355,24 @@ func (f FieldTemplate) ListType() string {
 		if rel != nil {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
+				// ONE_TO_MANY embeds a JSON *array* of the dependant entity —
+				// that is the shape the platform validates on write ("value is
+				// not a valid JSON array") and the one GolangType emits a slice
+				// for. So it is the MULTI case; ONE_TO_ONE is the single object.
+				//
+				// These two were swapped, and it was not merely a mislabel: the
+				// filter layer dispatches on this constant. Only the Multi branch
+				// sets isDependantMulti (see repo_list_fields.go.tmpl), which is
+				// what makes a clause ask "does any element match" instead of
+				// comparing a JSON array to a scalar. With the labels inverted an
+				// array embed took the Single path, so — per the comment on
+				// buildStringClause — the clause was false for every row and
+				// filters on a field inside an array embed silently matched
+				// nothing. Sorting was hit the same way via repo_list.go.tmpl.
 				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
-					return "SingleDependantEntityFieldType"
+					return "MultiDependantEntityFieldType"
 				}
-				return "MultiDependantEntityFieldType"
+				return "SingleDependantEntityFieldType"
 			}
 		}
 		return "RawJSONFieldType"

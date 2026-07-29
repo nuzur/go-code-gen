@@ -361,8 +361,12 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 		},
 		Entities: []*nemgen.Entity{mainEntity, dependant},
 		Relationships: []*nemgen.Relationship{
-			rel("r0000000-0000-0000-0000-000000000001", depSingle.Uuid, nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY),
-			rel("r0000000-0000-0000-0000-000000000002", depMulti.Uuid, nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_ONE),
+			// ONE_TO_ONE embeds one object, ONE_TO_MANY embeds a JSON array — so
+			// the "single" fixture is the ONE_TO_ONE one. These two used to be
+			// wired the other way round, matching what the (inverted) ListType
+			// mapping emitted rather than what the cardinality means.
+			rel("r0000000-0000-0000-0000-000000000001", depSingle.Uuid, nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_ONE),
+			rel("r0000000-0000-0000-0000-000000000002", depMulti.Uuid, nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY),
 		},
 	}
 }
@@ -431,6 +435,7 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertFieldTypeConstantsExist(t, dir)
 				assertEveryFieldIsTyped(t, dir, params.ProjectVersion)
 				assertStorageAndArrayShapes(t, dir, dbType)
+				assertDependantCardinalityShapes(t, dir)
 			})
 		}
 	}
@@ -571,6 +576,53 @@ func assertStorageAndArrayShapes(t *testing.T, dir string, dbType project.Databa
 	mapperSrc := readFile(t, filepath.Join(dir, "core", "module", "all_types", "mapper.go"))
 	if strings.Contains(mapperSrc, "mapper.JSONToSlice(") {
 		t.Error("mapper calls mapper.JSONToSlice, which the mapper package does not define")
+	}
+}
+
+// assertDependantCardinalityShapes pins the dependant-embed mapping across the
+// two layers that have to agree on it: the Go struct type and the FieldType
+// constant the filter layer dispatches on.
+//
+// This is the regression guard for a bug that compiled cleanly and so went
+// unnoticed: ListType returned SingleDependantEntityFieldType for ONE_TO_MANY
+// and Multi for ONE_TO_ONE — exactly backwards. The struct type was right
+// either way (JSONIdentifier slices on ONE_TO_MANY), which is why nothing broke
+// at build time. But only the Multi branch of handleClauseByType sets
+// isDependantMulti, and that flag is what makes a clause ask "does any element
+// match" instead of comparing a JSON array to a scalar. With the labels swapped,
+// an array embed took the Single path and — per the comment on buildStringClause
+// — every clause was false, so filters on a field inside an array embed silently
+// matched nothing. Sorting went the same way through repo_list.go.tmpl.
+//
+// Checking the constant alone would not have caught it either: both constants
+// exist and both are declared, so the "does it exist" sweep passes. The mapping
+// has to be pinned to the cardinality.
+func assertDependantCardinalityShapes(t *testing.T, dir string) {
+	t.Helper()
+
+	entitySrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types.go"))
+	listSrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types_list.go"))
+
+	// ONE_TO_ONE -> one embedded object, ONE_TO_MANY -> a slice of them. The Go
+	// names carry the Json->JSON initialism (strings.go) and the _req suffix the
+	// field() helper adds for the required variant.
+	assertStructFieldType(t, "entity", entitySrc, "T23JSONDepSingleReq", "dep_item.DepItem")
+	assertStructFieldType(t, "entity", entitySrc, "T23JSONDepMultiReq", "[]dep_item.DepItem")
+
+	typeMap := between(t, listSrc, "func (e AllTypes) FieldIdentifierToTypeMap()", "func (e AllTypes) OrderedFieldIdentifiers()")
+	for _, tc := range []struct{ field, want string }{
+		{"t23_json_dep_single_req", "SingleDependantEntityFieldType"},
+		{"t23_json_dep_multi_req", "MultiDependantEntityFieldType"},
+	} {
+		re := regexp.MustCompile(`"` + regexp.QuoteMeta(tc.field) + `":\s*entitytypes\.(\w+)`)
+		m := re.FindStringSubmatch(typeMap)
+		if m == nil {
+			t.Errorf("%s missing from FieldIdentifierToTypeMap", tc.field)
+			continue
+		}
+		if m[1] != tc.want {
+			t.Errorf("%s maps to entitytypes.%s, want entitytypes.%s — the dependant cardinality mapping is inverted, which silently breaks filtering on array embeds", tc.field, m[1], tc.want)
+		}
 	}
 }
 
