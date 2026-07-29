@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
@@ -30,6 +31,12 @@ import (
 // column type that matches the entity struct type, and a mapper conversion that
 // compiles against both — for MySQL and for PostgreSQL. The test proves it by
 // running `go build ./...` over the generated workspace.
+// allTypesIndexLeadingColumn is the equality-prefix column every composite index
+// in the fixture starts with, so each index is (char, <type under test>) and the
+// type under test always sits in trailing position — the position where a missing
+// parameter mapping shows up.
+const allTypesIndexLeadingColumn = "t06_char_req"
+
 func allFieldTypesSchema() *nemgen.ProjectVersion {
 	enumUUID := "e0000000-0000-0000-0000-0000000000ff"
 
@@ -307,17 +314,72 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 	depMulti := field("t23_json_dep_multi", nemgen.FieldType_FIELD_TYPE_JSON, true, &nemgen.FieldTypeConfig{Json: &nemgen.FieldTypeJSONConfig{}})
 	fields = append(fields, depSingle, depMulti)
 
+	// Indexes are what drive the fetch-by-index surface (core/repo's
+	// ResolveSelectStatements walks them, one select per index), and that surface
+	// has its OWN type mapping — RepoToMapperFetch — separate from the entity /
+	// model / mapper mappings the fields above exercise. With only a PRIMARY index
+	// on `id` no fetch-by-index function is generated for any other type, so a
+	// missing case in that mapping is invisible: an indexed `time` column emitted
+	// `StartLocalTime: ,` — a syntax error — and the matrix still passed.
+	//
+	// So every field type also gets indexed here, as the TRAILING column of a
+	// composite (char, <type>) index — the exact shape a real schema takes, and
+	// the position where a missing mapping shows up as an empty parameter
+	// expression rather than a missing function.
+	indexes := []*nemgen.Index{{
+		Uuid: "idx-pk", Identifier: "primary", Type: nemgen.IndexType_INDEX_TYPE_PRIMARY,
+		Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+		Fields: []*nemgen.IndexField{{FieldUuid: "f-id"}},
+	}}
+	leading := "f-" + allTypesIndexLeadingColumn
+	composite := func(trailing string, indexType nemgen.IndexType) {
+		indexes = append(indexes, &nemgen.Index{
+			Uuid:       "idx-" + trailing,
+			Identifier: "idx_char_" + strings.TrimPrefix(trailing, "f-"),
+			Type:       indexType,
+			Status:     nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+			Fields: []*nemgen.IndexField{
+				{FieldUuid: leading},
+				{FieldUuid: trailing},
+			},
+		})
+	}
+	// Every field declared above, in both nullabilities, gets its own composite
+	// index. Deriving the list from `fields` rather than hand-listing it means a
+	// field type added to the fixture is automatically covered here too — and it
+	// covers the types no real schema has ever indexed (encrypted, location,
+	// color, richtext, code, json, array, slug, and the file/image/audio/video
+	// family in all four storage shapes).
+	for _, f := range fields {
+		if f.Uuid == "f-id" || f.Uuid == leading {
+			continue
+		}
+		composite(f.Uuid, nemgen.IndexType_INDEX_TYPE_INDEX)
+	}
+	// ...plus a UNIQUE composite and a single-column index, the two other index
+	// shapes that reach the select resolver.
+	composite("f-t28_slug_req", nemgen.IndexType_INDEX_TYPE_UNIQUE)
+	indexes = append(indexes,
+		&nemgen.Index{
+			Uuid: "idx-single-time", Identifier: "idx_t27_time_req",
+			Type: nemgen.IndexType_INDEX_TYPE_INDEX, Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+			Fields: []*nemgen.IndexField{{FieldUuid: "f-t27_time_req"}},
+		},
+		// A FULLTEXT index must NOT produce a select (only INDEX/UNIQUE do).
+		&nemgen.Index{
+			Uuid: "idx-ft", Identifier: "idx_ft_t08_text_req",
+			Type: nemgen.IndexType_INDEX_TYPE_FULLTEXT, Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+			Fields: []*nemgen.IndexField{{FieldUuid: "f-t08_text_req"}},
+		},
+	)
+
 	mainEntity := &nemgen.Entity{
 		Uuid:       "c0000000-0000-0000-0000-0000000000a1",
 		Identifier: "all_types",
 		Type:       nemgen.EntityType_ENTITY_TYPE_STANDALONE,
 		Fields:     fields,
 		TypeConfig: &nemgen.EntityTypeConfig{Standalone: &nemgen.EntityTypeStandaloneConfig{
-			Indexes: []*nemgen.Index{{
-				Uuid: "idx-pk", Identifier: "primary", Type: nemgen.IndexType_INDEX_TYPE_PRIMARY,
-				Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
-				Fields: []*nemgen.IndexField{{FieldUuid: "f-id"}},
-			}},
+			Indexes: indexes,
 		}},
 	}
 
@@ -436,6 +498,7 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertEveryFieldIsTyped(t, dir, params.ProjectVersion)
 				assertStorageAndArrayShapes(t, dir, dbType)
 				assertDependantCardinalityShapes(t, dir)
+				assertFetchByIndexShapes(t, dir, params.ProjectVersion)
 			})
 		}
 	}
@@ -623,6 +686,129 @@ func assertDependantCardinalityShapes(t *testing.T, dir string) {
 		if m[1] != tc.want {
 			t.Errorf("%s maps to entitytypes.%s, want entitytypes.%s — the dependant cardinality mapping is inverted, which silently breaks filtering on array embeds", tc.field, m[1], tc.want)
 		}
+	}
+}
+
+// assertFetchByIndexShapes pins the fetch-by-index surface: which indexes get a
+// fetch function, and that each one passes a real value for every column it
+// filters on.
+//
+// This is the regression guard for the third layer of the field-type mapping,
+// RepoToMapperFetch, which the entity/model/mapper assertions above do not reach.
+// It has its own switch, and a type missing from it produced an EMPTY parameter
+// expression — `StartLocalTime: ,` — a syntax error that took the whole generated
+// module down. `go build` catches that once an index exists; what it cannot catch
+// is a type quietly excluded from the surface altogether, which is why the set of
+// generated functions is pinned here rather than just their contents.
+func assertFetchByIndexShapes(t *testing.T, dir string, version *nemgen.ProjectVersion) {
+	t.Helper()
+
+	moduleDir := filepath.Join(dir, "core", "module", "all_types")
+	entries, err := os.ReadDir(moduleDir)
+	if err != nil {
+		t.Fatalf("read %s: %v", moduleDir, err)
+	}
+	// covered maps the trailing column of each generated composite fetch function
+	// to the file that declares it.
+	prefix := "fetch_all_types_by_" + allTypesIndexLeadingColumn + "_and_"
+	covered := map[string]string{}
+	present := map[string]bool{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".go") {
+			continue
+		}
+		present[e.Name()] = true
+		if trailing, ok := strings.CutPrefix(e.Name(), prefix); ok {
+			covered[strings.TrimSuffix(trailing, ".go")] = filepath.Join(moduleDir, e.Name())
+		}
+	}
+
+	var mainFields []*nemgen.Field
+	for _, e := range version.Entities {
+		if e.Identifier == "all_types" {
+			mainFields = e.Fields
+		}
+	}
+	if len(mainFields) == 0 {
+		t.Fatal("all_types entity not found in the fixture")
+	}
+
+	for _, f := range mainFields {
+		if f.Identifier == "id" || f.Identifier == allTypesIndexLeadingColumn {
+			continue
+		}
+		switch f.Type {
+		case nemgen.FieldType_FIELD_TYPE_DATE, nemgen.FieldType_FIELD_TYPE_DATETIME:
+			// Known, deliberate exclusion: core/repo's select resolver drops date
+			// and datetime columns from non-primary indexes, so a composite index
+			// over them collapses to its prefix and no fetch function names them.
+			// Pinned so that lifting the exclusion is a visible decision rather
+			// than an accident — if you do lift it, delete this branch.
+			if path, ok := covered[f.Identifier]; ok {
+				t.Errorf("%s: a fetch-by-index function now exists for %s (type %v); date/datetime were excluded from the fetch surface on purpose — update this assertion deliberately", path, f.Identifier, f.Type)
+			}
+			continue
+		}
+		path, ok := covered[f.Identifier]
+		if !ok {
+			t.Errorf("no fetch-by-index function generated for indexed field %q (type %v): the select resolver dropped it", f.Identifier, f.Type)
+			continue
+		}
+		// Every column the query filters on must be passed a value derived from
+		// the request. An empty expression here is the `time` bug; an expression
+		// built off some other receiver (`e.X`, as the file/json/array branches
+		// used to emit) does not compile in this package.
+		src := readFile(t, path)
+		goName := gcgstrings.ToCamelCase(f.Identifier)
+		re := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(goName) + `:\s*(.*),\s*$`)
+		m := re.FindStringSubmatch(src)
+		if m == nil {
+			t.Errorf("%s: no parameter assigned for %s", path, f.Identifier)
+			continue
+		}
+		if strings.TrimSpace(m[1]) == "" {
+			t.Errorf("%s: %s is passed an EMPTY expression — RepoToMapperFetch has no case for field type %v", path, goName, f.Type)
+			continue
+		}
+		if !strings.Contains(m[1], "req.") {
+			t.Errorf("%s: %s is passed %q, which does not read from the fetch request", path, goName, m[1])
+		}
+	}
+
+	// The specific shape the bug was found on: a TIME column's sqlc parameter is
+	// exactly the type the request field has, so it passes straight through, in
+	// both nullabilities and for a single-column index as well as a composite one.
+	typesDir := filepath.Join(dir, "core", "module", "all_types", "types")
+	for _, tc := range []struct{ column, goName, goType string }{
+		{"t27_time_req", "T27TimeReq", "time.Time"},
+		{"t27_time_opt", "T27TimeOpt", "null.Time"},
+	} {
+		// covered is empty for this column only when the loop above already
+		// reported the function as missing; don't pile a fatal read on top of it.
+		if covered[tc.column] == "" {
+			continue
+		}
+		src := readFile(t, filepath.Join(typesDir, prefix+tc.column+".go"))
+		assertStructFieldType(t, "fetch request", src, tc.goName, tc.goType)
+		fetchSrc := readFile(t, covered[tc.column])
+		if !strings.Contains(fetchSrc, tc.goName+": req."+tc.goName+",") {
+			t.Errorf("%s: %s is not passed through to the query parameter", covered[tc.column], tc.goName)
+		}
+	}
+
+	// A single-column INDEX gets its own fetch function...
+	if !present["fetch_all_types_by_t27_time_req.go"] {
+		t.Error("no fetch function generated for the single-column index on t27_time_req")
+	}
+	// ...a composite index whose trailing column is excluded collapses to its
+	// prefix and still gets one...
+	if !present["fetch_all_types_by_"+allTypesIndexLeadingColumn+".go"] {
+		t.Errorf("no fetch function generated for the index prefix %s", allTypesIndexLeadingColumn)
+	}
+	// ...and a FULLTEXT index gets none: only INDEX and UNIQUE reach the select
+	// resolver.
+	if present["fetch_all_types_by_t08_text_req.go"] {
+		t.Error("a FULLTEXT index produced a fetch-by-index function; only INDEX and UNIQUE should")
 	}
 }
 

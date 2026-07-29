@@ -110,6 +110,23 @@ func (f FieldTemplate) GolangType() string {
 	}
 }
 
+// QualifiedGolangType is GolangType with the package qualifier a JSON field's
+// type needs, so the result can be written in any generated package.
+//
+// GolangType alone is incomplete for JSON: it returns the bare "RawMessage" for a
+// raw json field and the bare dependant-entity name ("DepItem") for an embed,
+// both of which only resolve if the template adds the qualifier itself. The entity
+// template did; the fetch-request types template did not, so indexing a json
+// column produced `undefined: RawMessage`. Both go through here now.
+func (f FieldTemplate) QualifiedGolangType() string {
+	if !f.JSON() {
+		return f.GolangType()
+	}
+	// JSONIdentifier carries the slice prefix for a one-to-many embed, so
+	// "[]dep_item" + "." + "DepItem" is the fully qualified slice type.
+	return f.JSONIdentifier() + "." + f.GolangType()
+}
+
 // arrayElement is everything the three layers need to know about an array's
 // ELEMENT type: the Go type it becomes, the entitytypes constant the list/filter
 // layer keys on, and the mapper function that reads it back out of its JSON

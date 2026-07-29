@@ -15,7 +15,7 @@ import (
 )
 
 type {{.EntityName}} struct { {{range $field := .Fields}}
-    {{$field.Name}} {{if eq $field.JSONMany true}}[]{{end}}{{if eq $field.JSON true}}{{$field.JSONIdentifier}}.{{end}}{{$field.GolangType}} {{$field.Tags}}{{end}}
+    {{$field.Name}} {{$field.QualifiedGolangType}} {{$field.Tags}}{{end}}
 }
 
 func (e {{.EntityName}}) String() string {

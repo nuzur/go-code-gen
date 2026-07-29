@@ -10,11 +10,6 @@ func (f FieldTemplate) JSON() bool {
 	return f.Field.Type == nemgen.FieldType_FIELD_TYPE_JSON
 }
 
-func (f FieldTemplate) JSONMany() bool {
-	// check if there is a relationship with this field to a dependant entity
-	return false
-}
-
 func (f FieldTemplate) JSONIdentifier() string {
 	rel := f.Project.GetRelationshipFromField(f.Field)
 	if rel != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/core/repo"
@@ -30,6 +31,7 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 	if req.OnStatusChange != nil {
 		req.OnStatusChange("Generating core module selects for entities")
 	}
+	mapperImport := fmt.Sprintf("%s/%s/mapper", req.Project.Module, req.Project.EntitiesConfig.Dir)
 	for _, sel := range req.Selects {
 		importsTypes := map[string]any{}
 		importsFetch := map[string]any{}
@@ -37,8 +39,25 @@ func generateSelects(ctx context.Context, req coreSubModuleRequest) error {
 			if f.Field.Import() != nil {
 				importsTypes[*f.Field.Import()] = struct{}{}
 			}
-			if f.Field.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID && !f.Field.IsRequired() {
-				importsFetch[fmt.Sprintf("%s/%s/mapper", req.Project.Module, req.Project.EntitiesConfig.Dir)] = struct{}{}
+			// A raw json field's type is json.RawMessage; Import() returns nil for
+			// it because the entity template imports encoding/json unconditionally,
+			// which the fetch-request types template does not.
+			if f.Field.IsRawJSON() {
+				importsTypes["encoding/json"] = struct{}{}
+			}
+
+			// The fetch file's imports are derived from the parameter expressions
+			// themselves rather than re-deriving the type rules a second time: a
+			// conversion added to RepoToMapperFetch without a matching case here is
+			// how `mapper.SliceToJSON` reached the generated file undefined for an
+			// indexed multi-enum column.
+			expr := f.Field.RepoToMapperFetch()
+			if strings.Contains(expr, "mapper.") {
+				importsFetch[mapperImport] = struct{}{}
+			}
+			if dep := f.Field.DependantEntity(); dep != nil && f.Field.Field.Type == nemgen.FieldType_FIELD_TYPE_JSON {
+				// a dependant embed is serialized through its own entity package
+				importsFetch[fmt.Sprintf("%s/%s/%s", req.Project.Module, req.Project.EntitiesConfig.Dir, dep.Identifier)] = struct{}{}
 			}
 		}
 

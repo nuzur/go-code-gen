@@ -7,86 +7,99 @@ import (
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
+// RepoToMapperFetch is the expression that converts one field of a fetch request
+// into the value its sqlc query parameter expects. Every indexed column of an
+// entity goes through it (see core/repo.ResolveSelectStatements), so it has to
+// handle every field type — not just the ones that happen to be used as index
+// columns today.
+//
+// It mirrors RepoToMapperUpsert case for case: the column types are the same and
+// so are the conversions. The only difference is where the value is read from — a
+// fetch request holds the indexed fields directly (`req.X`), an upsert request
+// holds the whole entity (`req.<Entity>.X`).
+//
+// Every branch must return a non-empty expression. The result is emitted straight
+// into a struct literal (`X: <expr>,`), so "" is not a degraded fallback, it is a
+// syntax error that takes the whole generated module down: returning "" for
+// date/datetime/time is what made an indexed `time` column emit
+// `StartLocalTime: ,`. For the same reason the default returns the plain
+// reference instead of "".
 func (f FieldTemplate) RepoToMapperFetch() string {
+	ref := fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
 	switch f.Field.Type {
-	case nemgen.FieldType_FIELD_TYPE_INVALID:
-		return ""
 	case nemgen.FieldType_FIELD_TYPE_UUID:
 		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.UUIDPtrToNullString(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("mapper.UUIDPtrToNullString(%s)", ref)
 		}
-		return fmt.Sprintf("req.%s.String()", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_INTEGER:
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_FLOAT,
-		nemgen.FieldType_FIELD_TYPE_DECIMAL:
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_BOOLEAN:
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_CHAR,
-		nemgen.FieldType_FIELD_TYPE_VARCHAR,
-		nemgen.FieldType_FIELD_TYPE_TEXT,
-		nemgen.FieldType_FIELD_TYPE_ENCRYPTED,
-		nemgen.FieldType_FIELD_TYPE_EMAIL,
-		nemgen.FieldType_FIELD_TYPE_PHONE,
-		nemgen.FieldType_FIELD_TYPE_URL,
-		nemgen.FieldType_FIELD_TYPE_LOCATION,
-		nemgen.FieldType_FIELD_TYPE_COLOR,
-		nemgen.FieldType_FIELD_TYPE_CODE,
-		nemgen.FieldType_FIELD_TYPE_RICHTEXT,
-		nemgen.FieldType_FIELD_TYPE_MARKDOWN:
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return fmt.Sprintf("%s.String()", ref)
 	case nemgen.FieldType_FIELD_TYPE_FILE,
 		nemgen.FieldType_FIELD_TYPE_IMAGE,
 		nemgen.FieldType_FIELD_TYPE_AUDIO,
 		nemgen.FieldType_FIELD_TYPE_VIDEO:
-		// []byte and []string are already the proto wire types; only the single
-		// optional url needs unwrapping from null.String.
-		if f.IsBinaryFile() || f.AllowsMultipleFiles() {
-			return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		// A binary file is []byte on both sides (BLOB/BYTEA) and a single url is
+		// string/null.String on both sides — both pass straight through. A
+		// multi-file field is a list of urls in a JSON column, so it is compared
+		// exactly like any other list. The precedence (binary before multiple)
+		// follows GolangType, which decides the request's own type.
+		if f.IsBinaryFile() {
+			return ref
 		}
-		if !f.IsRequired() {
-			return fmt.Sprintf("e.%s.ValueOrZero()", gcgstrings.ToCamelCase(f.Identifier()))
+		if f.AllowsMultipleFiles() {
+			return fmt.Sprintf("mapper.SliceToJSON(%s)", ref)
 		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return ref
 	case nemgen.FieldType_FIELD_TYPE_ENUM:
 		// check if there is an enum defined for this field, if so return that, otherwise return int
 		enum := f.Project.GetEnum(f.EnumConfig().EnumUuid)
 		if enum != nil {
 			if f.EnumConfig().AllowMultiple {
 				// a multi-enum is persisted as a JSON array column
-				return fmt.Sprintf("mapper.SliceToJSON(req.%s)", gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("mapper.SliceToJSON(%s)", ref)
 			}
 			// A nullable enum column is a null.Int in the sqlc params, so the
 			// fetch value must be wrapped rather than a bare int64.
 			if !f.IsRequired() {
-				return fmt.Sprintf("req.%s.ToNullInt()", gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("%s.ToNullInt()", ref)
 			}
-			return fmt.Sprintf("req.%s.ToInt64()", gcgstrings.ToCamelCase(f.Identifier()))
+			return fmt.Sprintf("%s.ToInt64()", ref)
 		}
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		return ref
 	case nemgen.FieldType_FIELD_TYPE_JSON:
 		rel := f.Project.GetRelationshipFromField(f.Field)
 		if rel != nil {
 			dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 			if dependantEntity != nil {
+				// A dependant embed is a JSON column, so the request's struct (or
+				// slice of structs) has to be serialized to compare against it —
+				// the same *ToJSON helpers the upsert path uses. These used to be
+				// the proto mappers (`...ToProto`), which the core module package
+				// does not declare.
 				if rel.Cardinality == nemgen.RelationshipCardinality_RELATIONSHIP_CARDINALITY_ONE_TO_MANY {
-					return fmt.Sprintf("%sSliceToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+					return fmt.Sprintf("%s.%sSliceToJSON(%s)",
+						dependantEntity.Identifier,
+						gcgstrings.ToCamelCase(dependantEntity.Identifier),
+						ref)
 				}
-				return fmt.Sprintf("%sToProto(e.%s)", gcgstrings.ToCamelCase(dependantEntity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
+				return fmt.Sprintf("%s.%sToJSON(%s)",
+					dependantEntity.Identifier,
+					gcgstrings.ToCamelCase(dependantEntity.Identifier),
+					ref)
 			}
 		}
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		// An empty json.RawMessage is not valid JSON, so it is coerced to SQL NULL
+		// rather than compared as an empty string (see RepoToMapperUpsert).
+		if !f.IsRequired() {
+			return fmt.Sprintf("mapper.NullifyEmptyJSON(%s)", ref)
+		}
+		return ref
 	case nemgen.FieldType_FIELD_TYPE_ARRAY:
-		return fmt.Sprintf("e.%s", gcgstrings.ToCamelCase(f.Identifier()))
-	case nemgen.FieldType_FIELD_TYPE_DATE,
-		nemgen.FieldType_FIELD_TYPE_DATETIME,
-		nemgen.FieldType_FIELD_TYPE_TIME:
-		return ""
-	case nemgen.FieldType_FIELD_TYPE_SLUG:
-		return fmt.Sprintf("req.%s", gcgstrings.ToCamelCase(f.Identifier()))
+		// an array lives in a JSON column
+		return fmt.Sprintf("mapper.SliceToJSON(%s)", ref)
 	default:
-		return ""
+		// Every remaining type — integer, float/decimal, boolean, the string
+		// family, date/datetime/time and slug — has a sqlc parameter of exactly
+		// the type GolangType gives the request field, so it passes through.
+		return ref
 	}
 }
 

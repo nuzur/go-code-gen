@@ -8,7 +8,7 @@ import (
 )
 
 type Fetch{{.Select.Name}}Request struct { {{range $field := .Select.Fields}} 
-    {{$field.Field.Name}} {{$field.Field.GolangType}}{{end}}    
+    {{$field.Field.Name}} {{$field.Field.QualifiedGolangType}}{{end}}
     {{if ne .Select.IsPrimary true}}
     Offset int32
     Limit int32
