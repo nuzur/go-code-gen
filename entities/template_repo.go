@@ -181,9 +181,11 @@ func (f FieldTemplate) RepoToMapperUpsert() string {
 		nemgen.FieldType_FIELD_TYPE_TIME:
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	case nemgen.FieldType_FIELD_TYPE_SLUG:
-		if !f.IsRequired() {
-			return fmt.Sprintf("mapper.SQLNullFromNull(req.%s.%s)", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
-		}
+		// A slug is a VARCHAR(512), so the sqlc param is already null.String for an
+		// optional field — the same type the entity holds. It passes through like
+		// every other string type. (This used to emit mapper.SQLNullFromNull, which
+		// is not defined in the mapper package, so any optional slug field
+		// generated code that did not compile.)
 		return fmt.Sprintf("req.%s.%s", gcgstrings.ToCamelCase(entity.Identifier), gcgstrings.ToCamelCase(f.Identifier()))
 	default:
 		return ""

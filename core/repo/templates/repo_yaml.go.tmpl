@@ -79,12 +79,87 @@ sql:
               import: "github.com/guregu/null/v6"
               package: "null"
               type: "String"
+{{- if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}
+          # MySQL tiers TEXT by max_size (TINYTEXT / TEXT / MEDIUMTEXT / LONGTEXT);
+          # all four are plain string / null.String in the domain layer. Postgres
+          # has a single TEXT type, so it needs no extra entries here.
+          - db_type: "tinytext"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "String"
+          - db_type: "mediumtext"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "String"
+          - db_type: "longtext"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "String"
+{{- end}}
           - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"int"{{else}}"pg_catalog.int4"{{end}}
             nullable: true
             go_type:
               import: "github.com/guregu/null/v6"
               package: "null"
               type: "Int"
+          # An INTEGER field's size picks a different SQL width (MySQL SMALLINT /
+          # MEDIUMINT / BIGINT, Postgres int2 / int8), but GolangType() emits
+          # int64 / null.Int for EVERY width and the upsert path passes the entity
+          # value straight through — so each width needs the same override as int.
+{{- if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}
+          - db_type: "bigint"
+            go_type:
+              type: "int64"
+          - db_type: "bigint"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Int"
+          - db_type: "mediumint"
+            go_type:
+              type: "int64"
+          - db_type: "mediumint"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Int"
+          - db_type: "smallint"
+            go_type:
+              type: "int64"
+          - db_type: "smallint"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Int"
+{{- else}}
+          - db_type: "pg_catalog.int8"
+            go_type:
+              type: "int64"
+          - db_type: "pg_catalog.int8"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Int"
+          - db_type: "pg_catalog.int2"
+            go_type:
+              type: "int64"
+          - db_type: "pg_catalog.int2"
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Int"
+{{- end}}
           - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"float"{{else}}"pg_catalog.float8"{{end}}
             nullable: true
             go_type:
@@ -99,6 +174,21 @@ sql:
               package: "null"
               type: "Float"
 {{- end}}
+          # DECIMAL has no sqlc default that matches the domain layer: MySQL
+          # `decimal` and Postgres `numeric` both fall back to string /
+          # sql.NullString, while GolangType() emits float64 / null.Float and the
+          # upsert path passes the entity value through untouched. BOTH
+          # nullabilities need an override — miss either and any decimal field
+          # generates code that does not compile.
+          - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"decimal"{{else}}"pg_catalog.numeric"{{end}}
+            go_type:
+              type: "float64"
+          - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"decimal"{{else}}"pg_catalog.numeric"{{end}}
+            nullable: true
+            go_type:
+              import: "github.com/guregu/null/v6"
+              package: "null"
+              type: "Float"
           - db_type: {{if eq .Project.CoreConfig.RepoConfig.DatabaseType "mysql"}}"tinyint"{{else}}"pg_catalog.bool"{{end}}
             nullable: true
             go_type:
