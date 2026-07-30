@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 )
 
@@ -11,6 +12,23 @@ type Problem struct {
 	Status   int    `json:"status"`
 	Detail   string `json:"detail"`
 	Instance string `json:"instance,omitempty"`
+}
+
+// statusForError classifies a core error into an HTTP status.
+//
+// A core error that says "the caller sent something invalid" must not become a
+// 500. The core layer marks those with a BadRequest() method rather than a
+// sentinel value, so this matches on the BEHAVIOUR and needs no import of the
+// package that raised it. Everything unrecognised stays a 500.
+//
+// The concrete case this exists for: a filter or order_by expression the list
+// clause builder cannot turn into SQL (list.InvalidRequestError).
+func statusForError(err error) int {
+	var badRequest interface{ BadRequest() bool }
+	if errors.As(err, &badRequest) && badRequest.BadRequest() {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
 
 func writeProblem(w http.ResponseWriter, status int, err error) {

@@ -1,12 +1,37 @@
 package list 
 
 import (
+	"fmt"
+
 	"go.einride.tech/aip/filtering"
 	"go.einride.tech/aip/ordering"
 
 	entitytypes "{{.Module}}/{{.EntitiesConfig.Dir}}/types"
 	expr "google.golang.org/genproto/googleapis/api/expr/v1alpha1"	
 )
+
+// InvalidRequestError marks a list query that could not be built because of
+// something in the REQUEST — a filter or order_by expression that names a field
+// the entity does not have, or that applies an operator the field's type does not
+// support. It is not a server fault, so a transport must answer 4xx (HTTP 400 /
+// gRPC InvalidArgument), not 5xx.
+//
+// BadRequest() is the marker transports match on, via errors.As over an
+// anonymous interface, so no transport package has to import this one.
+type InvalidRequestError struct {
+	// Op is the request component at fault: "filter" or "order_by".
+	Op  string
+	Err error
+}
+
+func (e *InvalidRequestError) Error() string {
+	return fmt.Sprintf("invalid %s: %v", e.Op, e.Err)
+}
+
+func (e *InvalidRequestError) Unwrap() error { return e.Err }
+
+// BadRequest reports that the caller, not the server, is at fault.
+func (e *InvalidRequestError) BadRequest() bool { return true }
 
 type JoinParams struct {
 	JoinStatement string

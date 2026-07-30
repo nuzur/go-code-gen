@@ -59,7 +59,9 @@ func (h *handlers) List{{.Name}}(w http.ResponseWriter, r *http.Request) {
 		result, err = h.core.{{.Name}}().List(r.Context(), req)
 	}
 	if err != nil {
-		writeProblem(w, http.StatusInternalServerError, err)
+		// A filter or order_by the clause builder cannot express is the caller's
+		// error, not the server's: statusForError turns it into a 400.
+		writeProblem(w, statusForError(err), err)
 		return
 	}
 

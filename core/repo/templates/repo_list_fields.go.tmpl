@@ -3,6 +3,7 @@ package list
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.einride.tech/aip/filtering"
 	entitytypes "{{.Module}}/{{.EntitiesConfig.Dir}}/types"
@@ -169,23 +170,36 @@ func buildBooleanClause(req SingleClauseRequest) (SingleClauseResponse, error) {
 	}
 	left := buildLeftOperator(req)
 	booleanIdent := cex.Args[1].GetIdentExpr().GetName()
-	numValue := 0
-	if booleanIdent == "true" {
-		numValue = 1
-	}
 	if req.isDependant {
 		if req.isDependantMulti {
 			return SingleClauseResponse{
 				ResolvedClause: jsonMemberEquals(req, booleanIdent),
 			}, nil
 		}
+		// The value is compared as the TEXT "true"/"false", so the extracted JSON
+		// value has to be text too — see jsonBooleanOperand.
 		return SingleClauseResponse{
-			ResolvedClause: fmt.Sprintf("%s %s '%s'", left, cex.Function, booleanIdent),
+			ResolvedClause: fmt.Sprintf("%s %s '%s'", jsonBooleanOperand(left), cex.Function, booleanIdent),
 		}, nil
 	}
+	// A real boolean COLUMN is compared against a boolean literal. Comparing it
+	// against the integer 0/1 instead is a MySQL-ism: Postgres has no
+	// boolean-to-integer comparison at all and rejects `is_public = 1` with
+	// `operator does not exist: boolean = integer`, so every filter over a boolean
+	// column was a 500 there. TRUE/FALSE mean the same thing to both engines.
 	return SingleClauseResponse{
-		ResolvedClause: fmt.Sprintf("%s %s %d", left, cex.Function, numValue),
+		ResolvedClause: fmt.Sprintf("%s %s %s", left, cex.Function, sqlBooleanLiteral(booleanIdent == "true")),
 	}, nil
+}
+
+// sqlBooleanLiteral renders a boolean constant. TRUE/FALSE are standard SQL and
+// accepted by both engines (MySQL treats them as 1/0), so this needs no dialect
+// branch — it lives here so the intent is stated once.
+func sqlBooleanLiteral(b bool) string {
+	if b {
+		return "TRUE"
+	}
+	return "FALSE"
 }
 
 func buildTimestampClause(req SingleClauseRequest) (SingleClauseResponse, error) {
@@ -281,10 +295,25 @@ func sqlCast(expr, sqlType string) string {
 	return fmt.Sprintf("convert(%s, %s)", expr, sqlType)
 }
 
+// countDistinct counts distinct keys, used to de-duplicate a count over a query
+// that fans out. MySQL takes a plain column list.
+func countDistinct(columns []string) string {
+	return fmt.Sprintf("count(DISTINCT %s)", strings.Join(columns, ", "))
+}
+
 // jsonEnumOperand: MySQL compares an extracted JSON number to an integer
 // directly, so the operand needs no cast.
 func jsonEnumOperand(left string) string {
 	return left
+}
+
+// jsonBooleanOperand unwraps an extracted JSON value to text so it can be
+// compared against 'true'/'false'. JSON_EXTRACT yields a JSON value, and a JSON
+// boolean is NEVER equal to the string 'true'/'false' — the comparison is silently
+// false for every row, so a filter over a boolean inside a single-object embed
+// matched nothing. Postgres's ->> already yields text and needs no equivalent.
+func jsonBooleanOperand(left string) string {
+	return fmt.Sprintf("JSON_UNQUOTE(%s)", left)
 }
 
 // jsonArrayContains tests membership in a top-level JSON array of scalars.
@@ -354,10 +383,27 @@ func sqlCast(expr, sqlType string) string {
 	return fmt.Sprintf("CAST(%s AS %s)", expr, sqlType)
 }
 
+// countDistinct counts distinct keys, used to de-duplicate a count over a query
+// that fans out. count(DISTINCT a, b) is MySQL-only; Postgres needs the columns
+// wrapped in a row constructor.
+func countDistinct(columns []string) string {
+	if len(columns) == 1 {
+		return fmt.Sprintf("count(DISTINCT %s)", columns[0])
+	}
+	return fmt.Sprintf("count(DISTINCT (%s))", strings.Join(columns, ", "))
+}
+
 // jsonEnumOperand: ->> yields text, so an enum comparison against an integer
 // needs an explicit cast (MySQL's JSON_EXTRACT returns a number and does not).
 func jsonEnumOperand(left string) string {
 	return sqlCast(left, sqlTypeInt)
+}
+
+// jsonBooleanOperand is the identity here: ->> already yields the text 'true' /
+// 'false', which is what the boolean clause compares against. (MySQL's
+// JSON_EXTRACT yields a JSON value and needs JSON_UNQUOTE.)
+func jsonBooleanOperand(left string) string {
+	return left
 }
 
 // jsonArrayContains tests membership in a top-level JSON array of scalars.

@@ -21,17 +21,41 @@ type FieldFilterDeclaration struct {
 }
 
 func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
+	return entityFilterDeclarations(e, "")
+}
+
+// entityFilterDeclarations emits the filter identifiers a transport declares for
+// one entity. hostField is the identifier of the json FIELD a dependant entity is
+// embedded under, and it is empty for the entity being listed.
+//
+// A field inside a dependant embed is declared as `<host field>.<sub field>` —
+// the host FIELD's name, never the embedded ENTITY's name. That spelling is
+// load-bearing, not cosmetic: it is the key of
+// ListEntity.FieldIdentifierToTypeMap and DependantFieldIdentifierToTypeMap, and
+// it is also the json COLUMN the clause builder puts in the SQL. Declaring the
+// entity's name instead (`channel_spec.microphone_model` for a
+// `microphone_channels` column) left no working spelling at all: the entity name
+// passed AIP validation but missed the type-map lookup, so the clause build
+// failed and — before the error was propagated — emitted an empty WHERE; the
+// column name failed AIP validation as an undeclared identifier. Every filter and
+// sort over a dependant embed was unreachable, including the array-embed
+// containment path.
+func entityFilterDeclarations(e EntityTemplate, hostField string) []EntityFilterDeclaration {
 	finalRes := []EntityFilterDeclaration{}
 
+	identifier := e.Identifier
+	if hostField != "" {
+		identifier = hostField
+	}
 	entityRes := EntityFilterDeclaration{
-		Identifier:  e.Identifier,
-		IsDependant: e.Entity.Type == nemgen.EntityType_ENTITY_TYPE_DEPENDENT,
+		Identifier:  identifier,
+		IsDependant: hostField != "",
 		Fields:      []FieldFilterDeclaration{},
 	}
 	for _, f := range e.Fields {
 		finalIdentifier := f.Identifier()
-		if e.Entity.Type == nemgen.EntityType_ENTITY_TYPE_DEPENDENT {
-			finalIdentifier = fmt.Sprintf("%s.%s", e.Entity.Identifier, f.Identifier())
+		if hostField != "" {
+			finalIdentifier = fmt.Sprintf("%s.%s", hostField, f.Identifier())
 		}
 		switch f.Field.Type {
 		case nemgen.FieldType_FIELD_TYPE_UUID:
@@ -94,12 +118,21 @@ func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
 				})
 			}
 		case nemgen.FieldType_FIELD_TYPE_JSON:
+			// Only a depth-1 embed is declared. The clause builder resolves a
+			// filter path as exactly (host json column, key inside it) — CEL gives
+			// it one select expression — so a field nested two embeds deep has no
+			// clause the builder can produce. Declaring it anyway is how a filter
+			// that cannot be built reaches the SQL layer; leaving it undeclared
+			// makes AIP reject it up front with "undeclared identifier".
+			if hostField != "" {
+				break
+			}
 			rel := f.Project.GetRelationshipFromField(f.Field)
 			if rel != nil {
 				dependantEntity := f.Project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
 				if dependantEntity != nil {
 					depTemplate, _ := ResolveEntityTemplate(dependantEntity, f.Project)
-					dependantEntityDeclarations := EntityFilterDeclarations(depTemplate)
+					dependantEntityDeclarations := entityFilterDeclarations(depTemplate, f.Identifier())
 					finalRes = append(finalRes, dependantEntityDeclarations...)
 				}
 			}
@@ -146,11 +179,21 @@ func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
 
 	finalRes = append(finalRes, entityRes)
 
-	seen := map[string]bool{}
+	// Two embeds of the SAME dependant entity under two different host fields are
+	// two distinct declaration groups, because their identifiers are prefixed with
+	// the host field. So the dedup key is the group's identifier plus whether it is
+	// an embed — keying on the entity name alone used to collapse them into one and
+	// silently drop the second field's filters.
+	type dedupKey struct {
+		identifier  string
+		isDependant bool
+	}
+	seen := map[dedupKey]bool{}
 	deduped := []EntityFilterDeclaration{}
 	for _, d := range finalRes {
-		if !seen[d.Identifier] {
-			seen[d.Identifier] = true
+		k := dedupKey{identifier: d.Identifier, isDependant: d.IsDependant}
+		if !seen[k] {
+			seen[k] = true
 			deduped = append(deduped, d)
 		}
 	}

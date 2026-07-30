@@ -237,12 +237,20 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 	for _, name := range []string{"unset", "uuid", "integer", "float", "decimal", "char", "varchar",
 		"email", "phone", "url", "color", "date", "datetime", "encrypted", "time", "enum"} {
 		at := arrayTypes[name]
+		isEnum := at == nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM
 		add(pair("t24_array_"+name, nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			nested := &nemgen.ArrayTypeConfig{}
+			// An array of enums names its member enum in the nested config;
+			// without it the element type has to fall back to a raw int64. Only
+			// the enum slot gets it: a nested config is also what an UNSET
+			// element type is inferred from, so handing every array an enum
+			// reference would make "unset" indistinguishable from "enum".
+			if isEnum {
+				nested.Enum = &nemgen.FieldTypeEnumConfig{EnumUuid: enumUUID}
+			}
 			return &nemgen.FieldTypeConfig{Array: &nemgen.FieldTypeArrayConfig{
-				Type: at,
-				// An array of enums names its member enum in the nested config;
-				// without it the element type has to fall back to a raw int64.
-				TypeConfig: &nemgen.ArrayTypeConfig{Enum: &nemgen.FieldTypeEnumConfig{EnumUuid: enumUUID}},
+				Type:       at,
+				TypeConfig: nested,
 			}}
 		}))
 	}
@@ -256,29 +264,85 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 	// An array field with NO type_config at all: the shape a hand-written or
 	// partially-migrated schema can take.
 	add(pair("t24_array_noconfig", nemgen.FieldType_FIELD_TYPE_ARRAY, empty))
+	// allBranches is the nested type_config the platform actually sends on EVERY
+	// array field: every scalar branch present, and the branch that names the
+	// real element type carrying that element's own configuration. configure
+	// fills in one branch, which is the only thing distinguishing an array of
+	// decimals from an array of varchars on the wire.
+	allBranches := func(configure func(*nemgen.ArrayTypeConfig)) *nemgen.FieldTypeConfig {
+		nested := &nemgen.ArrayTypeConfig{
+			Integer:   &nemgen.FieldTypeIntegerConfig{},
+			Float:     &nemgen.FieldTypeFloatConfig{},
+			Decimal:   &nemgen.FieldTypeDecimalConfig{},
+			Char:      &nemgen.FieldTypeCharConfig{},
+			Varchar:   &nemgen.FieldTypeVarcharConfig{},
+			Encrypted: &nemgen.FieldTypeEncryptedConfig{},
+			Url:       &nemgen.FieldTypeURLConfig{},
+			Email:     &nemgen.FieldTypeEmailConfig{},
+			Phone:     &nemgen.FieldTypePhoneConfig{},
+			Date:      &nemgen.FieldTypeDateConfig{},
+			Datetime:  &nemgen.FieldTypeDatetimeConfig{},
+			// The platform sends a zero enum reference on every array field,
+			// whatever the element type. It must not be read as "the elements
+			// are enums".
+			Enum: &nemgen.FieldTypeEnumConfig{EnumUuid: "00000000-0000-0000-0000-000000000000"},
+		}
+		if configure != nil {
+			configure(nested)
+		}
+		// `type` deliberately left unset: this is the whole point of the shape.
+		return &nemgen.FieldTypeConfig{Array: &nemgen.FieldTypeArrayConfig{TypeConfig: nested}}
+	}
+
 	// The exact shape the platform normalizes a bare `{"type": 24}` to: an
 	// array wrapper whose element type is unset and whose nested type_config
-	// carries EVERY scalar branch, so the element type cannot be inferred from
-	// the config either. This is the field that produced the un-compilable
-	// `entitytypes.interface{}`.
+	// carries EVERY scalar branch, all of them EMPTY — so the element type
+	// genuinely cannot be recovered and must fall back to a concrete type. This
+	// is the field that produced the un-compilable `entitytypes.interface{}`.
 	add(pair("t24_array_allbranches", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
-		return &nemgen.FieldTypeConfig{Array: &nemgen.FieldTypeArrayConfig{
-			TypeConfig: &nemgen.ArrayTypeConfig{
-				Integer:   &nemgen.FieldTypeIntegerConfig{},
-				Float:     &nemgen.FieldTypeFloatConfig{},
-				Decimal:   &nemgen.FieldTypeDecimalConfig{},
-				Char:      &nemgen.FieldTypeCharConfig{},
-				Varchar:   &nemgen.FieldTypeVarcharConfig{},
-				Encrypted: &nemgen.FieldTypeEncryptedConfig{},
-				Url:       &nemgen.FieldTypeURLConfig{},
-				Email:     &nemgen.FieldTypeEmailConfig{},
-				Phone:     &nemgen.FieldTypePhoneConfig{},
-				Date:      &nemgen.FieldTypeDateConfig{},
-				Datetime:  &nemgen.FieldTypeDatetimeConfig{},
-				Enum:      &nemgen.FieldTypeEnumConfig{},
-			},
-		}}
+		return allBranches(nil)
 	}))
+	// ...and the same shape with ONE branch configured, which is how the platform
+	// actually expresses an element type: `type` is absent and the element's own
+	// config is the only signal. Reading `type` alone typed all of these as
+	// []string, which is silent data loss on read for the non-string ones — the
+	// JSON column holds numbers/objects the string decoder rejects, and the
+	// decoder logs-and-returns-empty, so the field vanished from every response.
+	add(
+		pair("t24_array_inferred_decimal", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Decimal = &nemgen.FieldTypeDecimalConfig{AllowNegatives: true, NumberOfDecimals: 1}
+			})
+		}),
+		pair("t24_array_inferred_varchar", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Varchar = &nemgen.FieldTypeVarcharConfig{MaxSize: 40}
+			})
+		}),
+		pair("t24_array_inferred_integer", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Integer = &nemgen.FieldTypeIntegerConfig{Size: nemgen.FieldTypeIntegerConfigSize_FIELD_TYPE_INTEGER_CONFIG_SIZE_THIRTY_TWO_BITS}
+			})
+		}),
+		pair("t24_array_inferred_datetime", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Datetime = &nemgen.FieldTypeDatetimeConfig{EnforcePast: true}
+			})
+		}),
+		pair("t24_array_inferred_enum", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Enum = &nemgen.FieldTypeEnumConfig{EnumUuid: enumUUID}
+			})
+		}),
+		// Two configured branches: ambiguous, so it must fall back rather than
+		// pick one at random.
+		pair("t24_array_inferred_ambiguous", nemgen.FieldType_FIELD_TYPE_ARRAY, func() *nemgen.FieldTypeConfig {
+			return allBranches(func(n *nemgen.ArrayTypeConfig) {
+				n.Decimal = &nemgen.FieldTypeDecimalConfig{AllowNegatives: true}
+				n.Integer = &nemgen.FieldTypeIntegerConfig{EnableLimits: true}
+			})
+		}),
+	)
 
 	// 25-28
 	add(
@@ -499,6 +563,9 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertStorageAndArrayShapes(t, dir, dbType)
 				assertDependantCardinalityShapes(t, dir)
 				assertFetchByIndexShapes(t, dir, params.ProjectVersion)
+				assertListQueryDedupeShapes(t, dir)
+				assertArrayElementTypeShapes(t, dir, params.ProjectVersion)
+				assertFilterIdentifierSpelling(t, dir, params.ProjectVersion)
 			})
 		}
 	}
@@ -809,6 +876,320 @@ func assertFetchByIndexShapes(t *testing.T, dir string, version *nemgen.ProjectV
 	// resolver.
 	if present["fetch_all_types_by_t08_text_req.go"] {
 		t.Error("a FULLTEXT index produced a fetch-by-index function; only INDEX and UNIQUE should")
+	}
+}
+
+// assertListQueryDedupeShapes pins how the list query de-duplicates rows, and
+// that a filter it cannot build is reported rather than swallowed.
+//
+// This is a RUNTIME contract that compiles either way, so `go build` says nothing
+// about it. The generated builder used to emit `SELECT DISTINCT` on every branch,
+// unconditionally. Postgres has no equality operator for `json`, so DISTINCT over
+// any projection containing a json column is rejected outright — which is most
+// entities, since an embed / raw json field / array field all become json columns.
+// Every list endpoint for such an entity answered
+// `pq: could not identify an equality operator for type json`. MySQL 8 tolerates
+// it (it can compare JSON), so this was a Postgres-only 500 from a dialect-blind
+// template.
+//
+// DISTINCT was there to collapse the row fan-out of a LATERAL / JSON_TABLE join
+// built for a filter over an array embed — a join that is absent from the common
+// case. So the pin is: de-duplication is conditional on a fan-out source actually
+// being joined, and it is not spelled DISTINCT (which cannot include a json
+// column on Postgres) but GROUP BY the primary key.
+func assertListQueryDedupeShapes(t *testing.T, dir string) {
+	t.Helper()
+
+	// Comments are stripped: the generated file explains this very decision, so
+	// matching on raw text would match the explanation rather than the code.
+	src := stripGoComments(readFile(t, filepath.Join(dir, "core", "repository", "list", "list.go")))
+
+	// No branch may hard-code DISTINCT into a select list.
+	if i := strings.Index(src, "SELECT DISTINCT"); i >= 0 {
+		t.Errorf("core/repository/list/list.go emits a literal `SELECT DISTINCT` (at offset %d): "+
+			"an unconditional DISTINCT is illegal on Postgres for any projection containing a json "+
+			"column, and unnecessary when no fan-out source is joined", i)
+	}
+
+	// De-duplication must be gated on a fan-out source being present...
+	if !strings.Contains(src, "fansOut") {
+		t.Error("core/repository/list/list.go has no fan-out gate: de-duplication must apply only when a lateral/JSON_TABLE expansion or a caller-supplied join is actually part of the query")
+	}
+	// ...and spelled as a GROUP BY over the primary key, which never compares a
+	// json value.
+	if !strings.Contains(src, `"GROUP BY "`) {
+		t.Error("core/repository/list/list.go does not de-duplicate with GROUP BY <primary key>; DISTINCT cannot include a json column on Postgres")
+	}
+	// The count query must dedupe by counting distinct keys, not by DISTINCT over
+	// a single aggregate row (which never did anything).
+	if !strings.Contains(src, "countDistinct(") {
+		t.Error("core/repository/list/list.go does not use countDistinct for a fanned-out count")
+	}
+
+	// A clause the builder cannot express must PROPAGATE. Swallowing it left the
+	// where clause empty and emitted `... WHERE  LIMIT 10 OFFSET 0` — a syntax
+	// error reaching the client as a 500 instead of a 400.
+	where := between(t, src, "func buildWhereClauses(", "func buildSingleClause(")
+	if strings.Contains(where, `return "", nil`) {
+		t.Error(`buildWhereClauses discards a failed clause build (return "", nil): the where clause is then emitted EMPTY, which is malformed SQL and a 500 instead of a 400`)
+	}
+	if !strings.Contains(src, "InvalidRequestError") {
+		t.Error("core/repository/list/list.go does not classify a bad filter/order_by as an InvalidRequestError, so a transport cannot answer 400")
+	}
+
+	// And the transport has to act on that classification.
+	restSrc := stripGoComments(readFile(t, filepath.Join(dir, "rest", "server", "errors.go")))
+	if !strings.Contains(restSrc, "func statusForError(") || !strings.Contains(restSrc, "BadRequest() bool") {
+		t.Error("rest/server/errors.go has no statusForError classifying a caller error as 400")
+	}
+	listHandler := stripGoComments(readFile(t, filepath.Join(dir, "rest", "server", "list_all_types.go")))
+	if !strings.Contains(listHandler, "writeProblem(w, statusForError(err), err)") {
+		t.Error("rest/server/list_all_types.go reports every List error as 500; an unbuildable filter must be a 400")
+	}
+}
+
+// stripGoComments removes // and /* */ comments so an assertion matches CODE
+// rather than the prose explaining it. Deliberately crude — it does not track
+// string literals — which is fine because the generated sources it is used on
+// contain no comment markers inside strings.
+func stripGoComments(src string) string {
+	src = regexp.MustCompile(`(?s)/\*.*?\*/`).ReplaceAllString(src, "")
+	return regexp.MustCompile(`(?m)//.*$`).ReplaceAllString(src, "")
+}
+
+// arrayElementExpectation is what all four layers must agree on for one array
+// element type: the Go element type, the entitytypes constant the filter layer
+// dispatches on, the mapper function that decodes the JSON column, and the
+// element validation rule.
+type arrayElementExpectation struct {
+	goType     string
+	listType   string
+	mapperFunc string
+	// validation is the element validation call, or "" when the element type has
+	// no value rules.
+	validation string
+}
+
+// arrayElementExpectations is keyed by the element type named in the fixture
+// field's identifier (`t24_array_<name>` / `t24_array_inferred_<name>`). Spelling
+// it out declaratively — rather than calling the generator's own resolver — is
+// what makes this an independent check instead of a tautology.
+var arrayElementExpectations = map[string]arrayElementExpectation{
+	// The fallbacks: an element type that genuinely cannot be resolved becomes
+	// varchar, because every JSON scalar round-trips through a string.
+	"unset":       {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+	"noconfig":    {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+	"allbranches": {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+	"ambiguous":   {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+
+	"integer": {"int64", "IntFieldType", "JSONToIntSlice", "validation.Integer("},
+	"float":   {"float64", "FloatFieldType", "JSONToFloatSlice", "validation.Float("},
+	"decimal": {"float64", "FloatFieldType", "JSONToFloatSlice", "validation.Float("},
+	"char":    {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+	"varchar": {"string", "StringFieldType", "JSONToStringSlice", "validation.String("},
+	// The string-shaped types with their own element rule.
+	"email": {"string", "StringFieldType", "JSONToStringSlice", "validation.Email("},
+	"phone": {"string", "StringFieldType", "JSONToStringSlice", "validation.Phone("},
+	"url":   {"string", "StringFieldType", "JSONToStringSlice", "validation.URL("},
+	"color": {"string", "StringFieldType", "JSONToStringSlice", "validation.Color("},
+	"date":  {"time.Time", "TimestampFieldType", "JSONToDateSlice", "validation.Date("},
+	// A datetime element validates with the same Date rule as a date element.
+	"datetime": {"time.Time", "TimestampFieldType", "JSONToDatetimeSlice", "validation.Date("},
+	// Element types with no value validation of their own. uuid/encrypted/time
+	// have no case in arrayElementCall, so their elements are only shape-checked.
+	"uuid":      {"uuid.UUID", "StringFieldType", "JSONToUUIDSlice", ""},
+	"encrypted": {"string", "StringFieldType", "JSONToStringSlice", ""},
+	"time":      {"time.Time", "TimestampFieldType", "JSONToTimeSlice", ""},
+	// Enum members serialize as JSON numbers, so the filter layer treats them as
+	// ints; only the Go type is enum-flavoured.
+	"enum": {"enums.AllTypesMode", "IntFieldType", "JSONToEnumSlice[enums.AllTypesMode]", ""},
+	// ...unless the enum cannot be resolved, in which case it is a raw int.
+	"enum_unknown": {"int64", "IntFieldType", "JSONToIntSlice", ""},
+}
+
+// assertArrayElementTypeShapes pins an array field's ELEMENT type across every
+// layer that has to agree on it, for every element type the fixture declares.
+//
+// This is the regression guard for silent data loss on READ. The element type is
+// not always carried by `type_config.array.type`: the platform expresses it by
+// populating the element's own config under the branch that names it, sending
+// every other branch alongside as an empty placeholder and leaving `type` unset.
+// Reading `type` alone defaulted all of those to varchar, so a decimal array was
+// generated as []string — and because the JSON decoder logs-and-returns-empty
+// rather than failing, `[-6.2,-8.4]` read back as `[]` on every row with no error
+// on any layer. Nothing about that fails to compile, which is why it needs pinning
+// here.
+func assertArrayElementTypeShapes(t *testing.T, dir string, version *nemgen.ProjectVersion) {
+	t.Helper()
+
+	entitySrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types.go"))
+	listSrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types_list.go"))
+	mapperSrc := readFile(t, filepath.Join(dir, "core", "module", "all_types", "mapper.go"))
+	validateSrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types_validate.go"))
+	arrayMap := between(t, listSrc, "func (e AllTypes) ArrayFieldIdentifierToType()", "")
+
+	seen := 0
+	for _, e := range version.Entities {
+		if e.Identifier != "all_types" {
+			continue
+		}
+		for _, f := range e.Fields {
+			if f.Type != nemgen.FieldType_FIELD_TYPE_ARRAY {
+				continue
+			}
+			name := strings.TrimPrefix(f.Identifier, "t24_array_")
+			name = strings.TrimSuffix(strings.TrimSuffix(name, "_req"), "_opt")
+			// An "inferred_" field carries its element type ONLY in the nested
+			// config; it must resolve to exactly the same shapes as the field
+			// that spells the type out.
+			name = strings.TrimPrefix(name, "inferred_")
+			want, ok := arrayElementExpectations[name]
+			if !ok {
+				t.Errorf("array field %q has no expectation in arrayElementExpectations — add one so a new element type cannot be added untested", f.Identifier)
+				continue
+			}
+			seen++
+
+			goName := gcgstrings.ToCamelCase(f.Identifier)
+
+			// 1. the entity struct holds a slice of the element type
+			assertStructFieldType(t, "entity", entitySrc, goName, "[]"+want.goType)
+
+			// 2. the filter layer is told the ELEMENT type (the field's own type
+			//    is ArrayFieldType; buildArrayClause switches on this to pick a
+			//    JSON containment comparison)
+			re := regexp.MustCompile(`res\["` + regexp.QuoteMeta(f.Identifier) + `"\]\s*=\s*entitytypes\.(\w+)`)
+			m := re.FindStringSubmatch(arrayMap)
+			if m == nil {
+				t.Errorf("array field %q publishes no element type in ArrayFieldIdentifierToType", f.Identifier)
+			} else if m[1] != want.listType {
+				t.Errorf("array field %q publishes element type entitytypes.%s, want entitytypes.%s (element config says %s)",
+					f.Identifier, m[1], want.listType, want.goType)
+			}
+
+			// 3. the mapper decodes the json column into that same slice type
+			wantCall := "mapper." + want.mapperFunc + "("
+			mre := regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(goName) + `:\s*(.*),\s*$`)
+			mm := mre.FindStringSubmatch(mapperSrc)
+			if mm == nil {
+				t.Errorf("mapper has no assignment for array field %q", f.Identifier)
+			} else if !strings.Contains(mm[1], wantCall) {
+				t.Errorf("mapper decodes array field %q with %q, want %s...: a decoder that disagrees with the Go type drops the column silently (it logs and returns an empty slice)",
+					f.Identifier, strings.TrimSpace(mm[1]), wantCall)
+			}
+
+			// 4. element validation matches the element type, so the WRITE path
+			//    agrees with the read path. A decimal array validated as a
+			//    string is the same bug seen from the other side.
+			block := arrayValidationBlock(validateSrc, goName)
+			switch {
+			case want.validation == "":
+				if block != "" {
+					t.Errorf("array field %q now validates its elements (%q) but %s elements were expected to have no value rule — update the expectation deliberately",
+						f.Identifier, strings.TrimSpace(block), want.goType)
+				}
+			case block == "":
+				t.Errorf("array field %q validates no elements, want %s", f.Identifier, want.validation)
+			case !strings.Contains(block, want.validation):
+				t.Errorf("array field %q validates its elements with %q, want %s (the element type is %s)",
+					f.Identifier, strings.TrimSpace(block), want.validation, want.goType)
+			}
+		}
+	}
+	if seen == 0 {
+		t.Fatal("no array fields found in the fixture")
+	}
+}
+
+// arrayValidationBlock returns the element-validation line generated for one
+// array field, or "" when the field has none.
+func arrayValidationBlock(src, goName string) string {
+	re := regexp.MustCompile(`for i, el := range e\.` + regexp.QuoteMeta(goName) + `\s*\{\s*\n([^\n]*)`)
+	m := re.FindStringSubmatch(src)
+	if m == nil {
+		return ""
+	}
+	return m[1]
+}
+
+// assertFilterIdentifierSpelling pins the one thing that makes a filter over a
+// dependant embed reachable at all: the identifier the transport DECLARES has to
+// be the identifier the clause builder LOOKS UP.
+//
+// The builder reads ListEntity.FieldIdentifierToTypeMap, which is keyed by the
+// entity's own field identifiers — so a field inside an embed is
+// `<host json field>.<sub field>`. The REST/gRPC declarations used the embedded
+// ENTITY's name instead (`dep_item.name` for a `t23_json_dep_multi_req` column).
+// The result was that no spelling worked: the entity name passed AIP validation
+// and then missed the type-map lookup (zero FieldType -> "unsupported field
+// type"), while the column name was rejected by AIP as an undeclared identifier.
+// Both halves compile, and the whole array-embed containment path was
+// unreachable through the API.
+func assertFilterIdentifierSpelling(t *testing.T, dir string, version *nemgen.ProjectVersion) {
+	t.Helper()
+
+	listSrc := readFile(t, filepath.Join(dir, "entity", "all_types", "all_types_list.go"))
+	typeMap := between(t, listSrc, "func (e AllTypes) FieldIdentifierToTypeMap()", "func (e AllTypes) OrderedFieldIdentifiers()")
+	dependantMap := between(t, listSrc, "func (e AllTypes) DependantFieldIdentifierToTypeMap()", "func (e AllTypes) EntityIdentifier()")
+
+	// The host fields of the two embeds, and the dependant entity's own fields.
+	hostFields := []string{"t23_json_dep_single_req", "t23_json_dep_multi_req"}
+	for _, h := range hostFields {
+		if !strings.Contains(dependantMap, `res["`+h+`"]`) {
+			t.Fatalf("DependantFieldIdentifierToTypeMap is not keyed by the host field %q", h)
+		}
+	}
+
+	declSrc := readFile(t, filepath.Join(dir, "rest", "server", "list_all_types.go"))
+	declared := map[string]bool{}
+	for _, m := range regexp.MustCompile(`filtering\.Declare(?:Enum)?Ident\("([^"]+)"`).FindAllStringSubmatch(declSrc, -1) {
+		declared[m[1]] = true
+	}
+	if len(declared) == 0 {
+		t.Fatal("no filter identifiers declared in rest/server/list_all_types.go")
+	}
+
+	for ident := range declared {
+		if ident == "true" || ident == "false" {
+			continue
+		}
+		host, sub, dotted := strings.Cut(ident, ".")
+		if !dotted {
+			// A plain identifier must be a key of the type map the builder reads.
+			if !strings.Contains(typeMap, `"`+host+`":`) {
+				t.Errorf("declared filter identifier %q is not a key of FieldIdentifierToTypeMap, so buildSingleClause cannot resolve its type", ident)
+			}
+			continue
+		}
+		// A dotted identifier must be <host json FIELD>.<sub field>: the host has
+		// to be a key of the type map (it is the json COLUMN the clause names),
+		// and the sub field a key of that host's dependant type map.
+		if !strings.Contains(typeMap, `"`+host+`":`) {
+			t.Errorf("declared filter identifier %q is prefixed with %q, which is not a field of the entity — the prefix must be the HOST json field (the column), not the embedded entity's name; no spelling of this filter can reach a clause", ident, host)
+			continue
+		}
+		if !strings.Contains(dependantMap, `res["`+host+`"]`) {
+			t.Errorf("declared filter identifier %q is prefixed with %q, which is not a dependant embed", ident, host)
+			continue
+		}
+		if sub == "" {
+			t.Errorf("declared filter identifier %q has an empty sub field", ident)
+		}
+	}
+
+	// Concretely: the fields of the dependant entity are declared under BOTH host
+	// fields, and never under the entity's own name.
+	for _, h := range hostFields {
+		for _, sub := range []string{"name", "count"} {
+			if !declared[h+"."+sub] {
+				t.Errorf("filter identifier %q is not declared; a field inside an embed must be reachable under its host field", h+"."+sub)
+			}
+		}
+	}
+	for _, sub := range []string{"name", "count"} {
+		if declared["dep_item."+sub] {
+			t.Errorf("filter identifier %q is declared under the embedded ENTITY's name; the clause builder keys on the host field, so this spelling can never resolve", "dep_item."+sub)
+		}
 	}
 }
 

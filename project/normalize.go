@@ -3,6 +3,7 @@ package project
 import (
 	nemgen "github.com/nuzur/nem/idl/gen"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // NormalizeProjectVersion returns a copy of pv with every field's type_config
@@ -92,14 +93,31 @@ func normalizeFileField(f *nemgen.Field) {
 	setFileConfigSlot(f, cfg)
 }
 
-// normalizeArrayField makes the element type explicit. An array whose element
-// type is unset has no Go type to generate, and the platform normalizes such a
-// field to an array wrapper holding every scalar branch of its nested
-// type_config — so the element type cannot be recovered from the config either.
-// VARCHAR is the one element type every JSON scalar round-trips through, so it
-// is the fallback; without it the element type fed the template a bare
-// `interface{}`, which the entity-types template prefixed with its package name
-// and emitted as the un-compilable `entitytypes.interface{}`.
+// normalizeArrayField makes the element type explicit, so that every layer that
+// needs it — the entity struct's slice type, the entitytypes constant the
+// filter layer dispatches on, the mapper function that decodes the JSON column,
+// the element validation rules and the proto `repeated` type — derives it from
+// one resolved value.
+//
+// The element type is NOT always carried by `type_config.array.type`: what the
+// platform stores is the element's own CONFIG, under the nested branch that
+// names its type, and it sends every other branch alongside as an empty
+// message. A decimal array therefore arrives as
+//
+//	{"array": {"type_config": {"decimal": {"allow_negatives": true,
+//	  "number_of_decimals": 1}, "varchar": {}, "integer": {}, ...}}}
+//
+// with no `type` at all. Reading only `type` and defaulting to VARCHAR retyped
+// every such array as []string, which is silent DATA LOSS on read: the JSON
+// column holds numbers, mapper.JSONToStringSlice cannot decode them into
+// []string, and because it logs-and-returns-empty rather than failing, the field
+// came back as [] with no error on any layer.
+//
+// So the type is inferred from the nested config first, and VARCHAR remains the
+// fallback only when it genuinely cannot be recovered. Without a concrete
+// fallback the element type fed the template a bare `interface{}`, which the
+// entity-types template prefixed with its package name and emitted as the
+// un-compilable `entitytypes.interface{}`.
 func normalizeArrayField(f *nemgen.Field) {
 	if f.TypeConfig.Array == nil {
 		f.TypeConfig.Array = &nemgen.FieldTypeArrayConfig{}
@@ -109,11 +127,98 @@ func normalizeArrayField(f *nemgen.Field) {
 		arr.TypeConfig = &nemgen.ArrayTypeConfig{}
 	}
 	if arr.Type == nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID {
-		arr.Type = nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR
+		arr.Type = inferArrayElementType(arr.TypeConfig)
 	}
 	if arr.Type == nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM && arr.TypeConfig.Enum == nil {
 		arr.TypeConfig.Enum = &nemgen.FieldTypeEnumConfig{}
 	}
+}
+
+// arrayElementTypeByConfigBranch maps each branch of ArrayTypeConfig to the
+// element type it configures. It is keyed by proto field name so a branch added
+// to the message without a mapping here is simply ignored rather than
+// mis-attributed.
+var arrayElementTypeByConfigBranch = map[string]nemgen.FieldTypeArrayConfigType{
+	"integer":   nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INTEGER,
+	"float":     nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_FLOAT,
+	"decimal":   nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DECIMAL,
+	"char":      nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_CHAR,
+	"varchar":   nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR,
+	"encrypted": nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENCRYPTED,
+	"url":       nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_URL,
+	"email":     nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_EMAIL,
+	"phone":     nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_PHONE,
+	"date":      nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATE,
+	"datetime":  nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
+	"enum":      nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM,
+}
+
+// inferArrayElementType recovers an array's element type from its nested
+// type_config, for the (common) shape where the platform left
+// `type_config.array.type` unset.
+//
+// The rule is "the element type is the branch that carries real configuration".
+// Presence alone says nothing, because the platform sends every branch: `tags`
+// (an array of varchar, max_size 40) and `channel_peak_db` (an array of decimal,
+// allow_negatives, 1 dp) arrive with the same twelve branches present and differ
+// only in which one is non-empty.
+//
+// Exactly one configured branch means the element type is unambiguous. Zero
+// (every branch empty — what a bare `{"type": 24}` normalizes to) or more than
+// one means it cannot be recovered, and VARCHAR is the answer: it is the one
+// element type every JSON scalar round-trips through, so an array mis-resolved
+// to it is readable rather than lossy.
+func inferArrayElementType(etc *nemgen.ArrayTypeConfig) nemgen.FieldTypeArrayConfigType {
+	varchar := nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR
+	if etc == nil {
+		return varchar
+	}
+
+	found := varchar
+	matches := 0
+	// Range visits only the branches that are PRESENT; branchIsConfigured then
+	// separates "present but empty" (a placeholder) from "carries config".
+	etc.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		name := string(fd.Name())
+		elementType, mapped := arrayElementTypeByConfigBranch[name]
+		if !mapped || fd.Kind() != protoreflect.MessageKind {
+			return true
+		}
+		if !branchIsConfigured(name, v.Message()) {
+			return true
+		}
+		matches++
+		found = elementType
+		return matches < 2 // two configured branches is already ambiguous
+	})
+
+	if matches != 1 {
+		return varchar
+	}
+	return found
+}
+
+// branchIsConfigured reports whether an element-type branch carries real
+// configuration rather than being an empty placeholder.
+func branchIsConfigured(branch string, msg protoreflect.Message) bool {
+	configured := false
+	msg.Range(func(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
+		// A zero enum_uuid names no enum, so an `enum: {enum_uuid: "000...0"}`
+		// placeholder must not be read as "the elements are enums". The platform
+		// sends exactly that on every array field, whatever its element type.
+		if branch == "enum" && string(fd.Name()) == "enum_uuid" && isZeroUUID(v.String()) {
+			return true
+		}
+		configured = true
+		return false
+	})
+	return configured
+}
+
+const zeroUUID = "00000000-0000-0000-0000-000000000000"
+
+func isZeroUUID(s string) bool {
+	return s == "" || s == zeroUUID
 }
 
 // fileConfigSlot returns the config message that belongs to the field's own
@@ -172,7 +277,9 @@ func IsBinaryFile(f *nemgen.Field) bool {
 	return FileConfig(f).StorageType == nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY
 }
 
-// ArrayConfig returns an array field's config, never nil.
+// ArrayConfig returns an array field's config, never nil. It resolves an unset
+// element type exactly as NormalizeProjectVersion does, so a caller that reads a
+// field directly cannot disagree with a normalized one.
 func ArrayConfig(f *nemgen.Field) *nemgen.FieldTypeArrayConfig {
 	if f == nil || f.TypeConfig == nil || f.TypeConfig.Array == nil {
 		return &nemgen.FieldTypeArrayConfig{
@@ -187,7 +294,7 @@ func ArrayConfig(f *nemgen.Field) *nemgen.FieldTypeArrayConfig {
 			clone.TypeConfig = &nemgen.ArrayTypeConfig{}
 		}
 		if clone.Type == nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_INVALID {
-			clone.Type = nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_VARCHAR
+			clone.Type = inferArrayElementType(clone.TypeConfig)
 		}
 		return clone
 	}
