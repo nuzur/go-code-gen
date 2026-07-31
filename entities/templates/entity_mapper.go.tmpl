@@ -90,11 +90,16 @@ func NullifyEmptyJSON(data json.RawMessage) json.RawMessage {
 	return data
 }
 
+// SliceToJSON serializes a list-shaped field (array, multi-enum, multi-file)
+// into its JSON column. The failure branch returns the empty ARRAY, not a
+// zero-length json.RawMessage: a zero-length value reaches the driver as the
+// empty string, which no JSON column accepts, so a marshal error turned into a
+// 500 from the database instead of an empty list.
 func SliceToJSON(slice interface{}) json.RawMessage {
     res, err := json.Marshal(slice)
     if err != nil {
 		log.Printf("error marshaling slice to json: %v \n", err)
-		return json.RawMessage{}
+		return json.RawMessage("[]")
 	}
     return res
 }

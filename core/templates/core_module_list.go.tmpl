@@ -3,7 +3,6 @@ package {{.EntityIdentifier}}
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	main_entity "{{.Project.Module}}/{{.Project.EntitiesConfig.Dir}}/{{.EntityIdentifier}}"
 	"{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/module/{{.EntityIdentifier}}/types"
 	repogen "{{.Project.Module}}/{{.Project.CoreConfig.CoreDir}}/{{.Project.CoreConfig.RepoConfig.Dir}}/gen"
@@ -53,7 +52,12 @@ func (m *module) List(ctx context.Context,
 		querier = resolvedOpts.SQLTx
 	}
 	skipShared := resolvedOpts.SkipCache || resolvedOpts.SQLTx != nil
-	cacheKey := fmt.Sprintf("List{{.EntityName}}:%v", request)
+	// Keyed on the BUILT QUERY, which already encodes the filter, the ordering,
+	// the projection and the page. Formatting the request instead put the
+	// *filtering.Declarations POINTER in the key — a fresh allocation on every
+	// request — so no two keys could ever match: the cache only grew, and the
+	// singleflight group never collapsed anything.
+	cacheKey := "List{{.EntityName}}:" + query
 	if !skipShared {
 		if cached, found := m.cache.Get(cacheKey); found {
 			return cached.(types.ListResponse), nil

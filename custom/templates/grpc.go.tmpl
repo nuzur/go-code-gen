@@ -21,6 +21,24 @@ import (
 // run {{.CustomDir}}/idl/proto/gen.sh, implement it here, and register the generated
 // custom service on the gRPC server via a small fx invoke.
 //
+// THE CONTRACT — the generated server registers exactly ONE implementation of
+// {{.Name}} at startup: yours when an Override is provided (it is, by
+// NewOverride below), the generated one otherwise. So:
+//
+//   - Keep the embedded pb.{{.Name}}Server field. It is what makes every endpoint
+//     you do NOT override keep working; without it this is an incomplete
+//     implementation and fx fails to build the graph.
+//   - Register a brand-new service under its OWN service name. Registering a
+//     second implementation of {{.Name}} PANICS the gRPC server with "duplicate
+//     service registration" — and it happens while the process starts, so the
+//     container crash-loops instead of failing to compile.
+//   - Overrides run behind the same interceptor chain as the generated
+//     endpoints{{ if .AuthConfig.Enabled }}, auth included: a custom method is protected without any work, and
+//     needs an entry in the interceptor's exception list to be public{{ end }}. A brand-new
+//     service registered on the same grpc.Server inherits the chain too.
+//   - Report failures as google.golang.org/grpc/status codes, the way the
+//     generated endpoints do, so clients see a meaningful code and not Unknown.
+//
 // This file is generated ONCE — regeneration will not overwrite it.
 type Server struct {
 	pb.{{.Name}}Server

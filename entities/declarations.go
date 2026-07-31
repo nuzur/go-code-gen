@@ -3,6 +3,7 @@ package entities
 import (
 	"fmt"
 
+	"github.com/iancoleman/strcase"
 	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
@@ -18,10 +19,61 @@ type FieldFilterDeclaration struct {
 	Name       string
 	Filtering  string
 	IsEnum     bool
+	// EnumValues is populated for enum fields only. The transports emit it as a
+	// value table the clause builder resolves against, which is what lets an
+	// enum be filtered over REST at all: REST has no protobuf enum types to
+	// declare (a REST-only app generates no proto package), so there is nothing
+	// for the aip declarations to carry the mapping.
+	EnumValues []EnumValueDeclaration
+}
+
+// EnumValueDeclaration is one value of an enum as a filter expression may spell
+// it, together with the number the column actually stores.
+type EnumValueDeclaration struct {
+	// Number is what the column stores: the value's position in the enum, which
+	// is how both the generated Go enum (iota) and the generated proto enum
+	// number their values.
+	Number int
+	// ProtoName is the generated protobuf value name ("STATUS_ACTIVE"). It is
+	// the spelling aip-go declares as a constant for an enum ident, so it is the
+	// only one usable as a bare IDENT — on either transport.
+	ProtoName string
+	// Names are every accepted spelling of the value, deduped: the schema's own
+	// identifier ("active") and ProtoName. A quoted-string filter
+	// (`status = "active"`) is matched against these, case-insensitively.
+	Names []string
 }
 
 func EntityFilterDeclarations(e EntityTemplate) []EntityFilterDeclaration {
 	return entityFilterDeclarations(e, "")
+}
+
+// enumValueDeclarations lists an enum's values with every spelling a filter may
+// use for them. The proto name mirrors exactly what the proto enum generator
+// emits (generateEnumsProtoFile), so a gRPC client's `status = STATUS_ACTIVE`
+// and a REST client's `status = "active"` resolve to the same number.
+func enumValueDeclarations(enum *nemgen.Enum, enumType string) []EnumValueDeclaration {
+	res := []EnumValueDeclaration{}
+	seen := map[string]bool{}
+	for i, v := range enum.StaticValues {
+		protoName := strcase.ToScreamingSnake(fmt.Sprintf("%s_%s", enumType, v.Identifier))
+		names := []string{}
+		// Deduped across the whole enum: the spellings are emitted as map keys,
+		// and a duplicate key in a composite literal does not compile.
+		for _, n := range []string{v.Identifier, protoName} {
+			if n == "" || seen[n] {
+				continue
+			}
+			seen[n] = true
+			names = append(names, n)
+		}
+		res = append(res, EnumValueDeclaration{
+			Number:    i,
+			ProtoName: protoName,
+			Names:     names,
+		})
+	}
+	return res
 }
 
 // entityFilterDeclarations emits the filter identifiers a transport declares for
@@ -106,9 +158,10 @@ func entityFilterDeclarations(e EntityTemplate, hostField string) []EntityFilter
 			if enum != nil {
 				enumType := gcgstrings.ToCamelCase(enum.Identifier)
 				entityRes.Fields = append(entityRes.Fields, FieldFilterDeclaration{
-					Name:      finalIdentifier,
-					Filtering: fmt.Sprintf("pb.%s(0).Type()", enumType),
-					IsEnum:    true,
+					Name:       finalIdentifier,
+					Filtering:  fmt.Sprintf("pb.%s(0).Type()", enumType),
+					IsEnum:     true,
+					EnumValues: enumValueDeclarations(enum, enumType),
 				})
 			} else {
 				entityRes.Fields = append(entityRes.Fields, FieldFilterDeclaration{

@@ -96,18 +96,31 @@ func AuthMiddleware(exceptions []string) func(http.Handler) http.Handler {
 }
 
 {{ if .Project.AuthConfig.Enabled }}
+// bearerScheme is matched CASE-INSENSITIVELY, per RFC 7235.
+const bearerScheme = "bearer "
+
 func extractToken(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return "", errors.New("missing authorization header")
 	}
-	splitToken := strings.Split(authHeader, "Bearer ")
-	if len(splitToken) < 2 {
-		splitToken = strings.Split(authHeader, "bearer ")
-		if len(splitToken) < 2 {
-			return "", errors.New("invalid authorization header format")
-		}
+	token, ok := cutBearerScheme(authHeader)
+	if !ok {
+		return "", errors.New(`invalid authorization header format, expected "Authorization: Bearer <token>"`)
 	}
-	return strings.TrimSpace(splitToken[1]), nil
+	return token, nil
+}
+
+// cutBearerScheme strips the auth scheme from an authorization header value.
+// It cuts the PREFIX rather than splitting on the literal: strings.Split takes
+// index 1 of every occurrence, so a token that happens to contain "Bearer "
+// came back truncated instead of being returned whole (or rejected).
+func cutBearerScheme(header string) (string, bool) {
+	header = strings.TrimSpace(header)
+	if len(header) < len(bearerScheme) || !strings.EqualFold(header[:len(bearerScheme)], bearerScheme) {
+		return "", false
+	}
+	token := strings.TrimSpace(header[len(bearerScheme):])
+	return token, token != ""
 }
 {{end}}

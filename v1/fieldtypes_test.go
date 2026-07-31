@@ -447,6 +447,74 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 		}},
 	}
 
+	// Two NARROW entities. all_types cannot express the failure they cover: it
+	// carries every field type at once, so every import any one field needs is
+	// supplied by some other field on the same entity — and the import sets are
+	// per FILE. Any bug of the form "the import comes from somewhere else on the
+	// same entity" is structurally invisible to a one-entity fixture. Each of
+	// these reaches a type through EXACTLY ONE route and carries nothing else
+	// that could supply the import incidentally.
+	//
+	// narrowMulti's only mapper conversion is its multi-valued file field. It has
+	// no array field, no uuid field and no multi-enum — the three flags the
+	// mapper/upsert import gates used to be keyed on — so it generated
+	// `mapper.JSONToStringSlice(...)` with no `entity/mapper` import and the
+	// module did not compile (`undefined: mapper`).
+	narrowMulti := &nemgen.Entity{
+		Uuid:       "c0000000-0000-0000-0000-0000000000b1",
+		Identifier: "narrow_multi_file",
+		Type:       nemgen.EntityType_ENTITY_TYPE_STANDALONE,
+		Fields: []*nemgen.Field{
+			{Uuid: "f-nmf-id", Identifier: "id", Type: nemgen.FieldType_FIELD_TYPE_CHAR, Key: true, Required: true,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{Char: &nemgen.FieldTypeCharConfig{MaxSize: 36}}},
+			{Uuid: "f-nmf-label", Identifier: "label", Type: nemgen.FieldType_FIELD_TYPE_VARCHAR, Required: true,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{Varchar: &nemgen.FieldTypeVarcharConfig{MaxSize: 255}}},
+			{Uuid: "f-nmf-docs", Identifier: "customs_docs", Type: nemgen.FieldType_FIELD_TYPE_FILE, Required: false,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{
+					File: fileCfg(nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_OBJECT_STORE, true)}},
+		},
+		TypeConfig: &nemgen.EntityTypeConfig{Standalone: &nemgen.EntityTypeStandaloneConfig{
+			Indexes: []*nemgen.Index{{
+				Uuid: "idx-nmf-pk", Identifier: "primary", Type: nemgen.IndexType_INDEX_TYPE_PRIMARY,
+				Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+				Fields: []*nemgen.IndexField{{FieldUuid: "f-nmf-id"}},
+			}},
+		}},
+	}
+
+	// narrowProto reaches the enum and the timestamp types ONLY through array
+	// element types: no scalar enum field, and — deliberately — no
+	// created_at/updated_at, whose near-universal presence is what masks the
+	// timestamp half of the same bug in every real schema. Its .proto therefore
+	// has to import enums.proto and timestamp.proto on the strength of the
+	// rendered `repeated <element>` alone.
+	narrowProto := &nemgen.Entity{
+		Uuid:       "c0000000-0000-0000-0000-0000000000b2",
+		Identifier: "narrow_array_enum",
+		Type:       nemgen.EntityType_ENTITY_TYPE_STANDALONE,
+		Fields: []*nemgen.Field{
+			{Uuid: "f-nae-id", Identifier: "id", Type: nemgen.FieldType_FIELD_TYPE_CHAR, Key: true, Required: true,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{Char: &nemgen.FieldTypeCharConfig{MaxSize: 36}}},
+			{Uuid: "f-nae-modes", Identifier: "modes", Type: nemgen.FieldType_FIELD_TYPE_ARRAY, Required: true,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{Array: &nemgen.FieldTypeArrayConfig{
+					Type:       nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_ENUM,
+					TypeConfig: &nemgen.ArrayTypeConfig{Enum: &nemgen.FieldTypeEnumConfig{EnumUuid: enumUUID}},
+				}}},
+			{Uuid: "f-nae-stamps", Identifier: "stamps", Type: nemgen.FieldType_FIELD_TYPE_ARRAY, Required: true,
+				Status: nemgen.FieldStatus_FIELD_STATUS_ACTIVE, TypeConfig: &nemgen.FieldTypeConfig{Array: &nemgen.FieldTypeArrayConfig{
+					Type:       nemgen.FieldTypeArrayConfigType_FIELD_TYPE_ARRAY_CONFIG_TYPE_DATETIME,
+					TypeConfig: &nemgen.ArrayTypeConfig{Datetime: &nemgen.FieldTypeDatetimeConfig{}},
+				}}},
+		},
+		TypeConfig: &nemgen.EntityTypeConfig{Standalone: &nemgen.EntityTypeStandaloneConfig{
+			Indexes: []*nemgen.Index{{
+				Uuid: "idx-nae-pk", Identifier: "primary", Type: nemgen.IndexType_INDEX_TYPE_PRIMARY,
+				Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+				Fields: []*nemgen.IndexField{{FieldUuid: "f-nae-id"}},
+			}},
+		}},
+	}
+
 	rel := func(uuid string, fieldUUID string, card nemgen.RelationshipCardinality) *nemgen.Relationship {
 		return &nemgen.Relationship{
 			Uuid:        uuid,
@@ -485,7 +553,7 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 				},
 			},
 		},
-		Entities: []*nemgen.Entity{mainEntity, dependant},
+		Entities: []*nemgen.Entity{mainEntity, dependant, narrowMulti, narrowProto},
 		Relationships: []*nemgen.Relationship{
 			// ONE_TO_ONE embeds one object, ONE_TO_MANY embeds a JSON array — so
 			// the "single" fixture is the ONE_TO_ONE one. These two used to be
@@ -566,6 +634,11 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertListQueryDedupeShapes(t, dir)
 				assertArrayElementTypeShapes(t, dir, params.ProjectVersion)
 				assertFilterIdentifierSpelling(t, dir, params.ProjectVersion)
+				assertMapperImportedWhereUsed(t, dir)
+				assertEmbedSliceSerializesAsJSON(t, dir)
+				if withProto {
+					assertProtoImportsDeclared(t, dir)
+				}
 			})
 		}
 	}
@@ -1142,16 +1215,30 @@ func assertFilterIdentifierSpelling(t *testing.T, dir string, version *nemgen.Pr
 
 	declSrc := readFile(t, filepath.Join(dir, "rest", "server", "list_all_types.go"))
 	declared := map[string]bool{}
-	for _, m := range regexp.MustCompile(`filtering\.Declare(?:Enum)?Ident\("([^"]+)"`).FindAllStringSubmatch(declSrc, -1) {
+	for _, m := range regexp.MustCompile(`(?:filtering\.)?[Dd]eclare(?:Enum)?Ident\("([^"]+)"`).FindAllStringSubmatch(declSrc, -1) {
 		declared[m[1]] = true
 	}
 	if len(declared) == 0 {
 		t.Fatal("no filter identifiers declared in rest/server/list_all_types.go")
 	}
 
+	// An enum VALUE is declared as an ident too, so that the bare form
+	// (`mode = ALL_TYPES_MODE_ONE`, the spelling gRPC uses) type-checks. Those
+	// are values, not fields, so they are not keys of the type map — they are
+	// keys of the entity's enum value table, which is what the clause builder
+	// resolves them through.
+	enumValueSrc := between(t, declSrc, "EnumValues() map[string]map[string]int64 {", "")
+	enumValueSpellings := map[string]bool{}
+	for _, m := range regexp.MustCompile(`"([^"]+)":\s*\d+`).FindAllStringSubmatch(enumValueSrc, -1) {
+		enumValueSpellings[m[1]] = true
+	}
+
 	for ident := range declared {
 		if ident == "true" || ident == "false" {
 			continue
+		}
+		if enumValueSpellings[ident] {
+			continue // an enum value constant, checked below
 		}
 		host, sub, dotted := strings.Cut(ident, ".")
 		if !dotted {
@@ -1191,6 +1278,170 @@ func assertFilterIdentifierSpelling(t *testing.T, dir string, version *nemgen.Pr
 			t.Errorf("filter identifier %q is declared under the embedded ENTITY's name; the clause builder keys on the host field, so this spelling can never resolve", "dep_item."+sub)
 		}
 	}
+
+	// And the enum half of the same property: an enum field is only filterable
+	// if the transport also emits the value table the clause builder resolves
+	// against. REST declares enums as strings (it has no protobuf enum types to
+	// declare — an app generated without proto has no pb package at all), so
+	// with no table every enum filter failed with "enum declaration not found",
+	// for every syntax.
+	if len(enumValueSpellings) == 0 {
+		t.Error("rest/server/list_all_types.go declares no enum value table; an enum filter has " +
+			"nothing to resolve its value against")
+	}
+	for ident := range declared {
+		if !strings.HasPrefix(ident, "ALL_TYPES_MODE_") {
+			continue
+		}
+		if !enumValueSpellings[ident] {
+			t.Errorf("enum value ident %q is declared to the type checker but is not in the value "+
+				"table, so a filter using it cannot be resolved to a number", ident)
+		}
+	}
+}
+
+// assertMapperImportedWhereUsed pins the property the three core-module import
+// gates exist to provide: a generated file that CALLS the shared mapper package
+// must import it.
+//
+// `go build ./...` already fails when it does not, but only for the entities the
+// fixture happens to contain, and only with `undefined: mapper` three files deep
+// in a wall of output. Naming the file and the call here is what turns that into
+// a diagnosis. The gates were three separate re-derivations of "which field
+// types need a conversion" — a multi-valued file field satisfied none of them
+// while RepoFromMapper / RepoToMapperUpsert rendered mapper calls for it anyway.
+func assertMapperImportedWhereUsed(t *testing.T, dir string) {
+	t.Helper()
+
+	call := regexp.MustCompile(`\bmapper\.[A-Z]\w*`)
+	moduleDir := filepath.Join(dir, "core", "module")
+	checked := 0
+	err := filepath.WalkDir(moduleDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return err
+		}
+		src := stripGoComments(readFile(t, path))
+		calls := call.FindAllString(src, -1)
+		if len(calls) == 0 {
+			return nil
+		}
+		checked++
+		if !strings.Contains(src, `/entity/mapper"`) {
+			t.Errorf("%s calls %s but does not import the entity mapper package: the generated module does not compile (`undefined: mapper`)",
+				path, calls[0])
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk %s: %v", moduleDir, err)
+	}
+	if checked == 0 {
+		t.Error("no generated core-module file calls the mapper package — the fixture no longer exercises the import gate")
+	}
+}
+
+// assertEmbedSliceSerializesAsJSON pins the nil sentinel of a ONE_TO_MANY
+// embed's serializer.
+//
+// A nil slice used to become `json.RawMessage{}` — zero length, which reaches
+// the driver as the empty string. No JSON column accepts an empty string, so a
+// create that simply OMITTED an optional array embed was rejected by the
+// database ("invalid input syntax for type json" / MySQL 3140) and surfaced as a
+// 500, while the same request with `"field": []` succeeded. Nothing about that
+// fails to compile, so it needs pinning here.
+func assertEmbedSliceSerializesAsJSON(t *testing.T, dir string) {
+	t.Helper()
+
+	src := readFile(t, filepath.Join(dir, "entity", "dep_item", "dep_item.go"))
+	body := between(t, src, "func DepItemSliceToJSON(", "")
+	if strings.Contains(body, "json.RawMessage{}") {
+		t.Error("entity/dep_item/dep_item.go: DepItemSliceToJSON returns a zero-length json.RawMessage for the nil slice — " +
+			"that reaches the driver as an empty string, which no JSON column accepts, so omitting an optional array embed is a 500 on create")
+	}
+	if !strings.Contains(body, `json.RawMessage("[]")`) {
+		t.Errorf("entity/dep_item/dep_item.go: DepItemSliceToJSON does not serialize the nil slice as the empty JSON array; got:\n%s", body)
+	}
+}
+
+// assertProtoImportsDeclared pins the property protoc enforces: every .proto
+// file that REFERENCES a named type imports the file declaring it.
+//
+// The import set used to be derived from f.Type while the field declaration is
+// rendered by ProtoType, which resolves an array field through its ELEMENT type
+// — so an entity whose only enum reference was an array element emitted
+// `repeated AllTypesMode` with no `import "enums.proto"`. Asserting on the
+// rendered text rather than on protoc's exit code keeps the check alive on a
+// machine that has no protoc (where the whole proto arm is skipped).
+func assertProtoImportsDeclared(t *testing.T, dir string) {
+	t.Helper()
+
+	protoDir := filepath.Join(dir, "idl", "proto")
+	entries, err := os.ReadDir(protoDir)
+	if err != nil {
+		t.Fatalf("read %s: %v", protoDir, err)
+	}
+
+	enumsSrc := readFile(t, filepath.Join(protoDir, "enums.proto"))
+	enumNames := []string{}
+	for _, m := range regexp.MustCompile(`(?m)^enum\s+(\w+)`).FindAllStringSubmatch(enumsSrc, -1) {
+		enumNames = append(enumNames, m[1])
+	}
+	if len(enumNames) == 0 {
+		t.Fatal("no enums declared in idl/proto/enums.proto")
+	}
+
+	// message name -> the file that declares it
+	declaredIn := map[string]string{}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".proto") || e.Name() == "enums.proto" {
+			continue
+		}
+		src := readFile(t, filepath.Join(protoDir, e.Name()))
+		for _, m := range regexp.MustCompile(`(?m)^message\s+(\w+)`).FindAllStringSubmatch(src, -1) {
+			declaredIn[m[1]] = e.Name()
+		}
+	}
+
+	fieldLine := regexp.MustCompile(`(?m)^\s*(?:repeated\s+)?([\w.]+)\s+\w+\s*=\s*\d+;`)
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".proto") || e.Name() == "enums.proto" {
+			continue
+		}
+		name := e.Name()
+		src := readFile(t, filepath.Join(protoDir, name))
+		imported := func(file string) bool { return strings.Contains(src, `import "`+file+`"`) }
+
+		for _, m := range fieldLine.FindAllStringSubmatch(src, -1) {
+			typ := m[1]
+			switch {
+			case typ == "google.protobuf.Timestamp":
+				if !imported("google/protobuf/timestamp.proto") {
+					t.Errorf(`%s declares a %s field but does not import "google/protobuf/timestamp.proto"`, name, typ)
+				}
+			case slicesContains(enumNames, typ):
+				if !imported("enums.proto") {
+					t.Errorf(`%s declares a field of enum type %s but does not import "enums.proto" — protoc rejects the file`, name, typ)
+				}
+			default:
+				decl, ok := declaredIn[typ]
+				if !ok || decl == name {
+					continue
+				}
+				if !imported(decl) {
+					t.Errorf(`%s declares a field of message type %s, declared in %s, but does not import it`, name, typ, decl)
+				}
+			}
+		}
+	}
+}
+
+func slicesContains(in []string, want string) bool {
+	for _, s := range in {
+		if s == want {
+			return true
+		}
+	}
+	return false
 }
 
 func assertStructFieldType(t *testing.T, layer, src, field, want string) {

@@ -30,7 +30,7 @@ func (i *Implementation) BuildListEntityQuery(
 	includeColumns := request.GetIncludeFields()
 	excludeColumns := request.GetExcludeFields()
 
-	columnsFinal := fmt.Sprintf("%s.*", entity.EntityIdentifier())
+	columnsFinal := fmt.Sprintf("%s.*", quoteIdent(entity.EntityIdentifier()))
 	if len(includeColumns) > 0 && len(excludeColumns) > 0 {
 		return "", errors.New("cannot use includeColumns and excludeColumns at the same time")
 	}
@@ -39,7 +39,7 @@ func (i *Implementation) BuildListEntityQuery(
 		fields := entity.OrderedFieldIdentifiers()
 		for _, c := range fields {
 			if slices.Contains(includeColumns, c) {
-				columns = append(columns, fmt.Sprintf("%s.%s", entity.EntityIdentifier(), c))
+				columns = append(columns, qualifiedColumn(entity.EntityIdentifier(), c))
 			}
 		}
 		if len(columns) > 0 {
@@ -50,7 +50,7 @@ func (i *Implementation) BuildListEntityQuery(
 		fields := entity.OrderedFieldIdentifiers()
 		for _, c := range fields {			
 			if !slices.Contains(excludeColumns, c) {
-				columns = append(columns, fmt.Sprintf("%s.%s", entity.EntityIdentifier(), c))
+				columns = append(columns, qualifiedColumn(entity.EntityIdentifier(), c))
 			}			
 		}
 		if len(columns) > 0 {
@@ -66,6 +66,7 @@ func (i *Implementation) BuildListEntityQuery(
 			request.GetFilter().CheckedExpr.Expr,
 			entity,
 			request.GetFilteringDeclarations(),
+			request.GetEnumValues(),
 			jsonTables)
 		if err != nil {
 			// A clause the builder cannot express is the CALLER's problem, and it
@@ -103,7 +104,7 @@ func (i *Implementation) BuildListEntityQuery(
 
 	// The entity, then any caller-supplied join, then the lateral expansions a
 	// filter needed.
-	fromClause := squash(fmt.Sprintf("%s %s %s", entity.EntityIdentifier(), joinStatement, jsonTablesFinal))
+	fromClause := squash(fmt.Sprintf("%s %s %s", quoteIdent(entity.EntityIdentifier()), joinStatement, jsonTablesFinal))
 
 	// A row of the entity appears more than once ONLY when the query joins
 	// something that fans out: a lateral/JSON_TABLE expansion built for a filter
@@ -171,11 +172,12 @@ func (i *Implementation) BuildListEntityQuery(
 }
 
 // qualifyColumns prefixes each column with the entity table so that a column
-// name a caller-supplied join also carries stays unambiguous.
+// name a caller-supplied join also carries stays unambiguous. Both parts are
+// quoted for the engine — see qualifiedColumn.
 func qualifyColumns(entity ListEntity, columns []string) []string {
 	res := make([]string, 0, len(columns))
 	for _, c := range columns {
-		res = append(res, fmt.Sprintf("%s.%s", entity.EntityIdentifier(), c))
+		res = append(res, qualifiedColumn(entity.EntityIdentifier(), c))
 	}
 	return res
 }
@@ -187,11 +189,11 @@ func squash(query string) string {
 	return strings.Join(strings.Fields(query), " ")
 }
 
-func buildWhereClauses(ex *expr.Expr, entity ListEntity, declarations *filtering.Declarations, jsonTables map[string]string) (string, error) {
+func buildWhereClauses(ex *expr.Expr, entity ListEntity, declarations *filtering.Declarations, enumValues map[string]map[string]int64, jsonTables map[string]string) (string, error) {
 	cex := ex.GetCallExpr()
 	if cex != nil {
 		if isBaseFunction(cex.Function) {
-			res, err := buildSingleClause(cex, entity, declarations)
+			res, err := buildSingleClause(cex, entity, declarations, enumValues)
 			if err != nil {
 				// Propagate. Discarding the error here (`return "", nil`) is what
 				// turned "this filter cannot be built" into an EMPTY where clause
@@ -214,11 +216,11 @@ func buildWhereClauses(ex *expr.Expr, entity ListEntity, declarations *filtering
 			operator = "OR"
 		}
 
-		left, err := buildWhereClauses(cex.Args[0], entity, declarations, jsonTables)
+		left, err := buildWhereClauses(cex.Args[0], entity, declarations, enumValues, jsonTables)
 		if err != nil {
 			return "", err
 		}
-		right, err := buildWhereClauses(cex.Args[1], entity, declarations, jsonTables)
+		right, err := buildWhereClauses(cex.Args[1], entity, declarations, enumValues, jsonTables)
 		if err != nil {
 			return "", err
 		}
@@ -227,7 +229,7 @@ func buildWhereClauses(ex *expr.Expr, entity ListEntity, declarations *filtering
 	return "", errors.New("invalid call expression")
 }
 
-func buildSingleClause(cex *expr.Expr_Call, entity ListEntity, declarations *filtering.Declarations) (SingleClauseResponse, error) {
+func buildSingleClause(cex *expr.Expr_Call, entity ListEntity, declarations *filtering.Declarations, enumValues map[string]map[string]int64) (SingleClauseResponse, error) {
 	if len(cex.Args) != 2 {
 		return SingleClauseResponse{}, errors.New("invalid argument count")
 	}
@@ -247,6 +249,7 @@ func buildSingleClause(cex *expr.Expr_Call, entity ListEntity, declarations *fil
 	request := SingleClauseRequest{
 		cex:                     cex,
 		declarations:            declarations,
+		enumValues:              enumValues,
 		fieldIdentifier:         fieldIdentifier,
 		isDependant:             isDependant,
 		dependantFieldIdentifier: dependantField,
@@ -306,7 +309,11 @@ func buildOrderByClause(request ListRequest, entity ListEntity, jsonTables map[s
 				order = "DESC"
 			}
 			if !f.isDependant {
-				orderByPairs = append(orderByPairs, fmt.Sprintf("%s %s", f.fieldIdentifier, order))
+				// Qualified AND quoted, like every other column reference the
+				// builder emits: an unquoted `ORDER BY order ASC` is a syntax
+				// error, and an unqualified name is ambiguous once a
+				// caller-supplied join carries the same column.
+				orderByPairs = append(orderByPairs, fmt.Sprintf("%s %s", qualifiedColumn(entity.EntityIdentifier(), f.fieldIdentifier), order))
 			} else if f.isDependantMulti {
 				/* 
 				json_table_name, json_table := resolveJSONTable(SingleClauseRequest{

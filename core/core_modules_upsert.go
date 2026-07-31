@@ -16,22 +16,18 @@ import (
 )
 
 type upsertModuleTemplate struct {
-	Project             *project.Project
-	Package             string
-	EntityName          string
-	EntityIdentifier    string
-	PrimaryKeys         []entities.FieldTemplate
-	PrimaryKeysName     string
-	Fields              []entities.FieldTemplate
-	Imports             []string
-	HasVersionField     bool
-	VersionField        entities.FieldTemplate
-	ShouldPublishEvents bool
-	HasArrayField       bool
-	HasNullString       bool
-	HasNullUUID         bool
-	HasMultiEnum        bool
-	HasRawJSON          bool
+	Project               *project.Project
+	Package               string
+	EntityName            string
+	EntityIdentifier      string
+	PrimaryKeys           []entities.FieldTemplate
+	PrimaryKeysName       string
+	Fields                []entities.FieldTemplate
+	Imports               []string
+	HasVersionField       bool
+	VersionField          entities.FieldTemplate
+	ShouldPublishEvents   bool
+	UsesMapper            bool
 	HasGeneratedTimestamp bool
 }
 
@@ -44,31 +40,17 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 	primaryKeys := entityTemplate.PrimaryKeys()
 	primaryKeysName := entityTemplate.PrimaryKeysName()
 
-	hasArrayField := false
-	hasNullString := false
-	hasNullUUID := false
-	hasMultiEnum := false
-	hasRawJSON := false
+	// Same rule as generateSelects and generateMapper: the mapper import follows
+	// the expressions the insert/update files actually render. The flag set it
+	// replaces was (array | optional uuid | multi-enum | optional raw json) —
+	// re-derived here a second time, and differently from generateMapper's
+	// (which did not test IsRequired on the uuid case) — and it missed the
+	// multi-file field that RepoToMapperUpsert wraps in mapper.SliceToJSON.
+	usesMapper := false
 	hasGeneratedTimestamp := false
 	for _, f := range req.Fields {
-		if f.Field.Type == nemgen.FieldType_FIELD_TYPE_ARRAY {
-			hasArrayField = true
-		}
-
-		if strings.Contains(f.GolangType(), "null.") {
-			hasNullString = true
-		}
-
-		if !f.IsRequired() && f.Field.Type == nemgen.FieldType_FIELD_TYPE_UUID {
-			hasNullUUID = true
-		}
-
-		if f.EnumMany() {
-			hasMultiEnum = true
-		}
-
-		if f.IsRawJSON() && !f.IsRequired() {
-			hasRawJSON = true
+		if strings.Contains(f.RepoToMapperUpsert(), "mapper.") {
+			usesMapper = true
 		}
 
 		if f.IsGeneratedTimestamp() {
@@ -76,21 +58,17 @@ func generateUpsert(ctx context.Context, req coreSubModuleRequest) error {
 		}
 	}
 	upsertTemplate := upsertModuleTemplate{
-		Package:             req.Entity.Identifier,
-		EntityIdentifier:    req.Entity.Identifier,
-		EntityName:          gcgstrings.ToCamelCase(req.Entity.Identifier),
-		PrimaryKeys:         primaryKeys,
-		PrimaryKeysName:     primaryKeysName,
-		Fields:              req.Fields,
-		Imports:             maps.MapKeys(req.Imports),
-		ShouldPublishEvents: events.ShouldPublishEvents(req.Project, req.Entity.Identifier),
-		HasArrayField:       hasArrayField,
-		HasNullString:       hasNullString,
-		HasNullUUID:         hasNullUUID,
-		HasMultiEnum:        hasMultiEnum,
-		HasRawJSON:          hasRawJSON,
+		Package:               req.Entity.Identifier,
+		EntityIdentifier:      req.Entity.Identifier,
+		EntityName:            gcgstrings.ToCamelCase(req.Entity.Identifier),
+		PrimaryKeys:           primaryKeys,
+		PrimaryKeysName:       primaryKeysName,
+		Fields:                req.Fields,
+		Imports:               maps.MapKeys(req.Imports),
+		ShouldPublishEvents:   events.ShouldPublishEvents(req.Project, req.Entity.Identifier),
+		UsesMapper:            usesMapper,
 		HasGeneratedTimestamp: hasGeneratedTimestamp,
-		Project:             req.Project,
+		Project:               req.Project,
 	}
 
 	versionField := VersionField(req.Fields)

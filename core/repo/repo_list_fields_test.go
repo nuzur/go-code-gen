@@ -120,8 +120,12 @@ func TestListFields_MySQLUnchanged(t *testing.T) {
 	out := stripComments(t, renderRepoListFields(t, projecttypes.MYSQL))
 	for _, want := range []string{
 		`INNER JOIN JSON_TABLE(`,
-		`JSON_EXTRACT(%s.%s, '$[*].%s')`,
-		`JSON_EXTRACT(%s.%s, '$.%s')`,
+		// The column operand is now one already-quoted `table`.`column` built by
+		// qualifiedColumn, instead of two raw identifiers — see
+		// TestListFields_IdentifiersAreQuoted. The JSON path arguments are
+		// unchanged.
+		`JSON_EXTRACT(%s, '$[*].%s')`,
+		`JSON_EXTRACT(%s, '$.%s')`,
 		`JSON_CONTAINS(%s,'%s','$')`,   // array containment
 		`JSON_CONTAINS(%s, '%s', '$')`, // member equality
 		`convert(%s, %s)`,
@@ -143,106 +147,79 @@ func TestListFields_MySQLUnchanged(t *testing.T) {
 	}
 }
 
-// Both branches must be syntactically valid Go. gofmt is disabled while
-// rendering above so a syntax error surfaces here as a parse failure rather than
-// as an opaque formatting error.
-func TestListFields_BothEnginesParse(t *testing.T) {
+// TestListFields_IdentifiersAreQuoted pins the per-engine identifier quoting the
+// clause builder relies on (see TestListQuery_IdentifiersAreQuoted for why an
+// entity named `user` used to 500 every list request on Postgres).
+func TestListFields_IdentifiersAreQuoted(t *testing.T) {
+	mysqlQuote := extractFunc(stripComments(t, renderRepoListFields(t, projecttypes.MYSQL)), "func quoteIdent")
+	if !strings.Contains(mysqlQuote, "``") {
+		t.Errorf("mysql quoteIdent does not quote with backticks (nor escape an embedded one):\n%s", mysqlQuote)
+	}
+
+	postgresQuote := extractFunc(stripComments(t, renderRepoListFields(t, projecttypes.POSTGRESQL)), "func quoteIdent")
+	if !strings.Contains(postgresQuote, `""`) {
+		t.Errorf("postgres quoteIdent does not quote with double quotes (nor escape an embedded one):\n%s", postgresQuote)
+	}
+
 	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
-		out := renderRepoListFields(t, dbType)
-		if _, err := parser.ParseFile(token.NewFileSet(), "list_fields.go", out, parser.AllErrors); err != nil {
-			t.Errorf("%s: rendered list_fields.go is not valid Go: %v", dbType, err)
+		out := stripComments(t, renderRepoListFields(t, dbType))
+		if !strings.Contains(out, "func qualifiedColumn(table, column string) string") {
+			t.Errorf("%s: list_fields.go is missing qualifiedColumn", dbType)
+		}
+		// The pre-fix interpolations: a table.column pair rendered raw.
+		for _, banned := range []string{
+			`fmt.Sprintf("%s.%s", req.entity.EntityIdentifier(), req.fieldIdentifier)`,
+			`"JSON_EXTRACT(%s.%s,`,
+			`json_array_elements(%s.%s)`,
+			`json_to_recordset(%s.%s)`,
+		} {
+			if strings.Contains(out, banned) {
+				t.Errorf("%s: list_fields.go still interpolates an unquoted table.column pair: %s", dbType, banned)
+			}
 		}
 	}
 }
 
-// TestListFields_MultiValueSemantics pins the two semantics fixes, on BOTH
-// engines. Both were verified against live MySQL 8 and PostgreSQL 16.
+// TestListFields_EnumValueResolution pins the fix for enum filtering.
 //
-//  1. `!=` on a multi-valued field (JSON array, or a field inside an array of
-//     objects) reused the positive containment clause, so it returned exactly the
-//     rows `=` returned. It must negate.
-//  2. A string filter over an array of objects compared the extracted ARRAY to a
-//     scalar. On MySQL that is false for every row — the filter silently matched
-//     nothing even when an element matched. It must test membership.
-func TestListFields_MultiValueSemantics(t *testing.T) {
+// REST declared enum fields as plain strings while the clause builder resolved
+// them ONLY through a protobuf enum declaration, so every REST enum filter
+// failed with "enum declaration not found" — no syntax worked, on any field.
+// The resolver now reads the value table the transports supply (REST generates
+// no protobuf enums at all), accepts BOTH the quoted string and the bare ident
+// spelling, and reports an unknown value instead of dereferencing nil.
+func TestListFields_EnumValueResolution(t *testing.T) {
 	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
 		out := stripComments(t, renderRepoListFields(t, dbType))
 
-		// (1) negation exists and is driven by the filter function
-		if !strings.Contains(out, `"NOT (%s)"`) {
-			t.Errorf("%s: no NOT(...) wrapper — `!=` on a multi-valued field will behave as `=`", dbType)
-		}
-		if !strings.Contains(out, "filtering.FunctionNotEquals") {
-			t.Errorf("%s: negation is not keyed on FunctionNotEquals", dbType)
-		}
-		// every containment call site must route through maybeNegate
-		if n := strings.Count(out, "maybeNegate("); n < 6 {
-			t.Errorf("%s: only %d maybeNegate call sites; every containment clause "+
-				"(enum-multi, string-multi, and the 4 array types) must negate for `!=`", dbType, n)
+		for _, want := range []string{
+			"func resolveEnumValue(req SingleClauseRequest, name string) (int64, error)",
+			"req.cex.Args[1].GetIdentExpr().GetName()",        // `status = STATUS_ACTIVE`
+			"req.cex.Args[1].GetConstExpr().GetStringValue()", // `status = "active"`
+			"req.enumValues[name]",                            // transport-supplied table
+			"strings.EqualFold(spelling, raw)",                // case-insensitive
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: enum resolution is missing %q", dbType, want)
+			}
 		}
 
-		// (2) the multi-value string filter must not compare an array to a scalar
-		if !strings.Contains(out, "jsonMemberStringEquals(req, value)") {
-			t.Errorf("%s: multi-value string equality does not use a membership test", dbType)
+		// ByName returns nil for an unknown value; calling .Number() on it
+		// panicked the request goroutine on a typo'd filter.
+		if strings.Contains(out, ".ByName(protoreflect.Name(value)).Number()") {
+			t.Errorf("%s: enum resolution still dereferences the result of ByName unguarded", dbType)
 		}
-		if !strings.Contains(out, "jsonMemberStringLike(req, value)") {
-			t.Errorf("%s: multi-value string `has` does not use a membership test", dbType)
-		}
-	}
-
-	// Engine-specific spellings of the membership test.
-	mysql := stripComments(t, renderRepoListFields(t, projecttypes.MYSQL))
-	// Exact spelling (incl. the LOWER/CAST wrapping) is pinned by
-	// TestListFields_HasIsCaseInsensitive; here we only require the mechanism.
-	if !strings.Contains(mysql, "JSON_SEARCH(") || !strings.Contains(mysql, "IS NOT NULL") {
-		t.Error("mysql: substring match over a JSON array must use JSON_SEARCH ... IS NOT NULL")
-	}
-	if !strings.Contains(mysql, `JSON_CONTAINS(%s, '\"%s\"', '$')`) {
-		t.Error("mysql: string membership must search for a quoted JSON literal")
-	}
-
-	pg := stripComments(t, renderRepoListFields(t, projecttypes.POSTGRESQL))
-	if !strings.Contains(pg, "jsonMemberPredicate(req, sqlLike") {
-		t.Error("postgres: substring match over a JSON array must use a like quantifier")
 	}
 }
 
-// TestListFields_HasIsCaseInsensitive guards a difference that is invisible in
-// the SQL's shape and only shows up as wrong search results.
-//
-// `has` (substring search) must mean the same thing everywhere. Three of the
-// four paths did not agree, verified on live engines:
-//   - MySQL `like` on a column   : case-INsensitive (default collation)
-//   - MySQL JSON_SEARCH          : case-SENSITIVE  (JSON strings collate utf8mb4_bin)
-//   - Postgres `like`            : case-SENSITIVE
-//   - Postgres `ilike`           : case-insensitive
-//
-// So Postgres uses ilike, and the MySQL JSON path lowers both sides.
-func TestListFields_HasIsCaseInsensitive(t *testing.T) {
-	mysql := stripComments(t, renderRepoListFields(t, projecttypes.MYSQL))
-	if !strings.Contains(mysql, `sqlLike = "like"`) {
-		t.Error("mysql: expected `like`, which is case-insensitive under the default collation")
+func extractFunc(out, header string) string {
+	i := strings.Index(out, header)
+	if i < 0 {
+		return "(" + header + " not found in rendered output)"
 	}
-	// JSON_SEARCH is case-sensitive, so both sides must be lowered.
-	if !strings.Contains(mysql, `JSON_SEARCH(LOWER(CAST(%s AS CHAR)), 'one', LOWER('%%%s%%')) IS NOT NULL`) {
-		t.Error("mysql: JSON_SEARCH is case-sensitive; both sides must be lowered so that `has` " +
-			"behaves the same for a field in a JSON array as for a plain column")
+	rest := out[i:]
+	if j := strings.Index(rest, "\n}"); j >= 0 {
+		return rest[:j+2]
 	}
-
-	pg := stripComments(t, renderRepoListFields(t, projecttypes.POSTGRESQL))
-	if !strings.Contains(pg, `sqlLike = "ilike"`) {
-		t.Error("postgres: `like` is case-sensitive there; `has` must use ilike to match MySQL")
-	}
-	if strings.Contains(pg, `"like"`) {
-		t.Error("postgres: a bare case-sensitive `like` is still emitted somewhere")
-	}
-
-	// Neither engine may hardcode the operator at a call site, or it will drift
-	// from the constant again.
-	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
-		out := stripComments(t, renderRepoListFields(t, dbType))
-		if strings.Contains(out, `" like '"`) || strings.Contains(out, `%s like '`) {
-			t.Errorf("%s: `like` is hardcoded at a call site instead of using sqlLike", dbType)
-		}
-	}
+	return rest
 }

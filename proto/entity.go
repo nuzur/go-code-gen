@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"strings"
 	"text/template"
 
 	"github.com/iancoleman/strcase"
@@ -37,26 +38,7 @@ func generateEntityProtoFile(
 
 			fields = append(fields, fieldTemplate)
 
-			if f.Type == nemgen.FieldType_FIELD_TYPE_JSON {
-				rel := project.GetRelationshipFromField(f)
-				if rel != nil {
-					dependantEntity := project.GetEntity(rel.To.GetTypeConfig().GetEntity().EntityUuid)
-					if dependantEntity != nil {
-						imports[fmt.Sprintf("%s.proto", strcase.ToSnake(dependantEntity.Identifier))] = nil
-					}
-				}
-			}
-
-			if f.Type == nemgen.FieldType_FIELD_TYPE_ENUM && f.TypeConfig.Enum != nil && f.TypeConfig.Enum.EnumUuid != "" && f.TypeConfig.Enum.EnumUuid != "00000000-0000-0000-0000-000000000000" {
-				enum := project.GetEnum(f.TypeConfig.Enum.EnumUuid)
-				if enum != nil {
-					imports["enums.proto"] = nil
-				}
-			}
-
-			if f.Type == nemgen.FieldType_FIELD_TYPE_DATE || f.Type == nemgen.FieldType_FIELD_TYPE_DATETIME || f.Type == nemgen.FieldType_FIELD_TYPE_TIME {
-				imports["google/protobuf/timestamp.proto"] = nil
-			}
+			addProtoImports(fieldTemplate, project, imports)
 		}
 
 		entityTemplate, _ := entities.ResolveEntityTemplate(e, project)
@@ -98,6 +80,54 @@ func generateEntityProtoFile(
 		})
 	}
 	return protoEntityTemplate, err
+}
+
+// addProtoImports records the .proto files a field's declaration needs, derived
+// from the type the field RENDERS as rather than from f.Type.
+//
+// The two used to be separate pieces of code and they disagreed: the import set
+// switched on FIELD_TYPE_ENUM / DATE|DATETIME|TIME, while ProtoType resolves an
+// ARRAY field through ArrayElement — so an entity whose only enum reference was
+// an array ELEMENT emitted `repeated Certification` with no
+// `import "enums.proto"` and protoc rejected the file ("seems to be defined in
+// enums.proto, which is not imported"). It only ever compiled because a scalar
+// enum field on the same entity supplied the import incidentally. Array-of-
+// date/datetime/time was the same shape, masked by the near-universal
+// created_at. Reading the rendered type is what keeps the two from disagreeing,
+// the same property ArrayProtoType's comment argues for.
+func addProtoImports(f entities.FieldTemplate, project *project.Project, imports map[string]interface{}) {
+	// `repeated X` and `X` need exactly the same import; the element is what
+	// names a type.
+	element := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(f.ProtoType()), "repeated "))
+	if element == "" {
+		return
+	}
+
+	if element == "google.protobuf.Timestamp" {
+		imports["google/protobuf/timestamp.proto"] = nil
+		return
+	}
+
+	// A dependant embed renders the embedded entity's name, declared in that
+	// entity's own file. DependantEntity is the resolver ProtoType itself uses.
+	if dep := f.DependantEntity(); dep != nil && gcgstrings.ToCamelCase(dep.Identifier) == element {
+		// A self-embed would make the file import itself, which protoc rejects;
+		// the message is already in scope.
+		if dep.Uuid != f.Entity.Uuid {
+			imports[fmt.Sprintf("%s.proto", strcase.ToSnake(dep.Identifier))] = nil
+		}
+		return
+	}
+
+	// Anything else that is not a proto scalar is one of the project's enums,
+	// all of which are declared in enums.proto — whether the field reaches it as
+	// a scalar enum, a multi-enum or an array element.
+	for _, enum := range project.Enums() {
+		if gcgstrings.ToCamelCase(enum.Identifier) == element {
+			imports["enums.proto"] = nil
+			return
+		}
+	}
 }
 
 func generateEnumsProtoFile(ctx context.Context, protoDir string, project *projecttypes.Project) error {

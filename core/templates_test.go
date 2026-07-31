@@ -10,7 +10,15 @@ import (
 
 func TestTemplatesParse(t *testing.T) {
 	// The test runs in the core/ directory, so the root of the workspace is ../
-	rootPath := "../"
+	//
+	// Resolved to an ABSOLUTE path, not left as "../": the walk below skips any
+	// directory whose name starts with a dot, and the base name of "../" is ".."
+	// — so the very first callback skipped the root, and this test walked
+	// NOTHING and passed without parsing a single template.
+	rootPath, err := filepath.Abs("..")
+	if err != nil {
+		t.Fatalf("resolving repository root: %v", err)
+	}
 
 	// Define the template helper functions registered in generator templates
 	funcs := template.FuncMap{
@@ -19,7 +27,8 @@ func TestTemplatesParse(t *testing.T) {
 		"Inc":         func(i int) int { return i + 1 },
 	}
 
-	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
+	parsed := 0
+	err = filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -31,6 +40,7 @@ func TestTemplatesParse(t *testing.T) {
 
 		// Target template files
 		if !info.IsDir() && (strings.HasSuffix(path, ".tmpl") || strings.HasSuffix(path, ".template")) {
+			parsed++
 			t.Run(path, func(t *testing.T) {
 				content, err := os.ReadFile(path)
 				if err != nil {
@@ -49,5 +59,10 @@ func TestTemplatesParse(t *testing.T) {
 
 	if err != nil {
 		t.Fatalf("failed to walk repository templates: %v", err)
+	}
+	// Guard the walk itself: finding no templates means the test is not testing
+	// anything, which is exactly what it did while the root was skipped.
+	if parsed == 0 {
+		t.Fatalf("no templates found under %s", rootPath)
 	}
 }

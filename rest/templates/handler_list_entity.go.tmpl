@@ -47,6 +47,7 @@ func (h *handlers) List{{.Name}}(w http.ResponseWriter, r *http.Request) {
 		PageSize:              lp.GetPageSize(),
 		Filter:                filter,
 		FilteringDeclarations: declarations,
+		EnumValues:            {{.FinalIdentifier}}EnumValues(),
 		OrderBy:               orderBy,
 		IncludeFields:         lp.includeFields,
 		ExcludeFields:         lp.excludeFields,
@@ -85,8 +86,15 @@ func {{.FinalIdentifier}}Declarations() *filtering.Declarations {
 		// {{$entityDeclaration.Identifier}}
 		{{range $field := $entityDeclaration.Fields}}
 		{{if eq $field.IsEnum true }}
-		// enums are filtered by their string value over REST
+		// An enum is filtered by its VALUE over REST — either quoted
+		// (status = "active", matched case-insensitively against every spelling
+		// in {{$.FinalIdentifier}}EnumValues) or as the generated value name ident
+		// (status = STATUS_ACTIVE, the same spelling gRPC accepts). Both are
+		// strings to the type checker; the number they stand for is resolved
+		// from the value table, not from this declaration.
 		filtering.DeclareIdent("{{$field.Name}}", filtering.TypeString),
+		{{range $value := $field.EnumValues}}filtering.DeclareIdent("{{$value.ProtoName}}", filtering.TypeString),
+		{{end}}
 		{{else}}
 		filtering.DeclareIdent("{{$field.Name}}", {{$field.Filtering}}),
 		{{end}}
@@ -97,4 +105,19 @@ func {{.FinalIdentifier}}Declarations() *filtering.Declarations {
 		log.Printf("error creating declarations for {{.FinalIdentifier}}: %v", err)
 	}
 	return declarations
+}
+
+// {{.FinalIdentifier}}EnumValues maps each enum filter field to every accepted
+// spelling of its values and the number the column stores. REST generates no
+// protobuf enum types (an app built with --api rest has no proto package at
+// all), so this table — not the filter declarations — is what makes an enum
+// filter resolvable here.
+func {{.FinalIdentifier}}EnumValues() map[string]map[string]int64 {
+	return map[string]map[string]int64{
+		{{range $entityDeclaration := .Declarations}}{{range $field := $entityDeclaration.Fields}}{{if eq $field.IsEnum true }}
+		"{{$field.Name}}": { {{range $value := $field.EnumValues}}{{range $name := $value.Names}}
+			"{{$name}}": {{$value.Number}},{{end}}{{end}}
+		},
+		{{end}}{{end}}{{end}}
+	}
 }

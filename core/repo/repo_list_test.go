@@ -82,3 +82,47 @@ func extractBuildLimit(out string) string {
 	}
 	return rest
 }
+
+// TestListQuery_IdentifiersAreQuoted pins the fix for an entity whose identifier
+// is a reserved word.
+//
+// The runtime builder interpolated the entity identifier raw, so an entity named
+// `user` — which `auth: jwt` REQUIRES — produced `SELECT user.id ... FROM user`.
+// Postgres reads `user` as the CURRENT_USER keyword and fails on the following
+// `.`, so every list request against that entity returned a 500, while the same
+// model worked on MySQL. `order`, `group` and `session` fail identically, as do
+// columns with those names.
+//
+// Every table/column reference must therefore go through quoteIdent /
+// qualifiedColumn (defined per engine in list_fields.go), exactly as create.sql
+// and the sqlc queries already do.
+func TestListQuery_IdentifiersAreQuoted(t *testing.T) {
+	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
+		out := renderRepoList(t, dbType)
+
+		// The raw interpolations, each of which produced invalid SQL.
+		for _, banned := range []string{
+			`fmt.Sprintf("%s.*", entity.EntityIdentifier())`,
+			`fmt.Sprintf("%s.%s", entity.EntityIdentifier()`,
+			`fmt.Sprintf("%s %s %s", entity.EntityIdentifier()`,
+			`fmt.Sprintf("%s %s", f.fieldIdentifier, order)`,
+		} {
+			if strings.Contains(out, banned) {
+				t.Errorf("%s: list.go still interpolates an UNQUOTED identifier: %s", dbType, banned)
+			}
+		}
+
+		// ... and the quoted forms that replaced them: select list, FROM clause,
+		// primary keys (GROUP BY / count) and ORDER BY.
+		for _, want := range []string{
+			`fmt.Sprintf("%s.*", quoteIdent(entity.EntityIdentifier()))`,
+			`quoteIdent(entity.EntityIdentifier()), joinStatement, jsonTablesFinal`,
+			`qualifiedColumn(entity.EntityIdentifier(), c)`,
+			`qualifiedColumn(entity.EntityIdentifier(), f.fieldIdentifier)`,
+		} {
+			if !strings.Contains(out, want) {
+				t.Errorf("%s: list.go does not quote an identifier where it must: expected %s", dbType, want)
+			}
+		}
+	}
+}

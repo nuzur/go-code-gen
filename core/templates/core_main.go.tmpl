@@ -109,7 +109,7 @@ func New(params Params) (*Implementation, error) {
 		})
 	}
 
-	return &Implementation{
+	impl := &Implementation{
 		db: db,
 		repository: repository,
 		logger: logger,
@@ -119,7 +119,33 @@ func New(params Params) (*Implementation, error) {
 		{{if eq .CoreConfig.EventsConfig.Enabled true}}
 		events: params.Events,
 		{{end}}
-	}, nil
+	}
+
+	// Every module is built ONCE, here, and the accessors below just hand it
+	// back. The accessors used to build their module lazily on a VALUE receiver,
+	// so the assignment landed on a copy that was thrown away when the method
+	// returned: every one of the (hundreds of) accessor calls in the transports
+	// constructed a fresh module — with a fresh, empty 30s cache and its own
+	// janitor goroutine — which is why the per-entity cache never served a hit
+	// and WithSkipCache() meant nothing.
+	//
+	// Constructing eagerly rather than lazily on a POINTER receiver is
+	// deliberate: the lazy branch would otherwise be a data race, since the
+	// accessors are called concurrently from request handlers.
+	{{range $entity := .StandaloneEntities}}
+	impl.{{$entity.Identifier}} = {{$entity.Identifier}}.New(coretypes.ModuleParams{
+		Repository: repository,
+		Logger:     logger,
+		{{if eq $.MonitoringConfig.Enabled true}}
+		Monitoring: params.Monitoring,
+		{{end}}
+		{{if eq $.CoreConfig.EventsConfig.Enabled true}}
+		Events: params.Events,
+		{{end}}
+	})
+	{{end}}
+
+	return impl, nil
 }
 
 
@@ -131,22 +157,12 @@ func (i *Implementation) DB() *sql.DB{
 	return i.db
 }
 
-{{$events := .CoreConfig.EventsConfig}}
-{{$monitoring := .MonitoringConfig}}
 {{range $entity := .StandaloneEntities}}
-func (i Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identifier}}.Module {
-	if i.{{$entity.Identifier}} == nil {
-		i.{{$entity.Identifier}} = {{$entity.Identifier}}.New(coretypes.ModuleParams{
-		 Repository:i.repository,
-		 Logger: i.logger,
-		 {{if eq $monitoring.Enabled true}}
-		 Monitoring: i.monitoring,
-		 {{end}}
-		 {{if eq $events.Enabled true}}
-		 Events: i.events,
-		 {{end}}
-		})
-	}
+// {{$entity.Identifier | ToCamelCase}} returns the process-wide {{$entity.Identifier}} module built in New.
+// The receiver is a POINTER, like Destroy/DB above: a value receiver here would
+// copy the struct on every call, which is how the previous lazy initialization
+// came to be discarded.
+func (i *Implementation) {{$entity.Identifier | ToCamelCase}}() {{$entity.Identifier}}.Module {
 	return i.{{$entity.Identifier}}
 }
 {{end}}
