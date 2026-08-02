@@ -23,5 +23,13 @@ jobs:
       - name: Install dependencies
         run: go mod download
 
+      # Generation invokes protoc whenever the proto surface is enabled, and the
+      # proto tests (TestProtoImportsFollowRenderedTypes, the fieldtypes matrix's
+      # proto arm) skip without it — which kept CI green while asserting nothing
+      # about protos, until a test that could not skip made it red instead.
+      # Installing it keeps the proto arm real in CI.
+      - name: Install protoc
+        run: sudo apt-get update -y && sudo apt-get install -y protobuf-compiler
+
       - name: Run Tests
         run: go test -v ./...

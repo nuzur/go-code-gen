@@ -3,6 +3,7 @@ package gocodegen
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -29,6 +30,17 @@ import (
 // isolates one route to a named type, and the enum/timestamp cases with no
 // scalar sibling are the ones that used to fail.
 func TestProtoImportsFollowRenderedTypes(t *testing.T) {
+	// The assertions below are on rendered .proto TEXT and need no protoc — but
+	// the generation run that PRODUCES that text invokes protoc unconditionally
+	// when the proto surface is enabled, and fails without it. That is what broke
+	// CI for three commits: Generate died at gen.sh (`protoc: not found`, exit
+	// 127) before the first text assertion ran. Same guard as
+	// TestAllFieldTypesGenerate; CI installs protoc, so this skip is for
+	// protoc-less dev machines, not a permanent CI blind spot.
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip("protoc not installed; generation cannot produce the proto surface these cases assert on")
+	}
+
 	const (
 		enumUUID   = "11111111-1111-1111-1111-111111111111"
 		entityUUID = "44444444-4444-4444-4444-444444444444"
