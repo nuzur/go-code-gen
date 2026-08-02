@@ -9,11 +9,20 @@ import (
 	"github.com/nuzur/filetools"
 	"github.com/nuzur/go-code-gen/files"
 	"github.com/nuzur/go-code-gen/project"
+	gcgstrings "github.com/nuzur/go-code-gen/strings"
 	nemgen "github.com/nuzur/nem/idl/gen"
 )
 
 //go:embed templates/**
 var templates embed.FS
+
+// infoEntity pairs an entity's identifier with the REST route the generator
+// actually mounts for it. The route is plural and kebab-cased (`roast_batch` →
+// `roast-batches`), so an example built from the identifier alone 404s.
+type infoEntity struct {
+	Identifier string
+	Path       string
+}
 
 type infoTemplateData struct {
 	AppName      string
@@ -23,7 +32,17 @@ type infoTemplateData struct {
 	RESTBasePath string
 	HTTPPort     string
 	AuthType     string // "" | "jwt" | "keycloak"
-	Entities     []string
+	Entities     []infoEntity
+}
+
+// ExampleEntityPath is the REST collection path used by the page's example
+// commands: the real, generated route of the first standalone entity. The
+// fallback is HTML-escaped because the only consumer is the HTML template.
+func (d infoTemplateData) ExampleEntityPath() string {
+	if len(d.Entities) == 0 {
+		return d.RESTBasePath + "/&lt;entity&gt;"
+	}
+	return d.RESTBasePath + "/" + d.Entities[0].Path
 }
 
 // GenerateInfo emits an `info` package whose Handler serves a self-documenting
@@ -49,7 +68,7 @@ func GenerateInfo(ctx context.Context, params *project.ProjectParams) error {
 		RESTBasePath: proj.RESTConfig.BasePath,
 		HTTPPort:     proj.APIConfig.HTTPPort,
 		AuthType:     authType(proj),
-		Entities:     standaloneEntityIdentifiers(proj),
+		Entities:     entityRoutes(proj),
 	}
 
 	tplBytes, err := files.GetTemplateBytes(templates, "info")
@@ -87,14 +106,21 @@ func authType(proj *project.Project) string {
 	return "jwt"
 }
 
-func standaloneEntityIdentifiers(proj *project.Project) []string {
-	var out []string
+// entityRoutes lists the standalone entities with the REST route each one is
+// mounted at. The path is derived with the same helper the REST router uses
+// (rest.RESTEntityTemplate.PluralPath), so the page cannot drift from the routes
+// that actually exist.
+func entityRoutes(proj *project.Project) []infoEntity {
+	var out []infoEntity
 	if proj.ProjectVersion == nil {
 		return out
 	}
 	for _, e := range proj.ProjectVersion.Entities {
 		if e.Type == nemgen.EntityType_ENTITY_TYPE_STANDALONE {
-			out = append(out, e.Identifier)
+			out = append(out, infoEntity{
+				Identifier: e.Identifier,
+				Path:       gcgstrings.ToKebabPlural(e.Identifier),
+			})
 		}
 	}
 	return out
