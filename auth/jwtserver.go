@@ -100,6 +100,21 @@ func generateBasicJWTServer(ctx context.Context, authDir string, project *projec
 		return err
 	}
 
+	jwtHTTPTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_http"))
+	if err != nil {
+		if project.OnStatusChange != nil {
+			project.OnStatusChange(fmt.Sprintf("ERROR: Getting template bytes for jwt http helpers: %v", err))
+		}
+		return fmt.Errorf("ERROR: Getting template bytes for jwt http helpers: %v\n", err)
+	}
+	_, err = files.GenerateFile(ctx, filetools.FileRequest{
+		OutputPath:    path.Join(jwtServerDir, "http.go"),
+		TemplateBytes: jwtHTTPTmplBytes,
+	})
+	if err != nil {
+		return err
+	}
+
 	jwtValidateTmplBytes, err := files.GetTemplateBytes(templates, path.Join("jwtserver", "jwt_validate"))
 	if err != nil {
 		if project.OnStatusChange != nil {

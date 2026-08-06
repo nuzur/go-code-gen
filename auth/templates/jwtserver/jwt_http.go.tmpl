@@ -1,0 +1,28 @@
+package jwtserver
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+// errorResponse is the body every failing auth endpoint returns.
+//
+// It exists because the handlers used to answer with a bare status code and an
+// EMPTY body, which made them indistinguishable from the mux that routed the
+// request. A gRPC-only deployment serves the info page's catch-all "/" handler
+// on the same port as /signin, so `curl -X POST .../signin` returning a bodiless
+// 404 read as "this route does not exist" when it actually meant "no user row
+// matched that email" — and the reasonable conclusion drawn from it was that
+// gRPC-only builds have no auth surface at all. They do; it just never said so.
+type errorResponse struct {
+	Error string `json:"error"`
+}
+
+// writeError answers with a status and a machine-readable reason. It sets the
+// content type itself rather than relying on the caller's CORS preamble, so it
+// is safe from every handler.
+func writeError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(errorResponse{Error: msg})
+}

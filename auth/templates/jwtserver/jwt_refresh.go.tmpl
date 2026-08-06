@@ -2,10 +2,11 @@ package jwtserver
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func (i *Implementation) Refresh(w http.ResponseWriter, r *http.Request) {
@@ -14,43 +15,54 @@ func (i *Implementation) Refresh(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&tknReq)
 	if err != nil {
 		// If the structure of the body is wrong, return an HTTP error
-		w.WriteHeader(http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, `invalid request body, expected JSON {"token":"..."}`)
 		return
 	}
 	tknStr := tknReq.Token
 	claims := &Claims{}
 	tkn, err := jwt.ParseWithClaims(tknStr, claims, func(token *jwt.Token) (interface{}, error) {
 		return i.key, nil
-	})
-	if !tkn.Valid {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
+	// err is checked BEFORE tkn is touched. ParseWithClaims returns a NIL token
+	// when the string does not split into three segments — true of jwt-go v3 and
+	// of golang-jwt v5 alike — so the previous order (`if !tkn.Valid` first)
+	// panicked on any malformed token, including the empty string. net/http
+	// recovered per-connection, so the caller just saw the connection drop.
 	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			w.WriteHeader(http.StatusUnauthorized)
-			return
+		switch {
+		case errors.Is(err, jwt.ErrTokenExpired):
+			writeError(w, http.StatusUnauthorized, "token has expired, sign in again")
+		case errors.Is(err, jwt.ErrTokenSignatureInvalid):
+			writeError(w, http.StatusUnauthorized, "token signature is invalid")
+		default:
+			writeError(w, http.StatusUnauthorized, "token is malformed or invalid")
 		}
-		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	// (END) The code uptil this point is the same as the first part of the `Welcome` route
+	if tkn == nil || !tkn.Valid {
+		writeError(w, http.StatusUnauthorized, "token is malformed or invalid")
+		return
+	}
 
 	// We ensure that a new token is not issued until enough time has elapsed
 	// In this case, a new token will only be issued if the old token is within
 	// 30 seconds of expiry. Otherwise, return a bad request status
-	if time.Unix(claims.ExpiresAt, 0).Sub(time.Now()) > 30*time.Second {
-		w.WriteHeader(http.StatusBadRequest)
+	if claims.ExpiresAt == nil {
+		writeError(w, http.StatusUnauthorized, "token has no expiry claim")
+		return
+	}
+	if time.Until(claims.ExpiresAt.Time) > 30*time.Second {
+		writeError(w, http.StatusBadRequest, "token is not close enough to expiry to be refreshed")
 		return
 	}
 
 	// Now, create a new token for the current use, with a renewed expiration time
 	expirationTime := time.Now().Add(30 * 24 * time.Hour)
-	claims.ExpiresAt = expirationTime.Unix()
+	claims.ExpiresAt = jwt.NewNumericDate(expirationTime)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(i.key)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "could not issue a token")
 		return
 	}
 

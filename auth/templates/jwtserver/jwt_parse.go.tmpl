@@ -2,38 +2,38 @@ package jwtserver
 
 import (
 	"errors"
-	"net/http"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func (i *Implementation) ParseToken(tknStr string, w *http.ResponseWriter) (*Claims, error) {
+// ParseToken verifies a token's signature and claims and returns them.
+//
+// It reports failure ONLY through its error: it used to take a
+// `w *http.ResponseWriter` and write status codes as a side effect, but every
+// caller passed nil, so the branch was dead. Mapping an error to a status is the
+// handler's job, and the handlers now do it consistently via writeError.
+func (i *Implementation) ParseToken(tknStr string) (*Claims, error) {
 	claims := &Claims{}
 
-	// Parse the JWT string and store the result in `claims`.
-	// Note that we are passing the key in this method as well. This method will return an error
-	// if the token is invalid (if it has expired according to the expiry time we set on sign in),
-	// or if the signature does not match
+	// Parse the JWT string and store the result in `claims`. The key is supplied
+	// here as well: parsing fails if the token is invalid — expired per the
+	// expiry set at sign-in, or signed with a different key.
+	//
+	// WithValidMethods pins the accepted algorithm to the one SignIn mints with.
+	// Without it the algorithm named in the token's own header selects the
+	// verifier, which is the shape every JWT algorithm-confusion attack relies on.
 	tkn, err := jwt.ParseWithClaims(tknStr, claims,
 		func(token *jwt.Token) (interface{}, error) {
 			return i.key, nil
-		})
+		},
+		jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
+	)
 	if err != nil {
-		if err == jwt.ErrSignatureInvalid {
-			if w != nil {
-				(*w).WriteHeader(http.StatusUnauthorized)
-			}
-			return nil, err
-		}
-		if w != nil {
-			(*w).WriteHeader(http.StatusBadRequest)
-		}
 		return nil, err
 	}
-	if !tkn.Valid {
-		if w != nil {
-			(*w).WriteHeader(http.StatusUnauthorized)
-		}
+	// Checked AFTER err: ParseWithClaims returns a nil token for a string that
+	// does not split into three segments, so touching tkn first panics.
+	if tkn == nil || !tkn.Valid {
 		return nil, errors.New("invalid token")
 	}
 	return claims, nil

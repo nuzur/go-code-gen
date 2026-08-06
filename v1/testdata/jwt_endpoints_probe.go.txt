@@ -1,0 +1,226 @@
+package main
+
+// Generated into the module under test by TestGRPCOnlyJWTEndpoints.
+// __MODULE__ is replaced with the generated module path.
+
+import (
+	"encoding/base64"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/config"
+
+	jwtserver "__MODULE__/auth/jwtserver"
+	"__MODULE__/info"
+)
+
+const testKey = "test-signing-key"
+
+// newServer returns the JWT server, built once. It is a singleton because
+// jwtserver.New registers its routes on the GLOBAL http.DefaultServeMux, and
+// Go's mux panics on a duplicate pattern — so it can only be constructed once
+// per process.
+//
+// Core is nil: every assertion below is on a path that fails before the database
+// is reached, so no DB is needed.
+var newServer = sync.OnceValues(func() (jwtserver.Interface, error) {
+	provider, err := config.NewYAML(config.Source(strings.NewReader("auth:\n  jwt:\n    key: " + testKey + "\n")))
+	if err != nil {
+		return nil, err
+	}
+	impl, err := jwtserver.New(jwtserver.Params{Config: provider})
+	if err != nil {
+		return nil, err
+	}
+	return impl.(jwtserver.Interface), nil
+})
+
+func mustServer(t *testing.T) jwtserver.Interface {
+	t.Helper()
+	s, err := newServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+// TestAuthRoutesMounted is the direct regression test for the misdiagnosis that
+// prompted this work: on a REST-less (gRPC-only) build the JWT endpoints must
+// resolve to their OWN mux patterns. If they fell through to the info page's "/"
+// catch-all they would 404, which is exactly what made the auth surface look
+// absent.
+func TestAuthRoutesMounted(t *testing.T) {
+	info.Register()
+	mustServer(t)
+
+	for _, p := range []string{"/signin", "/refresh", "/validate"} {
+		_, pattern := http.DefaultServeMux.Handler(httptest.NewRequest("POST", p, nil))
+		if pattern != p {
+			t.Errorf("%s resolved to mux pattern %q, want %q — the auth endpoint is not mounted (%q means it fell through to the info page catch-all)", p, pattern, p, "/")
+		}
+	}
+}
+
+func TestSignInMethodNotAllowed(t *testing.T) {
+	s := mustServer(t)
+
+	// A bare GET used to reach the body decode and answer 400, which reads as
+	// "bad credentials" rather than "wrong method".
+	rec := httptest.NewRecorder()
+	s.SignIn(rec, httptest.NewRequest("GET", "/signin", nil))
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Errorf("GET /signin = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+	if allow := rec.Header().Get("Allow"); !strings.Contains(allow, "POST") {
+		t.Errorf("GET /signin Allow header = %q, want it to list POST", allow)
+	}
+	assertErrorBody(t, rec, "GET /signin")
+
+	rec = httptest.NewRecorder()
+	s.SignIn(rec, httptest.NewRequest("OPTIONS", "/signin", nil))
+	if rec.Code != http.StatusOK {
+		t.Errorf("OPTIONS /signin = %d, want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestSignInBadBody(t *testing.T) {
+	s := mustServer(t)
+
+	// Form encoding rather than JSON — one of the shapes tried against the live
+	// deploy while diagnosing this.
+	req := httptest.NewRequest("POST", "/signin", strings.NewReader("email=a@b.com&password=x"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	s.SignIn(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("POST /signin (form-encoded) = %d, want %d", rec.Code, http.StatusBadRequest)
+	}
+	assertErrorBody(t, rec, "POST /signin (form-encoded)")
+}
+
+// TestRefreshMalformedToken guards a nil-pointer panic: ParseWithClaims returns
+// a NIL token for a string that does not split into three segments, and Refresh
+// used to read tkn.Valid before checking err.
+func TestRefreshMalformedToken(t *testing.T) {
+	s := mustServer(t)
+
+	for _, tok := range []string{"", "garbage", "a.b"} {
+		rec := httptest.NewRecorder()
+		body := strings.NewReader(fmt.Sprintf("{%q:%q}", "token", tok))
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("POST /refresh with token %q panicked: %v", tok, r)
+				}
+			}()
+			s.Refresh(rec, httptest.NewRequest("POST", "/refresh", body))
+		}()
+		if rec.Code != http.StatusUnauthorized {
+			t.Errorf("POST /refresh with token %q = %d, want %d", tok, rec.Code, http.StatusUnauthorized)
+		}
+		assertErrorBody(t, rec, "POST /refresh with token "+tok)
+	}
+}
+
+// TestValidateWithoutToken guards the 500-that-should-have-been-401.
+func TestValidateWithoutToken(t *testing.T) {
+	s := mustServer(t)
+
+	rec := httptest.NewRecorder()
+	s.Validate(rec, httptest.NewRequest("GET", "/validate", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("GET /validate with no Authorization header = %d, want %d", rec.Code, http.StatusUnauthorized)
+	}
+	assertErrorBody(t, rec, "GET /validate")
+}
+
+// TestTokenWireFormat guards the golang-jwt v5 migration. A token minted the way
+// SignIn mints one must parse, and `exp` must still serialise as a plain integer
+// — that is what keeps tokens issued by the previous jwt-go v3 build valid.
+func TestTokenWireFormat(t *testing.T) {
+	s := mustServer(t)
+
+	exp := time.Now().Add(time.Hour).Truncate(time.Second)
+	tokenString, err := jwt.NewWithClaims(jwt.SigningMethodHS256, &jwtserver.Claims{
+		Email:            "a@b.com",
+		RegisteredClaims: jwt.RegisteredClaims{ExpiresAt: jwt.NewNumericDate(exp)},
+	}).SignedString([]byte(testKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	parser, ok := s.(interface {
+		ParseToken(string) (*jwtserver.Claims, error)
+	})
+	if !ok {
+		t.Fatal("jwtserver implementation does not expose ParseToken(string)")
+	}
+	claims, err := parser.ParseToken(tokenString)
+	if err != nil {
+		t.Fatalf("ParseToken rejected a freshly minted token: %v", err)
+	}
+	if claims.Email != "a@b.com" {
+		t.Errorf("email claim = %q, want %q", claims.Email, "a@b.com")
+	}
+	if claims.ExpiresAt == nil || !claims.ExpiresAt.Time.Equal(exp) {
+		t.Errorf("exp claim = %v, want %v", claims.ExpiresAt, exp)
+	}
+
+	raw, err := base64.RawURLEncoding.DecodeString(strings.Split(tokenString, ".")[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]any
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.UseNumber()
+	if err := dec.Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	got, ok := payload["exp"].(json.Number)
+	if !ok {
+		t.Fatalf("exp claim is %T, want a JSON number", payload["exp"])
+	}
+	if strings.ContainsAny(got.String(), ".eE") {
+		t.Errorf("exp serialised as %q, want a plain integer — v3-issued tokens would stop validating", got.String())
+	}
+}
+
+// TestSigningMethodPinned checks that parsing refuses an algorithm SignIn never
+// mints, rather than letting the token's own header pick the verifier.
+func TestSigningMethodPinned(t *testing.T) {
+	s := mustServer(t)
+
+	parser, ok := s.(interface {
+		ParseToken(string) (*jwtserver.Claims, error)
+	})
+	if !ok {
+		t.Fatal("jwtserver implementation does not expose ParseToken(string)")
+	}
+
+	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
+	body := base64.RawURLEncoding.EncodeToString([]byte(`{"email":"attacker@example.com"}`))
+	if _, err := parser.ParseToken(header + "." + body + "."); err == nil {
+		t.Error("ParseToken accepted an alg=none token")
+	}
+}
+
+func assertErrorBody(t *testing.T, rec *httptest.ResponseRecorder, what string) {
+	t.Helper()
+	var body struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Errorf("%s: body %q is not JSON (%v) — a bodiless failure is indistinguishable from the mux's own 404", what, rec.Body.String(), err)
+		return
+	}
+	if body.Error == "" {
+		t.Errorf("%s: response carries no error message", what)
+	}
+}

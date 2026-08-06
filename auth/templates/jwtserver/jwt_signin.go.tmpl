@@ -6,15 +6,22 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"{{.Module}}/{{.CoreConfig.CoreDir}}/module/{{.UserEntityIdentifier}}/types"
 )
 
+// invalidCredentials is returned for BOTH an unknown email and a wrong password.
+//
+// Answering "not found" for one and "unauthorized" for the other turns signin
+// into an oracle for which email addresses have accounts. One status and one
+// message for both closes that.
+const invalidCredentials = "invalid email or password"
+
 func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	origin := r.Header.Get("origin")
-	method := r.Method	
+	method := r.Method
 	w.Header().Set("Access-Control-Allow-Origin", origin)
 	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
@@ -24,13 +31,21 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	// A GET used to fall through to the body decode and answer 400 "bad request",
+	// which reads like the credentials were malformed rather than like the method
+	// was wrong. Say which methods the endpoint takes instead.
+	if method != http.MethodPost {
+		w.Header().Set("Allow", "POST, OPTIONS")
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed, use POST")
+		return
+	}
 	var creds Credentials
 	// Get the JSON body and decode into credentials
 	err := json.NewDecoder(r.Body).Decode(&creds)
 	if err != nil {
 		// If the structure of the body is wrong, return an HTTP error
-		w.WriteHeader(http.StatusBadRequest)
-		i.logger.Error("error decoding credentials", zap.Error(err))
+		writeError(w, http.StatusBadRequest, `invalid request body, expected JSON {"email":"...","password":"..."}`)
+		i.logger.Warn("error decoding credentials", zap.Error(err))
 		return
 	}
 	ctx := context.Background()
@@ -45,19 +60,23 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	defer cancelFn()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "could not look up the user")
 		i.logger.Error("error getting user", zap.Error(err))
 		return
 	}
 
     if len(userRes.Results) == 0 {
-        w.WriteHeader(http.StatusNotFound)
-		i.logger.Error("user not found", zap.String("email", creds.Email))
+        // 401, NOT 404. A bodiless 404 from this handler is byte-identical to the
+        // one the mux returns for a route it does not have, so "no user row with
+        // that email" was read as "signin is not deployed". It is also the
+        // enumeration oracle described above.
+        writeError(w, http.StatusUnauthorized, invalidCredentials)
+		i.logger.Warn("sign-in failed: no user with that email", zap.String("email", creds.Email))
 		return
     }
 
-    
-	
+
+
 	{{ if ne .UserPasswordField nil }}
 	user := userRes.Results[0]
 	{{$field := .UserPasswordField}}
@@ -65,28 +84,29 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	passwordStr := user.{{.UserPasswordFieldName}}
 	{{else}}
 	passwordStr := user.{{.UserPasswordFieldName}}.String
-	{{end}}	
+	{{end}}
 	{{else}}
 	passwordStr := ""
-	{{end}}	
+	{{end}}
 
 
+	// The stored value must be a bcrypt hash; a plaintext password column fails
+	// here with "hashedSecret too short to be a bcrypted password".
 	err = bcrypt.CompareHashAndPassword([]byte(passwordStr), []byte(creds.Password))
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		i.logger.Error("error comparing password", zap.Error(err))
+		writeError(w, http.StatusUnauthorized, invalidCredentials)
+		i.logger.Warn("sign-in failed: password mismatch", zap.String("email", creds.Email), zap.Error(err))
 		return
 	}
 
 	// Declare the expiration time of the token
-	// here, we have kept it as 5 minutes
 	expirationTime := time.Now().Add(30 * 24 * time.Hour)
 	// Create the JWT claims, which includes the username and expiry time
 	claims := &Claims{
 		Email: creds.Email,
-		StandardClaims: jwt.StandardClaims{
-			// In JWT, the expiry time is expressed as unix milliseconds
-			ExpiresAt: expirationTime.Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
@@ -96,7 +116,7 @@ func (i *Implementation) SignIn(w http.ResponseWriter, r *http.Request) {
 	tokenString, err := token.SignedString(i.key)
 	if err != nil {
 		// If there is an error in creating the JWT return an internal server error
-		w.WriteHeader(http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "could not issue a token")
 		i.logger.Error("error generating token", zap.Error(err))
 		return
 	}

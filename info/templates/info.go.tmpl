@@ -72,6 +72,7 @@ const infoHTML = `<!doctype html>
 {{ if .RESTEnabled }}curl __NUZUR_ORIGIN__{{.ExampleEntityPath}} -H "Authorization: Bearer $TOKEN"{{ end }}{{ if and .RESTEnabled .GRPCEnabled }}
 {{ end }}{{ if .GRPCEnabled }}grpcurl __NUZUR_PLAINTEXT__-H "authorization: Bearer $TOKEN" __NUZUR_ADDR__ list{{ end }}</code></pre>
   <p>Also <code>POST /refresh</code> and <code>POST /validate</code>, on the same address.</p>
+  <p class="note">These endpoints are served here whether or not a REST API is enabled — a gRPC-only deployment still signs in over HTTP at this address. A <code>401</code> from signin means the email matched no user row <em>or</em> the password was wrong; a user row must exist in your <code>{{ .UserEntityIdentifier }}</code> entity with a <strong>bcrypt hash</strong> in its password column, not a plaintext password.</p>
   {{ else }}
   <p>Keycloak (OpenID Connect) — get a token from your realm and send <code>Authorization: Bearer &lt;token&gt;</code>{{ if .RESTEnabled }} with every request:</p>
   <pre><code>curl __NUZUR_ORIGIN__{{.ExampleEntityPath}} -H "Authorization: Bearer $TOKEN"</code></pre>{{ else }}.</p>{{ end }}

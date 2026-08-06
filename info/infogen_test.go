@@ -126,6 +126,38 @@ func TestInfoPageExamplesTargetTheRequestOrigin(t *testing.T) {
 	})
 }
 
+// TestInfoPageExplainsSigninFailures covers the guidance that would have
+// prevented a real misdiagnosis: on a gRPC-only deploy, signin answered 404 for
+// "no user row with that email" and it was read as "signin is not deployed".
+// The page must say that the auth endpoints exist regardless of REST, that a 401
+// covers both bad-password and no-such-user, and that the stored password has to
+// be a bcrypt hash.
+func TestInfoPageExplainsSigninFailures(t *testing.T) {
+	src := renderInfoPackage(t, infoTemplateData{
+		AppName:              "terroir",
+		GRPCEnabled:          true,
+		GRPCPort:             "6009",
+		HTTPPort:             "8080",
+		AuthType:             "jwt",
+		UserEntityIdentifier: "user",
+		Entities:             []infoEntity{{Identifier: "user", Path: "users"}},
+	})
+	// gRPC-only: no REST section at all, but signin must still be documented.
+	page := buildPageServer(t, src)(t, "64.225.62.77:8443")
+
+	for _, want := range []string{
+		"curl -s -X POST http://64.225.62.77:8443/signin",
+		"whether or not a REST API is enabled",
+		"<code>401</code>",
+		"bcrypt hash",
+		"<code>user</code>",
+	} {
+		if !strings.Contains(page, want) {
+			t.Errorf("gRPC-only info page does not contain %q", want)
+		}
+	}
+}
+
 // assertNoInternalPortsInCommands checks that no runnable line on the page names
 // a container-internal port. Mentioning them as information is fine; putting
 // them in a command the reader is invited to paste is the bug.

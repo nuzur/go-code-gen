@@ -3,7 +3,7 @@ package jwtserver
 import (
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type TokenResponse struct {
@@ -17,9 +17,14 @@ type Credentials struct {
 	Email    string `json:"email"`
 }
 
+// Claims embeds jwt.RegisteredClaims, which supplies the getters the v5 Claims
+// interface requires. The serialised form is unchanged from the v3
+// StandardClaims this replaced: `exp` still marshals as a plain integer, because
+// jwt.TimePrecision defaults to time.Second and NumericDate drops an empty
+// fractional part. Tokens minted before the upgrade still validate after it.
 type Claims struct {
 	Email string `json:"email"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 type TokenRefresh struct {

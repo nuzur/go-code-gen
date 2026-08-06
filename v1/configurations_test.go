@@ -149,6 +149,18 @@ func TestGenerateConfigurations(t *testing.T) {
 			rest: project.RESTConfig{Enabled: true, OpenAPI: true},
 			auth: true,
 		},
+		{
+			// gRPC + JWT with REST OFF. This combination had no case, which is
+			// how a deploy shipped where signin looked absent: with REST
+			// disabled the JWT endpoints are served by main.go's own httpServer
+			// on the default mux rather than by the REST router, and nothing
+			// exercised that path. See TestGRPCOnlyJWTEndpoints for the
+			// behaviour; this case guards that it still compiles.
+			name:       "grpc_jwt",
+			proto:      project.ProtoConfig{Enabled: true, Server: true, Dir: "idl"},
+			auth:       true,
+			needsProto: true,
+		},
 	}
 
 	for _, tc := range cases {

@@ -30,10 +30,12 @@ func (i *Implementation) Validate(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	// 401, not 500. A missing or malformed Authorization header is the caller's
+	// error, and answering 500 sent people looking for a server fault.
 	claims, err := i.ClaimsFromHeader(w, r)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return 
+		writeError(w, http.StatusUnauthorized, `missing or invalid token, expected "Authorization: Bearer <token>"`)
+		return
 	}
 
 	ctx := context.Background()
@@ -46,14 +48,18 @@ func (i *Implementation) Validate(w http.ResponseWriter, r *http.Request) {
 	defer cancelFn()
 
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "could not look up the user")
 		i.logger.Error("error getting user by email", zap.String("email", claims.Email), zap.Error(err))
-		return 
+		return
 	}
 
+	// Kept at 404, unlike signin's: the token verified, so this is genuinely
+	// "the identity in this valid token no longer has a row", not a credential
+	// failure. It carries a body now, so it is no longer mistakable for the
+	// mux's own 404.
 	if len(userRes.Results) == 0 {
-		w.WriteHeader(http.StatusNotFound)
-		i.logger.Error("user not found", zap.String("email", claims.Email))
+		writeError(w, http.StatusNotFound, "the user in this token no longer exists")
+		i.logger.Warn("user not found", zap.String("email", claims.Email))
 		return
 	}
 
@@ -81,7 +87,7 @@ func (i *Implementation) HandleHTTP(w http.ResponseWriter, r *http.Request) erro
 }
 
 func (i *Implementation) HandleToken(ctx context.Context, token string) error {
-	_, err :=  i.ParseToken(token, nil)
+	_, err :=  i.ParseToken(token)
 	if err != nil {
 		i.logger.Error("error parsing token", zap.Error(err))
 		return err
@@ -102,7 +108,7 @@ func (i *Implementation) ClaimsFromHeader(w http.ResponseWriter, r *http.Request
 	}
 	
 	// Initialize a new instance of `Claims`
-	claims, err :=  i.ParseToken(tknStr, nil)
+	claims, err :=  i.ParseToken(tknStr)
 	if err != nil {
 		i.logger.Error("error parsing token", zap.Error(err))
 		return nil, err

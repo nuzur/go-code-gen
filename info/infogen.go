@@ -32,7 +32,10 @@ type infoTemplateData struct {
 	RESTBasePath string
 	HTTPPort     string
 	AuthType     string // "" | "jwt" | "keycloak"
-	Entities     []infoEntity
+	// UserEntityIdentifier names the entity JWT signin reads credentials from, so
+	// the page can say which table needs a row. Empty unless AuthType is "jwt".
+	UserEntityIdentifier string
+	Entities             []infoEntity
 }
 
 // ExampleEntityPath is the REST collection path used by the page's example
@@ -69,6 +72,9 @@ func GenerateInfo(ctx context.Context, params *project.ProjectParams) error {
 		HTTPPort:     proj.APIConfig.HTTPPort,
 		AuthType:     authType(proj),
 		Entities:     entityRoutes(proj),
+	}
+	if data.AuthType == "jwt" {
+		data.UserEntityIdentifier = proj.UserEntityIdentifier()
 	}
 
 	tplBytes, err := files.GetTemplateBytes(templates, "info")
