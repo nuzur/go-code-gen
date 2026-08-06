@@ -2,6 +2,7 @@ package gocodegen
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -87,6 +88,109 @@ func TestGenerateRejectsJWTAuthWithoutUserEntity(t *testing.T) {
 	if _, statErr := os.Stat(filepath.Join(tmpDir, "testproject", "entity")); !os.IsNotExist(statErr) {
 		t.Fatalf("expected no generated entities, stat returned: %v", statErr)
 	}
+}
+
+// TestGenerateJWTSchemaWithUniqueEmailOnly proves field-level unique:true is a
+// complete substitute for a hand-drawn index, end to end: the schema below
+// carries NO index on email, only the flag. Generation must clear
+// ValidateJWTAuthRequirements, the select resolver must emit FetchUserByEmail
+// from the index normalization synthesized, and the whole generated module must
+// build — the flag alone used to produce a workspace that failed at go build
+// because the signin template called a method the repo never generated.
+func TestGenerateJWTSchemaWithUniqueEmailOnly(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping generated-code build in -short mode")
+	}
+
+	version := configurationsSchema()
+	for _, e := range version.Entities {
+		if e.Identifier != "user" {
+			continue
+		}
+		for _, f := range e.Fields {
+			if f.Identifier == "email" {
+				f.Unique = true
+			}
+		}
+		// Drop everything but the primary key: the unique flag is now the only
+		// thing that can produce the fetch-by-email select.
+		e.TypeConfig.Standalone.Indexes = e.TypeConfig.Standalone.Indexes[:1]
+	}
+
+	id := "cfg_rest_jwt_unique_email"
+	root := t.TempDir()
+	params := &project.ProjectParams{
+		Project:        &nemgen.Project{Name: "ConfigMatrix"},
+		ProjectVersion: version,
+		RootPath:       root,
+		Identifier:     id,
+		Module:         "github.com/mklfarha/" + id,
+		EntitiesConfig: project.EntitiesConfig{Enabled: true, Dir: "entity", IncludeListInterface: true},
+		CoreConfig: project.CoreConfig{
+			Enabled:    true,
+			CoreDir:    "core",
+			RepoConfig: project.RepoConfig{DatabaseType: project.MYSQL},
+		},
+		RESTConfig:     project.RESTConfig{Enabled: true, OpenAPI: true},
+		AuthConfig:     project.AuthConfig{Enabled: true, Type: project.JWT_SERVER_AUTH_TYPE},
+		OnStatusChange: func(status string) { t.Logf("[gen] %s", status) },
+	}
+
+	if err := Generate(context.Background(), params); err != nil {
+		t.Fatalf("Generate failed for unique-email schema: %v", err)
+	}
+
+	dir := filepath.Join(root, id)
+
+	// The select is what the whole feature exists for, so assert it in the repo
+	// layer as well as in the caller. It is emitted from the synthesized index by
+	// the same resolver that handles hand-drawn ones.
+	selects, err := os.ReadFile(indexedSelectsPath(t, dir))
+	if err != nil {
+		t.Fatalf("reading generated indexed selects: %v", err)
+	}
+	if !strings.Contains(string(selects), "UserByEmail") {
+		t.Errorf("generated indexed selects have no UserByEmail statement:\n%s", string(selects))
+	}
+
+	signin, err := os.ReadFile(filepath.Join(dir, "auth", "jwtserver", "signin.go"))
+	if err != nil {
+		t.Fatalf("reading generated signin.go: %v", err)
+	}
+	if !strings.Contains(string(signin), "FetchUserByEmail") {
+		t.Errorf("generated signin.go missing FetchUserByEmail")
+	}
+
+	cmd := exec.Command("go", "build", "./...")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build ./... failed for unique-email schema:\n%s", string(out))
+	}
+}
+
+// indexedSelectsPath locates the generated single-index select file, which lives
+// under the configurable repo directory. It is found by walking rather than by
+// composing the path so the test does not encode the repo layout twice.
+func indexedSelectsPath(t *testing.T, dir string) string {
+	t.Helper()
+	found := ""
+	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && d.Name() == "select_indexed_simple.sql" {
+			found = path
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking generated project: %v", err)
+	}
+	if found == "" {
+		t.Fatalf("no select_indexed_simple.sql generated under %s", dir)
+	}
+	return found
 }
 
 // TestGenerateSpanishJWTSchema proves the JWT server generated for a

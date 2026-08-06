@@ -200,6 +200,33 @@ func TestValidateJWTAuthRequirementsNoEmailIndex(t *testing.T) {
 	}
 }
 
+// A field marked unique:true is enough on its own: NormalizeProjectVersion
+// synthesizes the single-field UNIQUE index for it, and therefore the select. The
+// validator accepts it on a RAW entity too — it also runs against un-normalized
+// platform data, and its two out-of-module twins only ever see raw data.
+func TestValidateJWTAuthRequirementsUniqueEmailFieldWithoutIndex(t *testing.T) {
+	entity := validUserEntity()
+	indexes(entity).Indexes = indexes(entity).Indexes[:1] // keep only the primary key
+	entity.Fields[1].Unique = true
+
+	res := jwtProject(entity).ValidateJWTAuthRequirements()
+	if !res.OK() {
+		t.Fatalf("expected unique:true email to satisfy the index requirement, got missing: %v", res.Missing)
+	}
+}
+
+// The finding must name the unique:true escape hatch, not just the index, or a
+// user who already ticked unique is told to do something they have done.
+func TestValidateJWTAuthRequirementsIndexFindingMentionsUnique(t *testing.T) {
+	entity := validUserEntity()
+	indexes(entity).Indexes = indexes(entity).Indexes[:1]
+
+	res := jwtProject(entity).ValidateJWTAuthRequirements()
+	if !containsSubstring(res.Missing, "unique: true on that field (the generator synthesizes the index)") {
+		t.Fatalf("expected the finding to offer unique: true, got: %v", res.Missing)
+	}
+}
+
 func TestValidateJWTAuthRequirementsCompositeEmailIndexRejected(t *testing.T) {
 	entity := validUserEntity()
 	// An index over [email, id] generates FetchUserByEmailAndId, not

@@ -2,6 +2,7 @@ package project
 
 import (
 	nemgen "github.com/nuzur/nem/idl/gen"
+	"github.com/nuzur/sql-gen/tosql"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -21,7 +22,25 @@ import (
 // omitted (a JSON schema with just `{"identifier":..., "type": 19}`) used to
 // crash generation instead of generating anything.
 //
-// The input is never mutated — callers own their ProjectVersion.
+// Normalization is not limited to type_config: a field's `unique: true` is sugar
+// for a single-field UNIQUE index, and this is where the sugar is expanded. The
+// synthesis itself lives in sql-gen (tosql.EnsureUniqueFieldIndexes) because it
+// is the one place DDL generation and Go generation share — a second
+// implementation here would be a second answer to "which indexes does this
+// entity have", and the two would drift the day either side gained a case. It is
+// idempotent by construction, so it re-applies harmlessly when sql-gen's
+// GenerateSQL later runs EnsureUniqueFieldIndexes over this same normalized
+// version.
+//
+// Everything downstream of project.New reads the normalized copy, so the
+// synthesized indexes reach the entity templates, the fetch resolution in
+// core/repo/core_repository_selects.go and the JWT auth validator with no
+// further changes: a unique-flagged email field now generates FetchUserByEmail
+// exactly as a hand-drawn index would.
+//
+// The input is never mutated — callers own their ProjectVersion. That matters
+// more than usual here: EnsureUniqueFieldIndexes mutates in place, so it must be
+// handed the clone, never pv.
 func NormalizeProjectVersion(pv *nemgen.ProjectVersion) *nemgen.ProjectVersion {
 	if pv == nil {
 		return nil
@@ -32,6 +51,7 @@ func NormalizeProjectVersion(pv *nemgen.ProjectVersion) *nemgen.ProjectVersion {
 			normalizeField(f)
 		}
 	}
+	tosql.EnsureUniqueFieldIndexes(out)
 	return out
 }
 
