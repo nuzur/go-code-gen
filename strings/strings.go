@@ -4,33 +4,22 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/iancoleman/strcase"
+	"github.com/nuzur/sql-gen/tosql"
 )
 
 var matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
 var matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
 
+// ToCamelCase converts a snake_case identifier to CamelCase while keeping common
+// initialisms (ID, UUID, JSON, URL, HTTP/HTTPS) fully upper-cased.
+//
+// The rule has exactly one home: sql-gen names the sqlc queries and this
+// generator names the module methods that call them, so the two must mint
+// byte-identical names or the generated app does not compile. This used to be a
+// verbatim copy of tosql.ToCamelCase and is now a delegation to it, so the copies
+// cannot drift. strings_test.go still pins the behavior from this side.
 func ToCamelCase(str string) string {
-	if str == "id" {
-		return "ID"
-	}
-	if str == "uuid" {
-		return "UUID"
-	}
-
-	key := strcase.ToCamel(str)
-	if strings.Contains(key, "_Id") {
-		key = strings.ReplaceAll(key, "Id", "ID")
-	}
-
-	key = strings.ReplaceAll(key, "uuid", "UUID")
-	key = strings.ReplaceAll(key, "Uuid", "UUID")
-	key = strings.ReplaceAll(key, "Json", "JSON")
-	key = strings.ReplaceAll(key, "Url", "URL")
-	key = strings.ReplaceAll(key, "Https", "HTTPS")
-	key = strings.ReplaceAll(key, "Http", "HTTP")
-
-	return key
+	return tosql.ToCamelCase(str)
 }
 
 func ToSnakeCase(str string) string {
@@ -54,4 +43,3 @@ func ToKebabPlural(str string) string {
 	}
 	return kebab + "s"
 }
-

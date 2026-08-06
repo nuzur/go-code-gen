@@ -38,15 +38,18 @@ func generateRepositorySQL(ctx context.Context, project *projecttypes.Project, s
 		Configvalues: &tosql.ConfigValues{
 			DBType:   dbTypeForSQLGen,
 			Entities: entityUUIDs,
+			// Only the actions whose files are copied out below. Notably absent is
+			// SelectForIndexedCombinedAction: select_indexed_combined.sql has never
+			// been in the fileNames list, so we rendered it only to throw it away —
+			// and not asking for it insulates generation from any future change to
+			// the combined-file contract.
 			Actions: []tosql.Action{
 				tosql.CreateAction,
 				tosql.DeleteAction,
 				tosql.InsertAction,
 				tosql.UpdateAction,
-				tosql.DeleteAction,
 				tosql.SelectSimpleAction,
 				tosql.SelectForIndexedSimpleAction,
-				tosql.SelectForIndexedCombinedAction,
 			},
 		},
 		ProjectVersion: &projectVersionCopy,
@@ -54,6 +57,12 @@ func generateRepositorySQL(ctx context.Context, project *projecttypes.Project, s
 	}
 	res, err := tosql.GenerateSQL(context.Background(), req)
 	if err != nil {
+		return err
+	}
+
+	// The two resolvers must agree on the set of select names before a single
+	// file is written; see verifySelectContract.
+	if err := verifySelectContract(project, &projectVersionCopy, dbTypeForSQLGen); err != nil {
 		return err
 	}
 
