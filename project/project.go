@@ -145,6 +145,26 @@ func New(params *ProjectParams) (*Project, error) {
 		params.HelmConfig.ImageTag = "latest"
 	}
 
+	if params.HelmConfig.ChartVersion == "" {
+		params.HelmConfig.ChartVersion = "0.0.1"
+	}
+
+	// Defaults to ChartVersion (resolved just above) so the two stay in lockstep
+	// unless a caller deliberately splits them.
+	if params.HelmConfig.AppVersion == "" {
+		params.HelmConfig.AppVersion = params.HelmConfig.ChartVersion
+	}
+
+	if params.HelmConfig.CredentialsHostPath == "" {
+		params.HelmConfig.CredentialsHostPath = "/etc/config"
+	}
+
+	// NOT /root/config — that is where the image's own generated base.yaml
+	// lives, and a volume mounted there would hide it. See HelmConfig.
+	if params.HelmConfig.CredentialsMountPath == "" {
+		params.HelmConfig.CredentialsMountPath = "/root/prod-config"
+	}
+
 	if params.GitHubActionsConfig.GoVersion == "" {
 		params.GitHubActionsConfig.GoVersion = "1.24"
 	}

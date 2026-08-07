@@ -1,0 +1,52 @@
+Released {{ .Chart.Name }}-{{ .Chart.Version }} as {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+{{- if .Values.image.digest }}
+Image: {{ .Values.image.repository }}@{{ .Values.image.digest }}
+{{- else }}
+Image: {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+{{- end }}
+
+{{- if not .Values.image.repository }}
+
+WARNING: image.repository is empty, so the pods cannot pull an image. Set it to
+the image your CI pushes, e.g.
+
+    --set image.repository=ghcr.io/<owner>/<repo>
+{{- end }}
+
+Reach it:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+{{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+{{- end }}
+{{- end }}
+{{- else }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "<<.Identifier>>.fullname" . }} <<if .ServesHTTP>>{{ .Values.service.httpPort }}:{{ .Values.service.httpPort }}<<else>>{{ .Values.service.grpcPort }}:{{ .Values.service.grpcPort }}<<end>>
+{{- end }}
+
+Two things this chart does NOT create; both must already exist or the pods will
+not start:
+
+1. The credentials file, on every node that can schedule this app:
+
+       <<.HelmConfig.CredentialsHostPath>>/<<.HelmConfigDirName>>/prod.yaml
+
+   It is the second entry in CONFIG and overrides the image's own base.yaml, so
+   it is where the real `db` block belongs (host, port, user, pswd, driver) plus
+   any secrets. Without it the app exits with "db configuration not found".
+
+   It is deliberately not a Secret or ConfigMap: Helm stores release values in
+   the cluster, where `helm get values` would print them back.
+
+   NOTE: editing that file does not restart anything — nothing in the release
+   changes. Bump the chart version to roll the pods.
+
+2. The image pull secret{{ range .Values.imagePullSecrets }} "{{ .name }}"{{ end }}, since ghcr.io packages are private by default:
+
+       kubectl -n {{ .Release.Namespace }} create secret docker-registry ghcr-login-secret \
+         --docker-server=ghcr.io --docker-username=<user> --docker-password=<token>
+
+Check status:
+
+    kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "<<.Identifier>>.fullname" . }}

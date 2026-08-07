@@ -31,10 +31,23 @@ func GenerateGitHubActions(ctx context.Context, params *project.ProjectParams) e
 
 	workflowsDir := path.Join(p.Dir(), ".github", "workflows")
 
-	err = os.RemoveAll(path.Join(p.Dir(), ".github"))
-	if err != nil {
-		if p.OnStatusChange != nil {
-			p.OnStatusChange(fmt.Sprintf("ERROR: Deleting .github directory: %v", err))
+	// The workflow filenames this generator owns, listed unconditionally rather
+	// than derived from the enabled set below: a workflow whose feature was just
+	// turned off still has to be cleaned up.
+	ownedWorkflows := []string{
+		fmt.Sprintf("publish-%s-image.yaml", p.Identifier),
+		fmt.Sprintf("publish-%s-helm.yaml", p.Identifier),
+	}
+
+	// Delete only those. .github is shared: it holds hand-written workflows for
+	// other services (sfapi has publish-sfauthserver-helm.yaml), and typically
+	// issue templates, dependabot config and CODEOWNERS besides — none of which
+	// this generator can recreate. Removing the whole tree would take them with it.
+	for _, name := range ownedWorkflows {
+		if err := os.Remove(path.Join(workflowsDir, name)); err != nil && !os.IsNotExist(err) {
+			if p.OnStatusChange != nil {
+				p.OnStatusChange(fmt.Sprintf("ERROR: Deleting workflow %s: %v", name, err))
+			}
 		}
 	}
 
@@ -69,12 +82,15 @@ func GenerateGitHubActions(ctx context.Context, params *project.ProjectParams) e
 		if err != nil {
 			return fmt.Errorf("error getting template bytes for %s: %v", f.name, err)
 		}
-		_, err = files.GenerateFile(ctx, filetools.FileRequest{
+		// Workflows are dense with GitHub's own ${{ ... }} expressions. Render the
+		// generator's substitutions with << >> so those survive verbatim instead
+		// of every one needing to be escaped — see files.GenerateFileWithDelims.
+		_, err = files.GenerateFileWithDelims(ctx, filetools.FileRequest{
 			OutputPath:      f.output,
 			TemplateBytes:   tplBytes,
 			Data:            p,
 			DisableGoFormat: true,
-		})
+		}, "<<", ">>")
 		if err != nil {
 			return fmt.Errorf("error generating %s: %v", f.name, err)
 		}

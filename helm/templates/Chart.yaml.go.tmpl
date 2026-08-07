@@ -1,9 +1,35 @@
 apiVersion: v2
-name: {{.Identifier}}
-description: {{.Project.Name}} backend service
+name: <<.Identifier>>
+description: <<.Project.Name>> backend service
 
 type: application
+<<- if or .HasAuthSubchart .HelmConfig.Dependencies>>
 
-version: 0.0.1
+# Subcharts installed alongside this one. Declared here rather than added by
+# hand because regeneration rewrites this file.
+dependencies:
+<<- if .HasAuthSubchart>>
+  # The auth server: the same image as this chart, exposing only its HTTP side
+  # on its own hostname. It lives in charts/, so there is no repository to fetch
+  # from and no version to keep in step — helm lint still requires it be
+  # declared here for the bundled chart to be recognised.
+  - name: <<.AuthChartIdentifier>>
+    version: <<.HelmConfig.ChartVersion>>
+    condition: <<.AuthChartIdentifier>>.enabled
+<<- end>>
+<<- range .HelmConfig.Dependencies>>
+  - name: <<.Name>>
+    version: <<.Version>>
+    repository: <<.Repository>>
+<<- if .Condition>>
+    condition: <<.Condition>>
+<<- end>>
+<<- end>>
+<<- end>>
 
-appVersion: "0.0.1"
+# Bump on every release. Two things depend on it: the publish workflow reads it
+# back to name the packaged .tgz, and the chart version is stamped into the pod
+# template labels — so bumping it is what rolls the pods.
+version: <<.HelmConfig.ChartVersion>>
+
+appVersion: "<<.HelmConfig.AppVersion>>"

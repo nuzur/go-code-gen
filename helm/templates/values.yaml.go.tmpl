@@ -1,24 +1,58 @@
-# Default values for {{.Identifier}}.
+# Default values for <<.Identifier>>.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
 
 image:
-  repository: {{.HelmConfig.ImageRepository}}
-  pullPolicy: IfNotPresent
+  repository: <<.HelmImageRepository>>
+  # Always, paired with a moving tag, is what makes a re-deploy actually pull.
+  # Irrelevant when digest is set, since a digest is immutable.
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+  # Pin an immutable image by digest ("sha256:..."). Takes precedence over tag.
+  # Prefer this for anything you may need to roll back.
+  digest: ""
 
-imagePullSecrets: []
+# ghcr.io packages are private by default. Create the secret out of band:
+#   kubectl -n <namespace> create secret docker-registry ghcr-login-secret \
+#     --docker-server=ghcr.io --docker-username=<user> --docker-password=<token>
+imagePullSecrets:
+  - name: ghcr-login-secret
 nameOverride: ""
 fullnameOverride: ""
+
+# Environment for the container.
+#
+# CONFIG is a COMMA-SEPARATED SEARCH PATH, loaded left to right with later
+# entries overriding earlier ones. That is what makes the two-layer scheme work:
+#
+#   /root/config                      baked into the image; the generated,
+#                                     non-secret base.yaml
+#   <<.HelmConfig.CredentialsMountPath>>/<<.HelmConfigDirName>>   mounted from the node; YOUR prod.yaml
+#                                     with the real db credentials
+#
+# Nothing is hidden by the mount because the two are separate directories — see
+# volumes/volumeMounts below. ENV=prod is already baked into the image.
+env:
+  - name: CONFIG
+    value: "/root/config,<<.HelmConfig.CredentialsMountPath>>/<<.HelmConfigDirName>>"
+  # Individual secrets that do not belong in the credentials file can come from
+  # k8s Secrets instead. optional: true lets the app start when one is absent.
+  # - name: AWS_SECRET
+  #   valueFrom:
+  #     secretKeyRef:
+  #       name: <<.Identifier>>-aws-secret
+  #       key: secret_access_key
+  #       optional: true
 
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
-  # Automatically mount a ServiceAccount's API credentials?
-  automount: true
+  # The app never talks to the Kubernetes API, so it has no use for a mounted
+  # API token.
+  automount: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -32,47 +66,68 @@ podSecurityContext: {}
   # fsGroup: 2000
 
 securityContext: {}
+  # The image currently runs as root out of /root, so readOnlyRootFilesystem and
+  # runAsNonRoot need Dockerfile changes before they can be turned on.
   # capabilities:
   #   drop:
   #   - ALL
-  # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
-  # runAsUser: 1000
+  # allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP
-  grpcPort: {{.APIConfig.GRPCPort}}
-{{- if .HasJWTAuth}}
-  httpPort: {{.APIConfig.HTTPPort}}
-{{- end}}
+<<- if .ServesGRPC>>
+  grpcPort: <<.APIConfig.GRPCPort>>
+<<- end>>
+<<- if .ServesHTTP>>
+  httpPort: <<.APIConfig.HTTPPort>>
+<<- end>>
 
 ingress:
   enabled: false
-  className: ""
+  className: "nginx"
+<<- if .IngressTargetsGRPC>>
+  # This Ingress fronts the gRPC port. All three annotations are required:
+  # without them ingress-nginx speaks HTTP/1.1 to an HTTP/2 server and every
+  # call fails. proxy-body-size 0 lifts the default 1MB cap, which streaming
+  # RPCs hit immediately.
+  annotations:
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/grpc-backend: "true"
+    nginx.ingress.kubernetes.io/protocol: "h2c"
+    nginx.ingress.kubernetes.io/proxy-body-size: "0"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    # cert-manager.io/cluster-issuer: letsencrypt
+<<- else>>
   annotations: {}
-    # kubernetes.io/ingress.class: nginx
-    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: letsencrypt
+<<- if .ServesGRPC>>
+    # This app also serves gRPC on <<.APIConfig.GRPCPort>>. To front THAT port
+    # instead, set helm.ingress_backend to "grpc" in the generator config —
+    # gRPC through ingress-nginx needs backend-protocol, grpc-backend and
+    # protocol h2c annotations, which that turns on together.
+<<- end>>
+<<- end>>
   hosts:
-    - host: {{.Identifier}}.local
+    - host: <<.Identifier>>.local
       paths:
         - path: /
-          pathType: ImplementationSpecific
+          pathType: Prefix
   tls: []
-  #  - secretName: chart-example-tls
+  #  - secretName: <<.Identifier>>-tls
   #    hosts:
-  #      - chart-example.local
+  #      - <<.Identifier>>.example.com
 
-resources: {}
-  # We usually recommend not to specify default resources and to leave this as a conscious
-  # choice for the user. This also increases chances charts run on environments with little
-  # resources, such as Minikube. If you do want to specify resources, uncomment the following
-  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-  # limits:
-  #   cpu: 100m
-  #   memory: 128Mi
-  # requests:
-  #   cpu: 100m
-  #   memory: 128Mi
+# Requests are not optional in practice: horizontal autoscaling targets CPU
+# utilization as a percentage OF THE REQUEST, so with none set the HPA reports
+# <unknown>/80% and never scales.
+resources:
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+  requests:
+    cpu: 200m
+    memory: 128Mi
 
 autoscaling:
   enabled: false
@@ -81,21 +136,101 @@ autoscaling:
   targetCPUUtilizationPercentage: 80
   # targetMemoryUtilizationPercentage: 80
 
-# Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+<<- if and .ServesHTTP .HelmHTTPProbePath>>
 
-# Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+# Probes hit <<.HelmHTTPProbePath>>, which this app actually serves. Unlike a TCP
+# check, an HTTP probe fails when the process is up but not really serving.
+livenessProbe:
+  httpGet:
+    path: <<.HelmHTTPProbePath>>
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: <<.HelmHTTPProbePath>>
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+<<- else if .ServesHTTP>>
+
+# This app serves HTTP but exposes no endpoint safe to poll unauthenticated, so
+# fall back to checking the port accepts connections.
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+readinessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+<<- else if .ServesGRPC>>
+
+# gRPC-only: kubelet speaks the gRPC health protocol natively, so this needs no
+# extra endpoint in the app.
+livenessProbe:
+  grpc:
+    port: <<.APIConfig.GRPCPort>>
+  initialDelaySeconds: 10
+  periodSeconds: 15
+
+readinessProbe:
+  grpc:
+    port: <<.APIConfig.GRPCPort>>
+  initialDelaySeconds: 5
+  periodSeconds: 10
+<<- end>>
+
+# Seconds kubelet waits after SIGTERM before SIGKILL.
+terminationGracePeriodSeconds: 30
+
+# Old ReplicaSets kept for rollback.
+revisionHistoryLimit: 5
+
+# Credentials volume: a directory on the NODE holding config this chart does not
+# manage. You create <<.HelmConfig.CredentialsHostPath>>/<<.HelmConfigDirName>>/prod.yaml
+# yourself, with the real db block and any secrets. It is deliberately not a
+# Secret or ConfigMap: keeping it off the release means credentials never reach
+# Helm, whose stored release values are readable with `helm get values`.
+volumes:
+  - name: config
+    hostPath:
+      path: "<<.HelmConfig.CredentialsHostPath>>"
+
+volumeMounts:
+  - name: config
+    mountPath: "<<.HelmConfig.CredentialsMountPath>>"
+    readOnly: true
 
 nodeSelector: {}
 
 tolerations: []
 
 affinity: {}
+<<- if .HasAuthSubchart>>
+
+# The auth server, deployed from charts/<<.AuthChartIdentifier>>.
+#
+# It is the SAME image as this chart, run a second time exposing only its HTTP
+# side — the JWT endpoints — on its own hostname. Values here override that
+# subchart's own defaults; set its ingress host to the domain you want auth on.
+<<.AuthChartIdentifier>>:
+  enabled: true
+  # image: inherited defaults live in the subchart's values.yaml. The deploy
+  # sets repository/tag/digest on both charts so they can never diverge.
+  ingress:
+    enabled: false
+    hosts:
+      - host: auth.<<.Identifier>>.local
+        paths:
+          - path: /
+            pathType: Prefix
+<<- end>>

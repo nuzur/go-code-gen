@@ -1,10 +1,13 @@
 package files
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"strings"
+	"text/template"
 
 	"github.com/nuzur/filetools"
 )
@@ -40,6 +43,51 @@ func GenerateFile(ctx context.Context, req filetools.FileRequest) ([]byte, error
 		}
 	}
 	return filetools.GenerateFile(ctx, req)
+}
+
+// GenerateFileWithDelims is GenerateFile for templates whose OUTPUT is itself a
+// Go-templated file — Helm charts, most notably. Rendered with the default
+// delimiters, every literal Helm action in such a template has to be written as
+// {{ "{{" }} ... {{ "}}" }}, which is unreadable and easy to get wrong. With
+// left/right set to << >>, the generator's own substitutions are << >> and
+// Helm's {{ }} passes through untouched.
+//
+// filetools.GenerateFile hardcodes the default delimiters, so this reimplements
+// its (small) render-and-write loop rather than wrapping it. Go formatting is
+// deliberately not applied: these outputs are never Go source.
+func GenerateFileWithDelims(ctx context.Context, req filetools.FileRequest, left, right string) ([]byte, error) {
+	tmplBytes := req.TemplateBytes
+	if tmplBytes == nil && req.TemplatePath != "" {
+		b, err := os.ReadFile(req.TemplatePath)
+		if err != nil {
+			return nil, err
+		}
+		tmplBytes = b
+	}
+	if notice := generatedNotice(req.OutputPath); notice != "" && tmplBytes != nil {
+		tmplBytes = injectNotice(tmplBytes, notice)
+	}
+
+	funcs := template.FuncMap{}
+	for n, f := range req.Funcs {
+		funcs[n] = f
+	}
+
+	t, err := template.New("template").Delims(left, right).Funcs(funcs).Parse(string(tmplBytes))
+	if err != nil {
+		return nil, fmt.Errorf("error parsing template for %s: %w", req.OutputPath, err)
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, req.Data); err != nil {
+		return nil, fmt.Errorf("error executing template for %s: %w", req.OutputPath, err)
+	}
+
+	out := buf.Bytes()
+	if err := filetools.Write(req.OutputPath, out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // MarkGeneratedFile prepends the generated-file marker (in the comment style of
@@ -102,6 +150,12 @@ func generatedNotice(outputPath string) string {
 	case ext == ".sql":
 		return "-- " + GeneratedMarker + "\n"
 	case ext == ".yaml" || ext == ".yml" || ext == ".sh" || ext == ".toml" || name == "Dockerfile":
+		return "# " + GeneratedMarker + "\n"
+	// Helm partials (_helpers.tpl). Without this they carry no marker, so
+	// scanGeneratedFiles never lists them, stale-cleanup can never remove them,
+	// and they read as user-authored. Helm discards the rendered output of
+	// _-prefixed files, so a leading comment line is inert.
+	case ext == ".tpl":
 		return "# " + GeneratedMarker + "\n"
 	default:
 		return ""

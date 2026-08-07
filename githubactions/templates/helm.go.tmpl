@@ -1,16 +1,18 @@
-name: {{.Identifier}} helm
+name: <<.Identifier>> helm
 
 env:
-  GCR_IMAGE: ghcr.io/${{ "{{" }} github.repository_owner {{ "}}" }}/helm
+  GCR_IMAGE: ghcr.io/${{ github.repository_owner }}/helm
   REGISTRY: ghcr.io
-  APP_NAME: {{.Identifier}}
+  APP_NAME: <<.Identifier>>
+  CHART_DIR: ${{ github.workspace }}/<<.HelmConfig.Dir>>/<<.Identifier>>
 
 on:
   push:
     branches:
-      - {{.GitHubActionsConfig.MainBranch}}
+      - <<.GitHubActionsConfig.MainBranch>>
     paths:
-      - {{.HelmConfig.Dir}}/{{.Identifier}}/**
+      - <<.HelmConfig.Dir>>/<<.Identifier>>/**
+  workflow_dispatch:
 
 jobs:
   release:
@@ -26,17 +28,34 @@ jobs:
       - name: Log in to the Container registry
         uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
-            registry: ${{ "{{" }} env.REGISTRY {{ "}}" }}
-            username: ${{ "{{" }} github.actor {{ "}}" }}
-            password: ${{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }}
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Helm
         uses: azure/setup-helm@v3
       - name: Login to GHCR using helm
         run: |
-          echo ${{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }} | helm registry login ghcr.io --username ${{ "{{" }} github.actor {{ "}}" }} --password-stdin
-      - name: Package helm chart to local registry
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login ghcr.io --username ${{ github.actor }} --password-stdin
+      - name: Update chart dependencies
+        # Required before packaging any chart with a dependencies: block —
+        # helm package fails outright when the subcharts are not vendored.
         run: |
-          helm package ${{ "{{" }} github.workspace {{ "}}" }}/{{.HelmConfig.Dir}}/{{.Identifier}}/
+          helm dependency update "$CHART_DIR"
+      - name: Package helm chart
+        run: |
+          helm package "$CHART_DIR"
       - name: Publish chart to GHCR
         run: |
-          helm push {{.Identifier}}-$(grep 'version:' ${{ "{{" }} github.workspace {{ "}}" }}/{{.HelmConfig.Dir}}/{{.Identifier}}/Chart.yaml | tail -n1 | awk '{ print $2 }').tgz oci://${{ "{{" }} env.GCR_IMAGE {{ "}}" }}
+          # Read the version from the packaged chart's own metadata rather than
+          # grepping Chart.yaml. `grep 'version:' | tail -n1` happens to work
+          # today only because dependencies are listed ABOVE the chart version
+          # (and because grep is case-sensitive, so apiVersion/appVersion do not
+          # match) — move the dependencies block below it and the push silently
+          # uploads a subchart's version instead.
+          CHART_VERSION="$(helm show chart "$CHART_DIR" | awk '$1 == "version:" { print $2; exit }')"
+          if [ -z "$CHART_VERSION" ]; then
+            echo "could not determine chart version" >&2
+            exit 1
+          fi
+          echo "publishing <<.Identifier>> $CHART_VERSION"
+          helm push "<<.Identifier>>-${CHART_VERSION}.tgz" "oci://${GCR_IMAGE}"

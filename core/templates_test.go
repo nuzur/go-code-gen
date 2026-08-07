@@ -8,6 +8,21 @@ import (
 	"text/template"
 )
 
+// usesCustomDelims reports whether a template renders with << >> rather than
+// the default delimiters.
+//
+// Both cases produce a file that is ITSELF full of {{ }}: Helm chart templates
+// (Helm actions) and GitHub Actions workflows (${{ }} expressions). Rendering
+// those with the default delimiters would mean escaping every one of them, so
+// the generator swaps its own delimiters instead — see
+// files.GenerateFileWithDelims. Matched on the owning directory so a newly
+// added template is covered automatically.
+func usesCustomDelims(path string) bool {
+	p := filepath.ToSlash(path)
+	return strings.Contains(p, "/helm/templates/") ||
+		strings.Contains(p, "/githubactions/templates/")
+}
+
 func TestTemplatesParse(t *testing.T) {
 	// The test runs in the core/ directory, so the root of the workspace is ../
 	//
@@ -48,6 +63,9 @@ func TestTemplatesParse(t *testing.T) {
 				}
 
 				tmpl := template.New(filepath.Base(path)).Funcs(funcs)
+				if usesCustomDelims(path) {
+					tmpl = tmpl.Delims("<<", ">>")
+				}
 				_, err = tmpl.Parse(string(content))
 				if err != nil {
 					t.Errorf("failed to parse template %s: %v", path, err)

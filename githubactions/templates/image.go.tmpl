@@ -1,17 +1,19 @@
-name: {{.Identifier}} docker image
+name: <<.Identifier>> docker image
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ "{{" }} github.repository {{ "}}" }}/{{.Identifier}}
-  APP_NAME: {{.Identifier}}
+  # Must match image.repository in the chart's values.yaml, prefixed with
+  # REGISTRY. Keeping the identifier in the path lets one repo publish several
+  # services without their images colliding.
+  IMAGE_NAME: <<.GitHubActionsImageName>>
+  APP_NAME: <<.Identifier>>
 
 on:
   push:
     branches:
-      - {{.GitHubActionsConfig.MainBranch}}
-    paths:
-      - ./Dockerfile
-      - ./**
+      - <<.GitHubActionsConfig.MainBranch>>
+  # Lets you rebuild without an empty commit.
+  workflow_dispatch:
 
 jobs:
     build-and-push-image:
@@ -25,24 +27,42 @@ jobs:
             - name: Log in to the Container registry
               uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
               with:
-                registry: ${{ "{{" }} env.REGISTRY {{ "}}" }}
-                username: ${{ "{{" }} github.actor {{ "}}" }}
-                password: ${{ "{{" }} secrets.GITHUB_TOKEN {{ "}}" }}
+                registry: ${{ env.REGISTRY }}
+                username: ${{ github.actor }}
+                password: ${{ secrets.GITHUB_TOKEN }}
             - name: Extract metadata (tags, labels) for Docker
               id: meta
               uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
               with:
-                images: ${{ "{{" }} env.REGISTRY {{ "}}" }}/${{ "{{" }} env.IMAGE_NAME {{ "}}" }}
+                images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                # A commit-addressed tag alongside the moving one. With only
+                # `latest` there is no immutable reference to any build, so
+                # nothing can be pinned or rolled back — and a `helm upgrade`
+                # whose image string never changes does not even restart pods.
                 tags: |
                   type=raw,value=latest
+                  type=sha,format=long
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
             - name: Build and push Docker image
+              # id is what makes outputs.digest available below.
+              id: build
               uses: docker/build-push-action@v5
               with:
-                context: "{{"{{"}}defaultContext{{"}}"}}"
+                context: "{{defaultContext}}"
                 file: ./Dockerfile
                 platforms: linux/amd64
                 push: true
-                tags: ${{ "{{" }} steps.meta.outputs.tags {{ "}}" }}
-                labels: ${{ "{{" }} steps.meta.outputs.labels {{ "}}" }}
+                tags: ${{ steps.meta.outputs.tags }}
+                labels: ${{ steps.meta.outputs.labels }}
+            - name: Report image digest
+              # The immutable handle for this build. Pin it in the chart with
+              # image.digest to make a rollback exact.
+              run: |
+                echo "### <<.Identifier>> image" >> "$GITHUB_STEP_SUMMARY"
+                echo '' >> "$GITHUB_STEP_SUMMARY"
+                echo "digest: \`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"
+                echo "tags:" >> "$GITHUB_STEP_SUMMARY"
+                echo '```' >> "$GITHUB_STEP_SUMMARY"
+                echo "${{ steps.meta.outputs.tags }}" >> "$GITHUB_STEP_SUMMARY"
+                echo '```' >> "$GITHUB_STEP_SUMMARY"

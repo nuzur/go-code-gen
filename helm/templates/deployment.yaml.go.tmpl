@@ -1,83 +1,95 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ "{{" }} include "{{.Identifier}}.fullname" . {{ "}}" }}
+  name: {{ include "<<.Identifier>>.fullname" . }}
   labels:
-    {{ "{{-" }} include "{{.Identifier}}.labels" . | nindent 4 {{ "}}" }}
+    {{- include "<<.Identifier>>.labels" . | nindent 4 }}
 spec:
-  {{ "{{-" }} if not .Values.autoscaling.enabled {{ "}}" }}
-  replicas: {{ "{{" }} .Values.replicaCount {{ "}}" }}
-  {{ "{{-" }} end {{ "}}" }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
   selector:
     matchLabels:
-      {{ "{{-" }} include "{{.Identifier}}.selectorLabels" . | nindent 6 {{ "}}" }}
+      {{- include "<<.Identifier>>.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{ "{{-" }} with .Values.podAnnotations {{ "}}" }}
+      {{- with .Values.podAnnotations }}
       annotations:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       labels:
-        {{ "{{-" }} include "{{.Identifier}}.labels" . | nindent 8 {{ "}}" }}
-        {{ "{{-" }} with .Values.podLabels {{ "}}" }}
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-        {{ "{{-" }} end {{ "}}" }}
+        {{- /* The FULL label set, not just selectorLabels: it carries
+               helm.sh/chart and app.kubernetes.io/version, so bumping the chart
+               version changes the pod template and rolls the pods. That is the
+               release mechanism when the image tag itself does not move. */}}
+        {{- include "<<.Identifier>>.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
-      {{ "{{-" }} with .Values.imagePullSecrets {{ "}}" }}
+      {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
-      serviceAccountName: {{ "{{" }} include "{{.Identifier}}.serviceAccountName" . {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "<<.Identifier>>.serviceAccountName" . }}
+      {{- with .Values.terminationGracePeriodSeconds }}
+      terminationGracePeriodSeconds: {{ . }}
+      {{- end }}
       securityContext:
-        {{ "{{-" }} toYaml .Values.podSecurityContext | nindent 8 {{ "}}" }}
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ "{{" }} .Chart.Name {{ "}}" }}
+        - name: {{ .Chart.Name }}
           securityContext:
-            {{ "{{-" }} toYaml .Values.securityContext | nindent 12 {{ "}}" }}
-          image: "{{ "{{" }} .Values.image.repository {{ "}}" }}:{{ "{{" }} .Values.image.tag | default .Chart.AppVersion {{ "}}" }}"
-          imagePullPolicy: {{ "{{" }} .Values.image.pullPolicy {{ "}}" }}
-          {{ "{{-" }} with .Values.image.env {{ "}}" }}
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.image.digest }}
+          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
+          {{- else }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.env }}
           env:
-          {{ "{{-" }} toYaml . | nindent 10 {{ "}}" }}
-          {{ "{{-" }} end {{ "}}" }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
+<<- if .ServesGRPC>>
             - name: grpc
-              containerPort: {{ "{{" }} .Values.service.grpcPort {{ "}}" }}
+              containerPort: {{ .Values.service.grpcPort }}
               protocol: TCP
-{{- if .HasJWTAuth}}
+<<- end>>
+<<- if .ServesHTTP>>
             - name: http
-              containerPort: {{ "{{" }} .Values.service.httpPort {{ "}}" }}
+              containerPort: {{ .Values.service.httpPort }}
               protocol: TCP
-{{- end}}
+<<- end>>
+          {{- with .Values.livenessProbe }}
           livenessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 15
-            periodSeconds: 20
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            tcpSocket:
-              port: grpc
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
-            {{ "{{-" }} toYaml .Values.resources | nindent 12 {{ "}}" }}
-          {{ "{{-" }} with .Values.volumeMounts {{ "}}" }}
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.volumeMounts }}
           volumeMounts:
-            {{ "{{-" }} toYaml . | nindent 12 {{ "}}" }}
-          {{ "{{-" }} end {{ "}}" }}
-      {{ "{{-" }} with .Values.volumes {{ "}}" }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.volumes }}
       volumes:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
-      {{ "{{-" }} with .Values.nodeSelector {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
       nodeSelector:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
-      {{ "{{-" }} with .Values.affinity {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
       affinity:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
-      {{ "{{-" }} with .Values.tolerations {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
       tolerations:
-        {{ "{{-" }} toYaml . | nindent 8 {{ "}}" }}
-      {{ "{{-" }} end {{ "}}" }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
