@@ -1,0 +1,98 @@
+<<if .ServesGRPC>>
+{{ $hosts := list -}}
+{{- range .Values.grpcIngress.hosts }}{{- if .host }}{{- $hosts = append $hosts . }}{{- end }}{{- end }}
+{{ if and .Values.grpcIngress.enabled $hosts -}}
+{{- /* $hosts, not .Values.grpcIngress.hosts: an entry with an empty host renders
+       `- host: ""`, which ingress-nginx reads as a CATCH-ALL rule — it
+       would answer for every hostname reaching the controller, including
+       other releases' . Dropping the empties, and skipping the object
+       entirely when none are left, is what makes `grpcIngress.enabled=true`
+       with no host supplied a no-op instead of a cluster-wide one.
+
+       This is also why the template is generated whenever the app serves
+       gRPC, rather than only when a host is configured at GENERATION time:
+       hosts arrive at install time too (nuzur deploy passes them), and a
+       template that does not exist ignores them silently. */}}
+{{- $fullName := include "<<.Identifier>>.fullname" . -}}
+{{- $svcPort := .Values.service.grpcPort -}}
+{{- /* A SECOND Ingress object, alongside ingress.yaml, and not another rule on
+       it: nginx.ingress.kubernetes.io/backend-protocol is an annotation on the
+       Ingress object, so one object speaks one protocol to its backend. Hence
+       also the -grpc name suffix — same namespace, two Ingresses, and two
+       resources cannot share a name. */}}
+{{- $ingressName := printf "%s-grpc" $fullName | trunc 63 | trimSuffix "-" -}}
+{{- /* These annotations are not decoration. Without them ingress-nginx speaks
+       HTTP/1.1 to an HTTP/2 server and EVERY call fails; proxy-body-size 0
+       lifts the default 1MB cap that streaming RPCs hit immediately, and the
+       600s timeouts keep long-lived streams from being cut. They are set here
+       rather than in values.yaml so they cannot be dropped by an operator
+       overriding annotations — anything in values is merged on top. */}}
+{{- $annotations := dict
+      "nginx.ingress.kubernetes.io/backend-protocol" "GRPC"
+      "nginx.ingress.kubernetes.io/grpc-backend" "true"
+      "nginx.ingress.kubernetes.io/protocol" "h2c"
+      "nginx.ingress.kubernetes.io/proxy-body-size" "0"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout" "600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout" "600" -}}
+{{- range $key, $value := .Values.grpcIngress.annotations -}}
+{{- $_ := set $annotations $key $value -}}
+{{- end -}}
+{{- if and .Values.grpcIngress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) -}}
+{{- if not (hasKey $annotations "kubernetes.io/ingress.class") -}}
+{{- $_ := set $annotations "kubernetes.io/ingress.class" .Values.grpcIngress.className -}}
+{{- end -}}
+{{- end }}
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $ingressName }}
+  labels:
+    {{- include "<<.Identifier>>.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml $annotations | nindent 4 }}
+spec:
+  {{- if and .Values.grpcIngress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.grpcIngress.className }}
+  {{- end }}
+  {{- if .Values.grpcIngress.tls }}
+  tls:
+    {{- range .Values.grpcIngress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range $hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- /* The Service is the parent's, unsuffixed: only the Ingress
+                     object is named -grpc. */}}
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+              {{- else }}
+              serviceName: {{ $fullName }}
+              servicePort: {{ $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+<<- end>>

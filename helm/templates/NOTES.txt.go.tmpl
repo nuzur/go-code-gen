@@ -21,7 +21,15 @@ Reach it:
   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
 {{- end }}
 {{- end }}
-{{- else }}
+{{- end }}
+<<- if .ServesGRPCIngress>>
+{{- if .Values.grpcIngress.enabled }}
+{{- range $host := .Values.grpcIngress.hosts }}
+  {{ $host.host }}:443 (gRPC, TLS terminated at the ingress)
+{{- end }}
+{{- end }}
+<<- end>>
+{{- if not (or .Values.ingress.enabled <<if .ServesGRPCIngress>>.Values.grpcIngress.enabled<<else>>false<<end>>) }}
   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "<<.Identifier>>.fullname" . }} <<if .ServesHTTP>>{{ .Values.service.httpPort }}:{{ .Values.service.httpPort }}<<else>>{{ .Values.service.grpcPort }}:{{ .Values.service.grpcPort }}<<end>>
 {{- end }}
 

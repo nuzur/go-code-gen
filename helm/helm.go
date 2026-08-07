@@ -22,7 +22,7 @@ var templates embed.FS
 // endpoints live) on its own hostname, while the API exposes gRPC on another.
 // So rather than a second set of templates that would drift from the first,
 // the chart templates are rendered again against a project that differs in
-// exactly the three ways the deployment does.
+// exactly the four ways the deployment does.
 func authSubchartProject(p *project.Project) *project.Project {
 	auth := *p
 
@@ -30,18 +30,30 @@ func authSubchartProject(p *project.Project) *project.Project {
 	auth.Identifier = p.AuthChartIdentifier()
 
 	// 2. HTTP only. Clearing Server is what makes ServesGRPC false, which drops
-	//    the gRPC port, the gRPC probes and the gRPC ingress annotations
-	//    together — the auth endpoints are HTTP.
+	//    the gRPC port, the gRPC probes and the entire gRPC Ingress together —
+	//    the auth endpoints are HTTP.
 	auth.ProtoConfig.Server = false
-	auth.HelmConfig.IngressBackend = "http"
 
-	// 3. Reads the PARENT's config directory, because it is the same binary
+	// 3. Its own hostname. AuthDomain IS this chart's Domain: it renders the
+	//    parent's templates, so its Ingress comes from ServesHTTPIngress like
+	//    any other chart's. The parent's hosts must not follow it here — Domain
+	//    would put the API's hostname on the auth deployment, and GRPCDomain
+	//    would be a gRPC host on a chart that no longer serves gRPC. AuthDomain
+	//    is cleared because this chart has no auth subchart of its own.
+	auth.HelmConfig.Domain = p.HelmConfig.AuthDomain
+	auth.HelmConfig.GRPCDomain = ""
+	auth.HelmConfig.AuthDomain = ""
+
+	// 4. Reads the PARENT's config directory, because it is the same binary
 	//    reading the same operator-written prod.yaml. Without this it would look
 	//    for /root/prod-config/<id>-auth, which nothing creates.
 	auth.HelmConfig.ConfigDirName = p.HelmConfigDirName()
 
-	// A subchart never carries the parent's dependencies.
+	// A subchart never carries the parent's dependencies — and must not claim an
+	// auth subchart of its own, or it declares a dependency on "<id>-auth-auth"
+	// that nothing generates.
 	auth.HelmConfig.Dependencies = nil
+	auth.HelmConfig.IsAuthSubchart = true
 
 	return &auth
 }
@@ -101,7 +113,12 @@ func GenerateHelm(ctx context.Context, params *project.ProjectParams) error {
 		{name: "deployment.yaml", output: path.Join(templatesDir, "deployment.yaml")},
 		{name: "service.yaml", output: path.Join(templatesDir, "service.yaml")},
 		{name: "hpa.yaml", output: path.Join(templatesDir, "hpa.yaml")},
+		// Two Ingress templates, because backend-protocol is an annotation on
+		// the Ingress object: one object, one protocol. Each renders to an
+		// empty file unless its own hostname is configured AND the app serves
+		// that protocol.
 		{name: "ingress.yaml", output: path.Join(templatesDir, "ingress.yaml")},
+		{name: "ingress-grpc.yaml", output: path.Join(templatesDir, "ingress-grpc.yaml")},
 		{name: "serviceaccount.yaml", output: path.Join(templatesDir, "serviceaccount.yaml")},
 		{name: "_helpers.tpl", output: path.Join(templatesDir, "_helpers.tpl")},
 		{name: "test-connection.yaml", output: path.Join(testsDir, "test-connection.yaml")},
@@ -134,6 +151,8 @@ func GenerateHelm(ctx context.Context, params *project.ProjectParams) error {
 			templateFile{name: "deployment.yaml", output: path.Join(authTemplates, "deployment.yaml"), data: auth},
 			templateFile{name: "service.yaml", output: path.Join(authTemplates, "service.yaml"), data: auth},
 			templateFile{name: "hpa.yaml", output: path.Join(authTemplates, "hpa.yaml"), data: auth},
+			// The HTTP ingress only: the auth server serves the JWT endpoints
+			// over HTTP and nothing else, so there is no gRPC object for it.
 			templateFile{name: "ingress.yaml", output: path.Join(authTemplates, "ingress.yaml"), data: auth},
 			templateFile{name: "serviceaccount.yaml", output: path.Join(authTemplates, "serviceaccount.yaml"), data: auth},
 			templateFile{name: "_helpers.tpl", output: path.Join(authTemplates, "_helpers.tpl"), data: auth},

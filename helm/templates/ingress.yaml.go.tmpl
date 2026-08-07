@@ -1,15 +1,24 @@
-{{ if .Values.ingress.enabled -}}
+<<if .ServesHTTP>>
+{{ $hosts := list -}}
+{{- range .Values.ingress.hosts }}{{- if .host }}{{- $hosts = append $hosts . }}{{- end }}{{- end }}
+{{ if and .Values.ingress.enabled $hosts -}}
+{{- /* $hosts, not .Values.ingress.hosts: an entry with an empty host renders
+       `- host: ""`, which ingress-nginx reads as a CATCH-ALL rule — it
+       would answer for every hostname reaching the controller, including
+       other releases' . Dropping the empties, and skipping the object
+       entirely when none are left, is what makes `ingress.enabled=true`
+       with no host supplied a no-op instead of a cluster-wide one.
+
+       This is also why the template is generated whenever the app serves
+       HTTP, rather than only when a host is configured at GENERATION time:
+       hosts arrive at install time too (nuzur deploy passes them), and a
+       template that does not exist ignores them silently. */}}
 {{- $fullName := include "<<.Identifier>>.fullname" . -}}
-<<- if .IngressTargetsGRPC>>
-{{- /* Fronting the gRPC port. Needs the backend-protocol / grpc-backend / h2c
-       annotations in values.yaml, or the controller downgrades to HTTP/1.1. */}}
-{{- $svcPort := .Values.service.grpcPort -}}
-<<- else>>
-{{- /* HTTP is what ingress controllers route by default. This used to be
-       hardcoded to the gRPC port, which meant a REST project's ingress pointed
-       at a port nothing was listening on. */}}
+{{- /* The HTTP side of the app. The gRPC side, when there is one, is a
+       SEPARATE Ingress object (ingress-grpc.yaml) on its own hostname:
+       backend-protocol is an annotation on the object, so one Ingress can
+       only ever speak one protocol to its backend. */}}
 {{- $svcPort := .Values.service.httpPort -}}
-<<- end>>
 {{- if and .Values.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
   {{- if not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class") }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
@@ -46,7 +55,7 @@ spec:
     {{- end }}
   {{- end }}
   rules:
-    {{- range .Values.ingress.hosts }}
+    {{- range $hosts }}
     - host: {{ .host | quote }}
       http:
         paths:
@@ -68,3 +77,4 @@ spec:
           {{- end }}
     {{- end }}
 {{- end }}
+<<- end>>

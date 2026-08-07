@@ -41,14 +41,33 @@ type HelmConfig struct {
 	// values are read.
 	Dependencies []HelmDependency `json:"dependencies,omitempty"`
 
-	// IngressBackend selects which port the Ingress routes to: "http" or "grpc".
+	// Domain, GRPCDomain and AuthDomain are the hostnames this chart's Ingress
+	// objects answer on, and they are also what decides whether those objects
+	// exist at all: no host, no Ingress.
 	//
-	// Only meaningful when the app serves both. Defaults to http, which is what
-	// an ingress controller expects, but a gRPC API fronted by ingress-nginx
-	// needs "grpc" — that flips the backend port AND adds the three annotations
-	// (backend-protocol, grpc-backend, protocol h2c) without which the
-	// controller speaks HTTP/1.1 to an HTTP/2 server and every call fails.
-	IngressBackend string `json:"ingress_backend,omitempty"`
+	// There are three because there are up to three Ingress OBJECTS, and there
+	// are three objects because nginx.ingress.kubernetes.io/backend-protocol is
+	// an annotation on the object — one Ingress therefore speaks exactly one
+	// protocol to its backend. An app serving both gRPC and HTTP cannot be
+	// fronted by a single Ingress however its rules are written; it needs two,
+	// on two hostnames.
+	//
+	//	Domain      the HTTP side (REST, the info page, storage, JWT endpoints)
+	//	GRPCDomain  the gRPC side, with the h2c annotations that go with it
+	//	AuthDomain  the auth subchart, which is HTTP-only by construction
+	//
+	// A host configured for a layer the app does not serve renders nothing —
+	// see ServesHTTPIngress, ServesGRPCIngress and ServesAuthIngress. That way a
+	// domain left behind in a config after REST or gRPC is switched off cannot
+	// produce an Ingress aimed at a port nothing is listening on.
+	Domain     string `json:"domain"`
+	GRPCDomain string `json:"grpc_domain"`
+	AuthDomain string `json:"auth_domain"`
+
+	// IsAuthSubchart marks the derived project the auth subchart is rendered
+	// from, so it does not recurse into generating an auth subchart of its own.
+	// See HasAuthSubchart.
+	IsAuthSubchart bool `json:"-"`
 
 	// ConfigDirName overrides the subdirectory of the credentials mount this
 	// chart reads, which is otherwise the identifier.
@@ -66,7 +85,18 @@ type HelmConfig struct {
 // JWT auth is the trigger because it is what gives the app HTTP auth endpoints
 // (/signin and friends) worth exposing on their own hostname. Keycloak auth is
 // an external identity provider, so there is nothing of ours to run.
-func (p *Project) HasAuthSubchart() bool { return p.HasJWTAuth() }
+//
+// IsAuthSubchart stops the recursion. The auth chart is produced by rendering
+// these same templates against a derived project that copies AuthConfig
+// verbatim — so without this it reported that IT needed an auth subchart too,
+// and emitted a Chart.yaml declaring a dependency on "<id>-auth-auth", a chart
+// nothing generates. Clearing AuthConfig on the derived project would fix the
+// recursion and break something worse: HasJWTAuth also feeds ServesHTTP, so a
+// JWT-only project with the info page off would lose the auth server's own HTTP
+// port. The recursion is its own question, so it gets its own flag.
+func (p *Project) HasAuthSubchart() bool {
+	return p.HasJWTAuth() && !p.HelmConfig.IsAuthSubchart
+}
 
 // AuthChartIdentifier names the auth subchart, and through it every resource
 // the subchart creates.
@@ -80,15 +110,41 @@ type HelmDependency struct {
 	Condition  string `json:"condition,omitempty"`
 }
 
-// IngressTargetsGRPC reports whether the Ingress should route to the gRPC port.
+// ServesHTTPIngress, ServesGRPCIngress and ServesAuthIngress each report
+// whether one of the chart's Ingress objects should be enabled BY DEFAULT.
 //
-// True when explicitly asked for, and also when gRPC is the only thing the app
-// serves — an ingress pointing at a port nothing listens on is never right.
-func (p *Project) IngressTargetsGRPC() bool {
-	if p.HelmConfig.IngressBackend == "grpc" {
-		return p.ServesGRPC()
-	}
-	return p.ServesGRPC() && !p.ServesHTTP()
+// Two conditions, both required: a hostname was configured for that layer, and
+// the app actually serves it. Ingresses are therefore deduced, never selected —
+// there is no mode flag to get wrong, and the pathological cases (an Ingress on
+// a port nothing binds; a gRPC endpoint silently moved onto an HTTP port) are
+// not expressible.
+//
+// Note the seam these sit on, because getting it wrong is silent. Two different
+// questions decide two different things:
+//
+//	does the app serve the layer?  →  whether the TEMPLATE is generated at all
+//	is a hostname configured?      →  whether `enabled` DEFAULTS to true
+//
+// So these predicates gate values.yaml, not the template files, which gate on
+// ServesHTTP / ServesGRPC / HasAuthSubchart instead. A chart for an app with a
+// gRPC port therefore always CAN serve a gRPC Ingress; it just does not until
+// something supplies a host. That is what lets an installer pass one at install
+// time — `nuzur deploy --grpc-domain` does exactly this, and if the template
+// were gated on the host the flag would be accepted and quietly do nothing,
+// since helm ignores values no template reads.
+//
+// The pathological cases stay closed because the LAYER still gates the file: no
+// gRPC port means no gRPC Ingress template, so no value can conjure one.
+func (p *Project) ServesHTTPIngress() bool {
+	return p.HelmConfig.Domain != "" && p.ServesHTTP()
+}
+
+func (p *Project) ServesGRPCIngress() bool {
+	return p.HelmConfig.GRPCDomain != "" && p.ServesGRPC()
+}
+
+func (p *Project) ServesAuthIngress() bool {
+	return p.HelmConfig.AuthDomain != "" && p.HasAuthSubchart()
 }
 
 func (p *Project) HelmChartDir() string {

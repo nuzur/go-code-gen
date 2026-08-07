@@ -82,41 +82,61 @@ service:
   httpPort: <<.APIConfig.HTTPPort>>
 <<- end>>
 
+# The HTTP Ingress, fronting service.httpPort.
+#
+# enabled follows the configured hostname: on when a domain was set for a layer
+# this app actually serves, off otherwise. There is no mode flag, and no
+# placeholder host to forget to replace — templates/ingress.yaml is emitted
+# EMPTY unless both hold, so switching this on by hand on a chart with no HTTP
+# domain produces nothing at all.
+<<- if not .ServesHTTP>>
+#
+# This app serves no HTTP, so nothing here can ever apply: the block is kept
+# only because NOTES.txt reads ingress.enabled.
+<<- end>>
 ingress:
-  enabled: false
+  enabled: <<if .ServesHTTPIngress>>true<<else>>false<<end>>
   className: "nginx"
-<<- if .IngressTargetsGRPC>>
-  # This Ingress fronts the gRPC port. All three annotations are required:
-  # without them ingress-nginx speaks HTTP/1.1 to an HTTP/2 server and every
-  # call fails. proxy-body-size 0 lifts the default 1MB cap, which streaming
-  # RPCs hit immediately.
-  annotations:
-    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
-    nginx.ingress.kubernetes.io/grpc-backend: "true"
-    nginx.ingress.kubernetes.io/protocol: "h2c"
-    nginx.ingress.kubernetes.io/proxy-body-size: "0"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
-    # cert-manager.io/cluster-issuer: letsencrypt
-<<- else>>
   annotations: {}
     # cert-manager.io/cluster-issuer: letsencrypt
-<<- if .ServesGRPC>>
-    # This app also serves gRPC on <<.APIConfig.GRPCPort>>. To front THAT port
-    # instead, set helm.ingress_backend to "grpc" in the generator config —
-    # gRPC through ingress-nginx needs backend-protocol, grpc-backend and
-    # protocol h2c annotations, which that turns on together.
-<<- end>>
-<<- end>>
   hosts:
-    - host: <<.Identifier>>.local
+    - host: "<<.HelmConfig.Domain>>"
       paths:
         - path: /
           pathType: Prefix
   tls: []
   #  - secretName: <<.Identifier>>-tls
   #    hosts:
-  #      - <<.Identifier>>.example.com
+  #      - "<<.HelmConfig.Domain>>"
+<<- if .ServesGRPC>>
+
+# The gRPC Ingress, fronting service.grpcPort — a SECOND Ingress object, on its
+# own hostname, generated as templates/ingress-grpc.yaml.
+#
+# It cannot be another rule on the block above:
+# nginx.ingress.kubernetes.io/backend-protocol is an annotation on the Ingress
+# OBJECT, so a single Ingress speaks exactly one protocol to its backend. An app
+# serving both protocols needs two objects, which is why there are two hostnames.
+#
+# The gRPC annotations (backend-protocol, grpc-backend, protocol h2c, and the
+# body-size/timeout lifts streaming needs) are baked into that template rather
+# than listed here, so they cannot be dropped by overriding annotations. What
+# you put here is merged on top of them.
+grpcIngress:
+  enabled: <<if .ServesGRPCIngress>>true<<else>>false<<end>>
+  className: "nginx"
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt
+  hosts:
+    - host: "<<.HelmConfig.GRPCDomain>>"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: <<.Identifier>>-grpc-tls
+  #    hosts:
+  #      - "<<.HelmConfig.GRPCDomain>>"
+<<- end>>
 
 # Requests are not optional in practice: horizontal autoscaling targets CPU
 # utilization as a percentage OF THE REQUEST, so with none set the HPA reports
@@ -221,15 +241,19 @@ affinity: {}
 #
 # It is the SAME image as this chart, run a second time exposing only its HTTP
 # side — the JWT endpoints — on its own hostname. Values here override that
-# subchart's own defaults; set its ingress host to the domain you want auth on.
+# subchart's own defaults.
+#
+# `enabled` is read by the condition on the dependency in Chart.yaml, so it is
+# what installs the subchart at all; the ingress block below follows the
+# configured auth domain, exactly as this chart's own does.
 <<.AuthChartIdentifier>>:
   enabled: true
   # image: inherited defaults live in the subchart's values.yaml. The deploy
   # sets repository/tag/digest on both charts so they can never diverge.
   ingress:
-    enabled: false
+    enabled: <<if .ServesAuthIngress>>true<<else>>false<<end>>
     hosts:
-      - host: auth.<<.Identifier>>.local
+      - host: "<<.HelmConfig.AuthDomain>>"
         paths:
           - path: /
             pathType: Prefix
