@@ -3,6 +3,7 @@ package githubactions
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -115,5 +116,47 @@ func TestHelmWorkflowReadsChartVersionRobustly(t *testing.T) {
 	}
 	if !strings.Contains(body, "helm show chart") {
 		t.Errorf("helm workflow should read the version from chart metadata\n%s", body)
+	}
+
+	// The match must be anchored to column 1. `helm show chart` prints the
+	// dependencies block, whose subchart version lines are INDENTED — and awk
+	// splits on whitespace, so `$1 == "version:"` matches those too. That
+	// published a subchart's version while helm had packaged the parent's, and
+	// the push failed with "no such file".
+	if strings.Contains(body, `$1 == "version:"`) {
+		t.Errorf("version match must be anchored to the line start, or an indented subchart version wins\n%s", body)
+	}
+	if !strings.Contains(body, "/^version:/") {
+		t.Errorf("expected a line-anchored /^version:/ match\n%s", body)
+	}
+}
+
+// TestHelmVersionExtractionIgnoresSubcharts runs the workflow's actual
+// extraction against real `helm show chart` output, rather than trusting that
+// the shell reads correctly.
+func TestHelmVersionExtractionIgnoresSubcharts(t *testing.T) {
+	if _, err := exec.LookPath("awk"); err != nil {
+		t.Skip("awk not available")
+	}
+	// The shape that broke: dependencies listed above the chart's own version,
+	// with the subchart version indented.
+	showChartOutput := `apiVersion: v2
+dependencies:
+- condition: myapp-auth.enabled
+  name: myapp-auth
+  version: 0.0.1
+description: myapp backend service
+name: myapp
+type: application
+version: 0.1.0
+`
+	cmd := exec.Command("awk", "/^version:/ { print $2; exit }")
+	cmd.Stdin = strings.NewReader(showChartOutput)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("awk: %v", err)
+	}
+	if got := strings.TrimSpace(string(out)); got != "0.1.0" {
+		t.Errorf("extracted %q, want the CHART's version 0.1.0 (not the subchart's 0.0.1)", got)
 	}
 }

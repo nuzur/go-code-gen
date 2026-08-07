@@ -48,11 +48,18 @@ jobs:
         run: |
           # Read the version from the packaged chart's own metadata rather than
           # grepping Chart.yaml. `grep 'version:' | tail -n1` happens to work
-          # today only because dependencies are listed ABOVE the chart version
-          # (and because grep is case-sensitive, so apiVersion/appVersion do not
+          # only because dependencies are listed ABOVE the chart version (and
+          # because grep is case-sensitive, so apiVersion/appVersion do not
           # match) — move the dependencies block below it and the push silently
           # uploads a subchart's version instead.
-          CHART_VERSION="$(helm show chart "$CHART_DIR" | awk '$1 == "version:" { print $2; exit }')"
+          #
+          # /^version:/ is anchored to COLUMN 1 on purpose. `helm show chart`
+          # prints the dependencies block too, and a subchart's version line is
+          # indented — but awk splits on whitespace, so `$1 == "version:"`
+          # matches an indented line just as happily as a top-level one. That
+          # published the SUBCHART's version while helm had packaged the
+          # parent's, and the push died with "no such file".
+          CHART_VERSION="$(helm show chart "$CHART_DIR" | awk '/^version:/ { print $2; exit }')"
           if [ -z "$CHART_VERSION" ]; then
             echo "could not determine chart version" >&2
             exit 1
