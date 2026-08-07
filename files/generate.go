@@ -56,6 +56,26 @@ func GenerateFile(ctx context.Context, req filetools.FileRequest) ([]byte, error
 // its (small) render-and-write loop rather than wrapping it. Go formatting is
 // deliberately not applied: these outputs are never Go source.
 func GenerateFileWithDelims(ctx context.Context, req filetools.FileRequest, left, right string) ([]byte, error) {
+	return generateWithDelims(ctx, req, left, right, true)
+}
+
+// GenerateUserFileWithDelims is GenerateFileWithDelims for an output the USER
+// owns: identical rendering, no generated marker.
+//
+// The marker is not decoration. It is what lists a file in
+// .nuzur-codegen-manifest.json, and the manifest is what tells the client-side
+// extractor to overwrite that file and the orphan cleanup to delete it. Marking
+// a user-owned output would hand it to the very machinery whose job is keeping
+// generated files current, and the user's edits would vanish on the next run.
+//
+// Mirrors the existing filetools.GenerateFile (no marker) against
+// files.GenerateFile (marker) split — see custom/customgen.go's emitOnce, which
+// draws the same line for the API's custom layer.
+func GenerateUserFileWithDelims(ctx context.Context, req filetools.FileRequest, left, right string) ([]byte, error) {
+	return generateWithDelims(ctx, req, left, right, false)
+}
+
+func generateWithDelims(ctx context.Context, req filetools.FileRequest, left, right string, mark bool) ([]byte, error) {
 	tmplBytes := req.TemplateBytes
 	if tmplBytes == nil && req.TemplatePath != "" {
 		b, err := os.ReadFile(req.TemplatePath)
@@ -64,8 +84,10 @@ func GenerateFileWithDelims(ctx context.Context, req filetools.FileRequest, left
 		}
 		tmplBytes = b
 	}
-	if notice := generatedNotice(req.OutputPath); notice != "" && tmplBytes != nil {
-		tmplBytes = injectNotice(tmplBytes, notice)
+	if mark {
+		if notice := generatedNotice(req.OutputPath); notice != "" && tmplBytes != nil {
+			tmplBytes = injectNotice(tmplBytes, notice)
+		}
 	}
 
 	funcs := template.FuncMap{}

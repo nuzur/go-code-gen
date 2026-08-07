@@ -749,3 +749,110 @@ func TestIngressHostsCanBeSuppliedAtInstallTime(t *testing.T) {
 		t.Errorf("an app with no gRPC port must not render a gRPC Ingress:\n%s", out)
 	}
 }
+
+// TestCustomValuesOverlayIsUserOwned covers the one file in the chart that
+// regeneration must NOT touch.
+//
+// Everything else here is wiped and re-rendered every run (os.RemoveAll on the
+// chart dir), which is why hand-tuning a replica count or a TLS block in
+// values.yaml does not survive. The overlay is the supported place for it, so
+// the properties below are the whole feature: it appears, it carries no
+// generated marker, and an edit survives a regeneration.
+func TestCustomValuesOverlayIsUserOwned(t *testing.T) {
+	root := t.TempDir()
+	params := func() *project.ProjectParams {
+		return &project.ProjectParams{
+			RootPath:       root,
+			Identifier:     "myapp",
+			Module:         "myapp",
+			Project:        &nemgen.Project{Name: "myapp"},
+			ProjectVersion: &nemgen.ProjectVersion{},
+			RESTConfig:     project.RESTConfig{Enabled: true},
+			HelmConfig:     project.HelmConfig{Enabled: true, ImageRepository: "ghcr.io/acme/myapp"},
+		}
+	}
+	if err := GenerateHelm(context.Background(), params()); err != nil {
+		t.Fatalf("GenerateHelm: %v", err)
+	}
+
+	overlay := filepath.Join(root, "myapp", ".helm", "myapp", "values-custom.yaml")
+	body, err := os.ReadFile(overlay)
+	if err != nil {
+		t.Fatalf("overlay not generated: %v", err)
+	}
+
+	// No marker. This is load-bearing: the marker is what lists a file in the
+	// manifest, and the manifest is what makes the client-side extractor
+	// overwrite it and the orphan cleanup delete it.
+	if strings.Contains(string(body), "DO NOT EDIT") {
+		t.Errorf("the overlay must not carry the generated marker:\n%s", body)
+	}
+	// It must be inert until edited — a stray uncommented key here would apply
+	// to every deploy of every generated chart.
+	for _, line := range strings.Split(string(body), "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			t.Errorf("the overlay ships commented-out; found live YAML: %q", line)
+		}
+	}
+
+	// The property that matters: an edit survives regeneration, while the
+	// generated file next to it is rewritten.
+	edited := "replicaCount: 3\n"
+	if err := os.WriteFile(overlay, []byte(edited), 0644); err != nil {
+		t.Fatal(err)
+	}
+	generated := filepath.Join(root, "myapp", ".helm", "myapp", "values.yaml")
+	if err := os.WriteFile(generated, []byte("# clobber me\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateHelm(context.Background(), params()); err != nil {
+		t.Fatalf("regenerate: %v", err)
+	}
+
+	after, err := os.ReadFile(overlay)
+	if err != nil {
+		t.Fatalf("overlay lost on regeneration: %v", err)
+	}
+	if string(after) != edited {
+		t.Errorf("the overlay is the user's and must survive verbatim.\nwant: %q\ngot:  %q", edited, after)
+	}
+	if regenerated, err := os.ReadFile(generated); err != nil {
+		t.Fatal(err)
+	} else if strings.Contains(string(regenerated), "clobber me") {
+		t.Error("values.yaml is generated and must have been rewritten — the test is not proving anything otherwise")
+	}
+}
+
+// TestCustomValuesOverlayEmptiedStaysEmpty: an emptied overlay is still the
+// user's. Re-seeding it with the template's commented examples would be an edit
+// they did not make, so "no overlay yet" and "an overlay I cleared" must not be
+// the same state.
+func TestCustomValuesOverlayEmptiedStaysEmpty(t *testing.T) {
+	root := t.TempDir()
+	params := func() *project.ProjectParams {
+		return &project.ProjectParams{
+			RootPath:       root,
+			Identifier:     "myapp",
+			Module:         "myapp",
+			Project:        &nemgen.Project{Name: "myapp"},
+			ProjectVersion: &nemgen.ProjectVersion{},
+			RESTConfig:     project.RESTConfig{Enabled: true},
+			HelmConfig:     project.HelmConfig{Enabled: true, ImageRepository: "ghcr.io/acme/myapp"},
+		}
+	}
+	if err := GenerateHelm(context.Background(), params()); err != nil {
+		t.Fatal(err)
+	}
+	overlay := filepath.Join(root, "myapp", ".helm", "myapp", "values-custom.yaml")
+	if err := os.WriteFile(overlay, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateHelm(context.Background(), params()); err != nil {
+		t.Fatal(err)
+	}
+	if body, err := os.ReadFile(overlay); err != nil {
+		t.Fatal(err)
+	} else if len(body) != 0 {
+		t.Errorf("an emptied overlay was re-seeded:\n%s", body)
+	}
+}

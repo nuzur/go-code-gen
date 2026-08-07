@@ -1,0 +1,100 @@
+# Your values. This file is generated ONCE and regeneration will never
+# overwrite it — everything else in this chart is rewritten from scratch every
+# time, so this is where hand-tuning belongs.
+#
+# It is layered UNDER the values the deploy computes:
+#
+#     values.yaml          the generated defaults
+#     values-custom.yaml   <- this file
+#     <deploy's values>    image reference, resolved hostnames
+#     --chart-values       an explicit per-run override
+#
+# So `image` and the ingress `hosts` are NOT settable here: the deploy resolves
+# those per release and must win, or a value left behind in this file would
+# quietly pin an old image or serve a hostname the project no longer uses. Set
+# the image with --image-repo/--image-tag, and hostnames in the project's
+# go-code-gen config. Everything the deploy does not write is yours.
+#
+# Helm merges maps key by key, so adding `ingress.tls` here combines with the
+# `ingress.hosts` the deploy writes rather than replacing them.
+#
+# Everything below is commented out: this file does nothing until you edit it.
+
+# --- Scale ---------------------------------------------------------------
+#
+# A fixed replica count. The chart defaults to 1.
+#
+# replicaCount: 3
+#
+# ...or let the HPA decide (templates/hpa.yaml is already generated). Note that
+# autoscaling overrides replicaCount, and that it needs `resources.requests.cpu`
+# below — the HPA targets a PERCENTAGE OF THE REQUEST, so with no request set it
+# reports <unknown>/80% and never scales.
+#
+# autoscaling:
+#   enabled: true
+#   minReplicas: 2
+#   maxReplicas: 10
+#   targetCPUUtilizationPercentage: 80
+
+# --- Resources -----------------------------------------------------------
+#
+# resources:
+#   requests:
+#     cpu: 100m
+#     memory: 128Mi
+#   limits:
+#     memory: 512Mi
+
+# --- TLS -----------------------------------------------------------------
+#
+# HTTPS for the HTTP ingress. cert-manager watches for the cluster-issuer
+# annotation, requests the certificate, and writes it into secretName.
+#
+# ingress:
+#   annotations:
+#     cert-manager.io/cluster-issuer: lets-encrypt
+#   tls:
+#     - secretName: <<.Identifier>>-tls
+#       hosts:
+#         - your.domain.example
+#
+# TLS is not optional for gRPC — it is what makes gRPC work at all.
+# ingress-nginx enables HTTP/2 only on its TLS listener (`listen 443 ssl http2`;
+# `listen 80` has no http2), and a gRPC client negotiates HTTP/2 through ALPN,
+# which only happens in a TLS handshake. Over plain HTTP the ingress is created,
+# carries every correct annotation, and clients still cannot connect.
+#
+# grpcIngress:
+#   annotations:
+#     cert-manager.io/cluster-issuer: lets-encrypt
+#   tls:
+#     - secretName: <<.Identifier>>-grpc-tls
+#       hosts:
+#         - your.grpc.domain.example
+#
+# Check the issuer name against your cluster — `kubectl get clusterissuer` —
+# and give every hostname its own DNS record, or issuance retries forever.
+
+# --- Scheduling ----------------------------------------------------------
+#
+# nodeSelector: {}
+# tolerations: []
+# affinity: {}
+<<- if .HasAuthSubchart>>
+
+# --- The auth server -----------------------------------------------------
+#
+# Values for charts/<<.AuthChartIdentifier>>, nested under its name. It runs the
+# same image as this chart, so it scales and is tuned separately.
+#
+# <<.AuthChartIdentifier>>:
+#   replicaCount: 2
+#   ingress:
+#     annotations:
+#       cert-manager.io/cluster-issuer: lets-encrypt
+#     tls:
+#       - secretName: <<.AuthChartIdentifier>>-tls
+#         hosts:
+#           - your.auth.domain.example
+<<- end>>

@@ -76,6 +76,17 @@ func GenerateHelm(ctx context.Context, params *project.ProjectParams) error {
 	templatesDir := path.Join(chartDir, "templates")
 	testsDir := path.Join(templatesDir, "tests")
 
+	// The one file in this chart that is the USER's. Read it out before the wipe
+	// below and put it back after, so regeneration keeps their hand-tuning
+	// (replicas, resources, TLS) while every generated file is rewritten. See
+	// emitCustomValues.
+	//
+	// The client-side extractor also preserves it — unmarked files are skipped
+	// when a generated archive is unpacked — but relying on that alone would
+	// leave this generator destructive whenever it runs directly against a real
+	// tree, which is the trap os.RemoveAll below already sprang once.
+	customValues, hadCustomValues := readCustomValues(chartDir)
+
 	// Only this chart's own subtree is ours to delete. HelmConfig.Dir is a shared
 	// directory: a repo can keep hand-written charts for other services alongside
 	// the generated one (sfapi holds .helm/sfauthserver, a chart nothing here
@@ -178,5 +189,62 @@ func GenerateHelm(ctx context.Context, params *project.ProjectParams) error {
 		}
 	}
 
+	if err := emitCustomValues(ctx, p, chartDir, customValues, hadCustomValues); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// customValuesName is the chart's user-owned values overlay.
+//
+// It is the answer to "the generated chart is rewritten on every run, so where
+// do my replica count and my TLS block live?" — the same answer the API's
+// custom layer gives for app/rest.go and app/grpc.go.
+const customValuesName = "values-custom.yaml"
+
+// readCustomValues returns the existing overlay so it can survive the chart
+// wipe. The bool distinguishes "no overlay yet" from "an overlay the user
+// deliberately emptied": an empty file is still theirs, and re-seeding it with
+// the template's commented examples would be an edit they did not make.
+func readCustomValues(chartDir string) ([]byte, bool) {
+	body, err := os.ReadFile(path.Join(chartDir, customValuesName))
+	if err != nil {
+		return nil, false
+	}
+	return body, true
+}
+
+// emitCustomValues restores the user's overlay, or seeds a fresh one.
+//
+// It never carries the generated marker, and that is load-bearing rather than
+// cosmetic: the marker is what puts a file in .nuzur-codegen-manifest.json, and
+// the manifest is what makes the client-side extractor overwrite it and the
+// orphan cleanup delete it. Marked, this file would be clobbered on the next
+// regeneration by the very machinery that exists to keep generated files
+// current. So it goes through filetools.GenerateFile rather than
+// files.GenerateFileWithDelims, which injects the marker unconditionally.
+func emitCustomValues(ctx context.Context, p *project.Project, chartDir string, existing []byte, had bool) error {
+	outputPath := path.Join(chartDir, customValuesName)
+
+	if had {
+		if p.OnStatusChange != nil {
+			p.OnStatusChange(fmt.Sprintf("Preserving existing %s", customValuesName))
+		}
+		return os.WriteFile(outputPath, existing, 0644)
+	}
+
+	tplBytes, err := files.GetTemplateBytes(templates, customValuesName)
+	if err != nil {
+		return fmt.Errorf("error getting template bytes for %s: %v", customValuesName, err)
+	}
+	if _, err := files.GenerateUserFileWithDelims(ctx, filetools.FileRequest{
+		OutputPath:      outputPath,
+		TemplateBytes:   tplBytes,
+		Data:            p,
+		DisableGoFormat: true,
+	}, "<<", ">>"); err != nil {
+		return fmt.Errorf("error generating %s: %v", customValuesName, err)
+	}
 	return nil
 }

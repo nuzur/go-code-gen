@@ -98,7 +98,10 @@ ingress:
   enabled: <<if .ServesHTTPIngress>>true<<else>>false<<end>>
   className: "nginx"
   annotations: {}
-    # cert-manager.io/cluster-issuer: letsencrypt
+    # cert-manager.io/cluster-issuer: lets-encrypt   # check yours:
+    #   kubectl get clusterissuer
+    # Hand-editing here does not survive: this file is regenerated every
+    # run. Put it in values-custom.yaml, which is yours.
   hosts:
     - host: "<<.HelmConfig.Domain>>"
       paths:
@@ -126,7 +129,10 @@ grpcIngress:
   enabled: <<if .ServesGRPCIngress>>true<<else>>false<<end>>
   className: "nginx"
   annotations: {}
-    # cert-manager.io/cluster-issuer: letsencrypt
+    # cert-manager.io/cluster-issuer: lets-encrypt   # check yours:
+    #   kubectl get clusterissuer
+    # Hand-editing here does not survive: this file is regenerated every
+    # run. Put it in values-custom.yaml, which is yours.
   hosts:
     - host: "<<.HelmConfig.GRPCDomain>>"
       paths:
