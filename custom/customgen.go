@@ -28,9 +28,11 @@ type customTemplateData struct {
 // hand-written app package that plugs into the generated servers via gated fx
 // hooks (the generated main.go keeps wiring every transport — gRPC, REST, JWT).
 //
-// It is a no-op unless CustomConfig.Enabled and at least one wrappable transport
-// (gRPC server or REST) is enabled. Files are emitted ONCE (skipped if present)
-// and carry NO generated marker, so they are user-owned and survive regen.
+// It is a no-op unless CustomConfig.Enabled and at least one hook has something
+// to plug into: a wrappable transport (gRPC server or REST) or the core data
+// layer (which is what the background-worker hook needs). Files are emitted ONCE
+// (skipped if present) and carry NO generated marker, so they are user-owned and
+// survive regen.
 func GenerateCustom(ctx context.Context, params *project.ProjectParams) error {
 	proj, err := project.New(params)
 	if err != nil {
@@ -42,9 +44,12 @@ func GenerateCustom(ctx context.Context, params *project.ProjectParams) error {
 
 	grpcOn := proj.ProtoConfig.Enabled && proj.ProtoConfig.Server
 	restOn := proj.RESTConfig.Enabled && proj.CoreConfig.Enabled
-	if !grpcOn && !restOn {
+	// The worker hook needs no transport at all — it only needs the core data
+	// layer — so a core-only app still gets a custom zone (just app/worker.go).
+	coreOn := proj.CoreConfig.Enabled
+	if !grpcOn && !restOn && !coreOn {
 		if proj.OnStatusChange != nil {
-			proj.OnStatusChange("Skipping custom zone: no gRPC or REST transport enabled")
+			proj.OnStatusChange("Skipping custom zone: no gRPC or REST transport and no core enabled")
 		}
 		return nil
 	}
@@ -83,6 +88,15 @@ func GenerateCustom(ctx context.Context, params *project.ProjectParams) error {
 
 	if restOn {
 		if err := emitOnce(ctx, path.Join(appDir, "rest.go"), "templates/rest.go.tmpl", false, data, proj); err != nil {
+			return err
+		}
+	}
+
+	// Background workers: an fx.Invoke hook that runs in the API process and
+	// writes through the same core.Implementation. It needs the core layer, not a
+	// transport, so it is gated on coreOn alone.
+	if coreOn {
+		if err := emitOnce(ctx, path.Join(appDir, "worker.go"), "templates/worker.go.tmpl", false, data, proj); err != nil {
 			return err
 		}
 	}

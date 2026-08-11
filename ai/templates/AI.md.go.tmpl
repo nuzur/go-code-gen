@@ -51,6 +51,9 @@ regeneration. This is where an agent should add custom endpoints and custom logi
   idl/proto/custom.proto   # declarations for brand-new gRPC endpoints
   idl/proto/gen.sh         # regenerates the stubs for custom.proto into idl/gen
 {{- end }}
+{{- if .CoreConfig.Enabled }}
+  worker.go                # background workers (schedulers, pollers, consumers)
+{{- end }}
 ```
 {{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
 ### Add a REST endpoint
@@ -74,6 +77,51 @@ func ProvideCustomRoutes(coreImpl *core.Implementation) restserver.CustomRoutesF
 
 The generated middleware chain (request ID, recoverer, logger, CORS, JSON content type
 {{- if ne .AuthImport "" }}, auth{{ end }}) already applies to custom routes.
+{{- end }}
+{{ if .CoreConfig.Enabled }}
+### Run background work
+
+Edit `{{.CustomConfig.Dir}}/worker.go`. `RegisterWorkers(lc fx.Lifecycle, coreImpl *core.Implementation, provider config.Provider, logger *zap.Logger)`
+is wired in `main.go` via `fx.Invoke` and is the place for schedulers, pollers,
+ingesters, queue consumers and cache warmers. Workers run **in the API process**,
+sharing its data layer, configuration and logger. No code generation is required.
+
+```go
+ctx, cancel := context.WithCancel(context.Background()) // NOT the OnStart ctx
+var wg sync.WaitGroup
+lc.Append(fx.Hook{
+	OnStart: func(context.Context) error {
+		wg.Add(1)
+		go func() { defer wg.Done(); loop(ctx) }() // never block startup
+		return nil
+	},
+	OnStop: func(stopCtx context.Context) error { cancel(); /* wait on wg */ return nil },
+})
+```
+
+Six rules, and only the first is a compile-time concern:
+
+1. **`OnStart` must not block.** fx runs the hooks sequentially; startup does not
+   finish until yours returns. Spawn a goroutine and return `nil`.
+2. **The `OnStart` context is cancelled when startup completes** — it is the
+   startup deadline, not the app's lifetime. Derive the worker's context from
+   `context.Background()` and cancel it in `OnStop`.
+3. **`OnStop` cancels and waits** for the goroutines (a `sync.WaitGroup`, with a
+   `select` on the stop context so a stuck worker cannot hang shutdown).
+4. **Every replica runs this.** Three pods means three concurrent copies of an
+   "every 5 minutes" job. Pin the deployment to one replica, or take a lease: a
+   row with an owner and an expiry, or a MySQL advisory lock on a dedicated
+   connection (`conn, _ := coreImpl.DB().Conn(ctx)`, `SELECT GET_LOCK(?, 0)`,
+   released when that connection is closed).
+5. **A panic kills the whole process**, API included — the HTTP/gRPC recoverer
+   middleware does not cover your goroutines. `recover()` per unit of work.
+6. **The core caches are shared with the API**: every write flushes that entity's
+   cache, so one-row-at-a-time writes keep API reads cold. Batch the writes into
+   a single transaction (see the next section).
+
+Read intervals, batch sizes and endpoints from `provider` rather than hard-coding
+them — `config/base.yaml` is regenerated on every run, so real values belong in
+the deploy-time configuration.
 {{- end }}
 {{ if and .ProtoConfig.Enabled .ProtoConfig.Server }}
 ### Override a generated gRPC endpoint
@@ -115,6 +163,24 @@ Each standalone entity exposes a module with `Fetch...` (one per index),
 `List`, `Insert`, `Update`, `Upsert` and `Delete`. All of them accept options:
 `WithSQLTransaction(tx)` to join an existing transaction (honored by reads and writes)
 and `WithSkipCache()` to bypass the in-process cache.
+
+`WithSQLTransaction` is a **per-module** option — each entity module exports its own,
+so `foo.WithSQLTransaction(tx)` and `bar.WithSQLTransaction(tx)` are different
+functions. There is no transaction helper on `coreImpl`; the `*sql.Tx` comes from the
+shared pool, and every call that must share it takes its own module's option:
+
+```go
+tx, err := coreImpl.DB().Begin()
+if err != nil {
+	return err
+}
+defer tx.Rollback() // no-op once Commit has run
+
+if _, err := coreImpl.{{.SampleEntityName}}().Insert(ctx, types.UpsertRequest{ /* ... */ }, {{.SampleEntityIdentifier}}.WithSQLTransaction(tx)); err != nil {
+	return err
+}
+return tx.Commit()
+```
 {{- end }}
 
 ---

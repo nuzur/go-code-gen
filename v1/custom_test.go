@@ -14,7 +14,8 @@ import (
 )
 
 // TestGenerateCustomZone verifies the opt-in, transport-aware custom
-// application zone across gRPC-only, REST-only, both, and both+JWT-auth shapes:
+// application zone across core-only, gRPC-only, REST-only, both, and
+// both+JWT-auth shapes:
 // each still compiles (the app package plugs into the generated servers via
 // gated fx hooks while the generated main.go keeps wiring every transport), the
 // expected app files are user-owned (no generated marker, absent from the
@@ -37,22 +38,31 @@ func TestGenerateCustomZone(t *testing.T) {
 		wantFiles  []string // app-zone files that must be user-owned
 	}{
 		{
+			// No transport at all: the worker hook needs only the core data
+			// layer, so the zone is still generated (app/worker.go alone) and
+			// main.go must import the app package exactly when it has something
+			// in it — this case is what the import gating gets wrong if the
+			// guard and the template ever drift apart.
+			name:      "core_only",
+			wantFiles: []string{"app/worker.go"},
+		},
+		{
 			name:       "grpc_only",
 			proto:      project.ProtoConfig{Enabled: true, Server: true, Dir: "idl"},
 			needsProto: true,
-			wantFiles:  []string{"app/grpc.go", "app/idl/proto/custom.proto", "app/idl/proto/gen.sh"},
+			wantFiles:  []string{"app/grpc.go", "app/idl/proto/custom.proto", "app/idl/proto/gen.sh", "app/worker.go"},
 		},
 		{
 			name:      "rest_only",
 			rest:      project.RESTConfig{Enabled: true, OpenAPI: true},
-			wantFiles: []string{"app/rest.go"},
+			wantFiles: []string{"app/rest.go", "app/worker.go"},
 		},
 		{
 			name:       "both",
 			proto:      project.ProtoConfig{Enabled: true, Server: true, Dir: "idl"},
 			rest:       project.RESTConfig{Enabled: true, OpenAPI: true},
 			needsProto: true,
-			wantFiles:  []string{"app/grpc.go", "app/rest.go"},
+			wantFiles:  []string{"app/grpc.go", "app/rest.go", "app/worker.go"},
 		},
 		{
 			name:       "both_jwt",
@@ -60,7 +70,7 @@ func TestGenerateCustomZone(t *testing.T) {
 			rest:       project.RESTConfig{Enabled: true, OpenAPI: true},
 			auth:       true,
 			needsProto: true,
-			wantFiles:  []string{"app/grpc.go", "app/rest.go"},
+			wantFiles:  []string{"app/grpc.go", "app/rest.go", "app/worker.go"},
 		},
 	}
 
@@ -105,6 +115,15 @@ func TestGenerateCustomZone(t *testing.T) {
 			cmd.Dir = dir
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Fatalf("go build ./... failed:\n%s", string(out))
+			}
+
+			// The scaffold is what the user starts from, so it must be clean
+			// under vet too (an unused parameter or a stray import in a
+			// once-only file is a paper cut nobody can regenerate away).
+			vet := exec.Command("go", "vet", "./app/...")
+			vet.Dir = dir
+			if out, err := vet.CombinedOutput(); err != nil {
+				t.Fatalf("go vet ./app/... failed:\n%s", string(out))
 			}
 
 			m, err := files.ReadManifest(dir)
@@ -169,26 +188,32 @@ func TestGenerateCustomZone_EmitOnce(t *testing.T) {
 		t.Fatalf("Generate: %v", err)
 	}
 
-	grpcPath := filepath.Join(root, id, "app", "grpc.go")
 	const sentinel = "// SENTINEL_CUSTOM_EDIT_DO_NOT_CLOBBER"
-	b, err := os.ReadFile(grpcPath)
-	if err != nil {
-		t.Fatalf("read grpc.go: %v", err)
-	}
-	if err := os.WriteFile(grpcPath, append(b, []byte("\n"+sentinel+"\n")...), 0644); err != nil {
-		t.Fatalf("write sentinel: %v", err)
+	edited := []string{"grpc.go", "worker.go"}
+	for _, name := range edited {
+		p := filepath.Join(root, id, "app", name)
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", name, err)
+		}
+		if err := os.WriteFile(p, append(b, []byte("\n"+sentinel+"\n")...), 0644); err != nil {
+			t.Fatalf("write sentinel to %s: %v", name, err)
+		}
 	}
 
 	if err := Generate(context.Background(), params); err != nil {
 		t.Fatalf("regenerate: %v", err)
 	}
 
-	after, err := os.ReadFile(grpcPath)
-	if err != nil {
-		t.Fatalf("read grpc.go after regen: %v", err)
-	}
-	if !strings.Contains(string(after), sentinel) {
-		t.Fatal("custom edit was clobbered on regeneration (emit-once broken)")
+	for _, name := range edited {
+		p := filepath.Join(root, id, "app", name)
+		after, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s after regen: %v", name, err)
+		}
+		if !strings.Contains(string(after), sentinel) {
+			t.Fatalf("custom edit to %s was clobbered on regeneration (emit-once broken)", name)
+		}
 	}
 }
 
@@ -252,6 +277,10 @@ func TestFxGraphAcyclic(t *testing.T) {
 			app.NewOverride,
 		),
 		fx.Invoke(server.New),
+		// RegisterWorkers takes fx.Lifecycle + the three stubs above; validating
+		// it here catches a scaffold whose signature no longer resolves against
+		// what main.go can supply.
+		fx.Invoke(app.RegisterWorkers),
 	); err != nil {
 		t.Fatalf("fx graph invalid (dependency cycle?): %v", err)
 	}

@@ -31,6 +31,10 @@ type aiTemplateData struct {
 	// (e.g. "User"), used in the override examples. Empty when the schema has
 	// no standalone entity.
 	SampleEntityName string
+	// SampleEntityIdentifier is the raw identifier of that same entity (e.g.
+	// "user"), which is also the name of its core module package — needed to show
+	// per-module options like <module>.WithSQLTransaction(tx).
+	SampleEntityIdentifier string
 }
 
 func GenerateAIInfo(ctx context.Context, params *project.ProjectParams) error {
@@ -58,10 +62,11 @@ func GenerateAIInfo(ctx context.Context, params *project.ProjectParams) error {
 	}
 
 	data := aiTemplateData{
-		Project:          proj,
-		AppName:          appName(proj),
-		ServiceName:      gcgstrings.ToCamelCase(proj.Identifier),
-		SampleEntityName: sampleEntityName(proj),
+		Project:                proj,
+		AppName:                appName(proj),
+		ServiceName:            gcgstrings.ToCamelCase(proj.Identifier),
+		SampleEntityName:       sampleEntityName(proj),
+		SampleEntityIdentifier: sampleEntityIdentifier(proj),
 	}
 
 	_, err = files.GenerateFile(ctx, filetools.FileRequest{
@@ -92,4 +97,17 @@ func sampleEntityName(proj *project.Project) string {
 		return gcgstrings.ToCamelCase(e.Identifier)
 	}
 	return "Entity"
+}
+
+// sampleEntityIdentifier returns the raw identifier of the first standalone
+// entity — the name of its core module package — or "entity" when the schema has
+// none, so the transaction example always renders.
+func sampleEntityIdentifier(proj *project.Project) string {
+	for _, e := range proj.StandaloneEntities() {
+		if e == nil || e.Identifier == "" {
+			continue
+		}
+		return e.Identifier
+	}
+	return "entity"
 }

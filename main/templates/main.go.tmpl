@@ -33,7 +33,11 @@ import (
 	saramafx "github.com/mklfarha/sarama-fx"
 	{{end}}
 
-	{{ if .CustomConfig.Enabled }}
+	{{/* Import the custom zone only when GenerateCustom actually emits something
+	     for it: worker.go needs core, grpc.go needs a gRPC server, rest.go needs
+	     REST+core (which implies core). Custom enabled with none of those emits no
+	     files at all, and importing the empty/absent package breaks the build. */}}
+	{{ if and .CustomConfig.Enabled (or .CoreConfig.Enabled (and .ProtoConfig.Enabled .ProtoConfig.Server)) }}
 	"{{.Module}}/{{.CustomConfig.Dir}}"
 	{{ end }}
 
@@ -70,6 +74,9 @@ func main() {
 		{{ end }}
 		{{ if .StorageConfig.Enabled }}
 		fx.Invoke(storage.Register),
+		{{ end }}
+		{{ if and .CustomConfig.Enabled .CoreConfig.Enabled }}
+		fx.Invoke({{.CustomConfig.Dir}}.RegisterWorkers),
 		{{ end }}
 		{{ if and .RESTConfig.Enabled .CoreConfig.Enabled }}
 		fx.Invoke(restserver.New),

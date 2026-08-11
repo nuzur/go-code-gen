@@ -91,11 +91,43 @@ func TestGenerateAIInfoCustomEnabled(t *testing.T) {
 		"pb.AidocsServer",
 		"CreateUser(ctx context.Context, req *pb.CreateUserRequest) (*pb.User, error)",
 		"coreImpl.User().List(",
+		"app/worker.go",
+		"### Run background work",
+		"RegisterWorkers(lc fx.Lifecycle",
+		"Every replica runs this",
+		"coreImpl.DB().Begin()",
+		"user.WithSQLTransaction(tx)",
 		"POST /upload",
 		"GET /` — the info page",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("AI.md missing %q\n---\n%s", want, out)
+		}
+	}
+}
+
+// TestGenerateAIInfoWorkersRequireCore verifies the background-worker guidance is
+// gated on the core layer, not on the custom zone: with core off there is no
+// core.Implementation to hand a worker, GenerateCustom emits no worker.go, and
+// main.go wires no RegisterWorkers — so documenting it would be a lie.
+func TestGenerateAIInfoWorkersAbsentWithoutCore(t *testing.T) {
+	out := generateAIMarkdown(t, func(p *project.ProjectParams) {
+		p.CoreConfig = project.CoreConfig{Enabled: false}
+		p.ProtoConfig = project.ProtoConfig{Enabled: true, Server: true, Dir: "idl"}
+		p.CustomConfig = project.CustomConfig{Enabled: true, Dir: "app"}
+	})
+
+	// The custom zone is still documented — grpc.go is emitted for a gRPC server.
+	if !strings.Contains(out, "Custom Application Zone — `app/`") {
+		t.Fatalf("AI.md should still document the custom zone for a gRPC-only app\n---\n%s", out)
+	}
+	for _, unwanted := range []string{
+		"app/worker.go",
+		"### Run background work",
+		"RegisterWorkers",
+	} {
+		if strings.Contains(out, unwanted) {
+			t.Errorf("AI.md must not document workers when core is disabled: found %q\n---\n%s", unwanted, out)
 		}
 	}
 }
