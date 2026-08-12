@@ -124,7 +124,7 @@ func GenerateEntities(ctx context.Context, params *project.ProjectParams) error 
 			err = project.InstallDependency(imp)
 			if err != nil {
 				if params.OnStatusChange != nil {
-					params.OnStatusChange(fmt.Sprintf("ERROR: Running go get %s", imp))
+					params.OnStatusChange(fmt.Sprintf("ERROR: Running go get %s: %v", imp, err))
 				}
 			}
 		}

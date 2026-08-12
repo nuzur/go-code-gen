@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"path"
@@ -229,21 +230,50 @@ func (p *Project) Dir() string {
 	return path.Join(p.RootPath, p.Identifier)
 }
 
+// ErrGoToolchainMissing reports that the `go` binary is not on PATH, so the
+// module commands below could not run at all. It is deliberately distinguishable
+// from "the command ran and failed": the first is a property of the machine the
+// generator happens to be running on, the second is a property of the code we
+// just generated. Callers treat them differently — see the tidy helper in v1.
+var ErrGoToolchainMissing = errors.New("go toolchain not found in PATH")
+
+// classifyExecError turns a failure from exec into either ErrGoToolchainMissing
+// (the binary could not be started) or a wrapped error carrying the command's
+// combined output, which is where the real reason lives.
+func classifyExecError(what, dir string, err error, out []byte) error {
+	var execErr *exec.Error
+	if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
+		return fmt.Errorf("%w: cannot run %s in %s", ErrGoToolchainMissing, what, dir)
+	}
+	return fmt.Errorf("%s failed in %s: %w\noutput: %s", what, dir, err, string(out))
+}
+
 func (p *Project) InstallDependency(dep string) error {
 	cmd := exec.Command("go", "get", dep)
 	cmd.Dir = p.Dir()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("error running go get %s in %s: %v\noutput: %s\n", dep, p.Dir(), err, string(out))
+		// The output is folded into the error rather than printed: callers report
+		// through OnStatusChange, and a bare Printf here writes to a stdout nobody
+		// is reading when the generator runs as an extension server.
+		return classifyExecError(fmt.Sprintf("go get %s", dep), p.Dir(), err, out)
 	}
-	return err
+	return nil
 }
 
-func (p *Project) GoModTidy(dir string) {
+// GoModTidy reconciles dir's go.mod/go.sum with the Go source now on disk.
+//
+// It returns an error instead of printing one. An untidied go.mod is a go.mod
+// that may not build, and the only reason to run tidy at the end of generation is
+// so the caller finds out — the previous version swallowed the failure into
+// stdout and let generation report success while shipping a workspace that could
+// not compile.
+func (p *Project) GoModTidy(dir string) error {
 	cmd := exec.Command("go", "mod", "tidy")
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("error running go mod tidy in %s: %v\noutput: %s\n", dir, err, string(out))
+		return classifyExecError("go mod tidy", dir, err, out)
 	}
+	return nil
 }
