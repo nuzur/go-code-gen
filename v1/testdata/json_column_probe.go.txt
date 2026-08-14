@@ -1,0 +1,148 @@
+package mapper
+
+// This file is copied into a generated project by
+// v1.assertJSONColumnDriverValue and run there with `go test ./entity/mapper/`.
+// It needs no module substitution: it is in the mapper package itself and imports
+// only the standard library.
+
+import (
+	"bytes"
+	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
+	"io"
+	"testing"
+)
+
+// recordingDriver is a database/sql driver that records the argument values it is
+// handed and does nothing else.
+//
+// It deliberately does NOT implement driver.NamedValueChecker, so arguments reach
+// it through driver.DefaultParameterConverter — the same Valuer hop
+// go-sql-driver/mysql's own converter takes. What lands in args is therefore what
+// the real driver would render into the SQL text under interpolateParams=true.
+type recordingDriver struct{ args []driver.Value }
+
+func (d *recordingDriver) Open(string) (driver.Conn, error) { return &recordingConn{d: d}, nil }
+
+type recordingConn struct{ d *recordingDriver }
+
+func (c *recordingConn) Prepare(string) (driver.Stmt, error) { return &recordingStmt{d: c.d}, nil }
+func (c *recordingConn) Close() error                        { return nil }
+func (c *recordingConn) Begin() (driver.Tx, error)           { return nil, io.EOF }
+
+type recordingStmt struct{ d *recordingDriver }
+
+func (s *recordingStmt) Close() error  { return nil }
+func (s *recordingStmt) NumInput() int { return 1 }
+func (s *recordingStmt) Exec(args []driver.Value) (driver.Result, error) {
+	s.d.args = append(s.d.args, args...)
+	return driver.RowsAffected(0), nil
+}
+func (s *recordingStmt) Query([]driver.Value) (driver.Rows, error) { return nil, io.EOF }
+
+// TestJSONColumnReachesDriverAsString is the regression test for the bug that made
+// every write to a JSON column fail on a MySQL DSN with interpolateParams=true:
+//
+//	Error 3144 (22032): Cannot create a JSON value from a string with CHARACTER
+//	SET 'binary'
+//
+// With that flag the driver renders the SQL text itself, and its []byte branch
+// emits a BINARY string literal (_binary'{"a":1}') that MySQL will not cast to
+// JSON. The type of the value the driver receives is the whole bug: a
+// json.RawMessage assigned into a []byte params field is erased back to []byte
+// long before the driver sees it, so no amount of wrapping at the call site helps.
+// The column type has to hand the driver a string, which is what JSON.Value does.
+func TestJSONColumnReachesDriverAsString(t *testing.T) {
+	d := &recordingDriver{}
+	sql.Register("jsoncolumnprobe", d)
+	db, err := sql.Open("jsoncolumnprobe", "")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	if _, err := db.Exec("INSERT INTO t (c) VALUES (?)", JSON(`{"a":1}`)); err != nil {
+		t.Fatalf("exec: %v", err)
+	}
+	if len(d.args) != 1 {
+		t.Fatalf("expected one argument, got %d", len(d.args))
+	}
+
+	got, ok := d.args[0].(string)
+	if !ok {
+		t.Fatalf("the driver received %T; go-sql-driver/mysql renders a []byte argument as "+
+			"_binary'...' under interpolateParams=true, which MySQL rejects for a JSON column "+
+			"(Error 3144). A JSON column parameter must reach the driver as a string.", d.args[0])
+	}
+	if got != `{"a":1}` {
+		t.Errorf("driver received %q, want the JSON document verbatim", got)
+	}
+}
+
+// An empty value must be SQL NULL, not the empty string: no JSON column accepts
+// '' (MySQL error 3140, "Invalid JSON text: The document is empty"). This is what
+// mapper.NullifyEmptyJSON used to do at each call site, and it now covers required
+// columns too, which that call site never did.
+func TestJSONColumnEmptyIsNull(t *testing.T) {
+	for _, empty := range []JSON{nil, {}} {
+		v, err := empty.Value()
+		if err != nil {
+			t.Fatalf("Value: %v", err)
+		}
+		if v != nil {
+			t.Errorf("empty JSON produced %#v, want nil (SQL NULL)", v)
+		}
+	}
+}
+
+// Reading back a NULL JSON column is why the column type is not plain
+// json.RawMessage: database/sql cannot scan NULL into a bare named slice type
+// ("unsupported Scan, storing driver.Value type <nil> into type *json.RawMessage").
+func TestJSONColumnScan(t *testing.T) {
+	var j JSON
+	if err := j.Scan(nil); err != nil {
+		t.Fatalf("scanning NULL: %v", err)
+	}
+	if j != nil {
+		t.Errorf("NULL scanned to %q, want nil", j)
+	}
+
+	if err := j.Scan(`{"a":1}`); err != nil {
+		t.Fatalf("scanning string: %v", err)
+	}
+	if string(j) != `{"a":1}` {
+		t.Errorf("scanned %q, want the document verbatim", j)
+	}
+
+	// The copy is load-bearing: the generated list layer scans straight into the
+	// repository model's fields, and the []byte a driver hands to Scan is only
+	// valid until the next call. Retaining it would alias one row's buffer into
+	// every row of the response.
+	src := []byte(`{"a":1}`)
+	if err := j.Scan(src); err != nil {
+		t.Fatalf("scanning bytes: %v", err)
+	}
+	copy(src, []byte(`{"b":2}`))
+	if string(j) != `{"a":1}` {
+		t.Errorf("Scan retained the driver's buffer: value changed to %q when the source was reused", j)
+	}
+
+	if err := j.Scan(42); err == nil {
+		t.Error("scanning an int into a JSON column should fail")
+	}
+}
+
+// A repository model carries json tags (sqlc's emit_json_tags), so the column has
+// to marshal as its contents rather than as a base64 byte slice.
+func TestJSONColumnMarshalsVerbatim(t *testing.T) {
+	out, err := json.Marshal(struct {
+		Payload JSON `json:"payload"`
+	}{Payload: JSON(`{"a":1}`)})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !bytes.Contains(out, []byte(`"payload":{"a":1}`)) {
+		t.Errorf("marshaled to %s, want the JSON document embedded verbatim", out)
+	}
+}

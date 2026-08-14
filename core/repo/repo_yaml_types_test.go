@@ -35,7 +35,9 @@ import (
 // Deliberately excluded, because their mappers convert rather than pass through:
 //   - UUID          repo string <-> entity uuid.UUID via mapper.StringToUUID
 //   - ENUM          repo int64 <-> entity enums.X via enums.X(..) / .ToInt64()
-//   - JSON, ARRAY   repo []byte <-> entity struct/slice via *FromJSON / SliceToJSON
+//   - JSON, ARRAY   repo mapper.JSON <-> entity struct/slice via *FromJSON /
+//     SliceToJSON (see TestRepoYAML_JSONColumnsUseMapperJSON for why the column
+//     type is mapper.JSON and not []byte)
 //   - FILE/IMAGE/AUDIO/VIDEO  binary storage is an unimplemented TODO in
 //     entities/template_repo.go, and the multi-file case maps []string to a
 //     null.String — both are broken independently of the sqlc overrides.

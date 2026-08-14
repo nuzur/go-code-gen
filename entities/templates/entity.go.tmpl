@@ -30,7 +30,10 @@ func (e {{.EntityName}}) PrimaryKeyValues() []string {
     }    
 }
 
-func {{.EntityName}}FromJSON(data json.RawMessage) {{.EntityName}} {      
+// The parameter is a plain []byte rather than json.RawMessage so that both a
+// json.RawMessage and the mapper.JSON a repository model holds can be passed
+// without a conversion at the call site.
+func {{.EntityName}}FromJSON(data []byte) {{.EntityName}} {
     entity := {{.EntityName}}{}
     if data == nil {
         return entity
@@ -47,7 +50,7 @@ func {{.EntityName}}FromJSON(data json.RawMessage) {{.EntityName}} {
     return entity
 }
 
-func {{.EntityName}}SliceFromJSON(data json.RawMessage)[]{{.EntityName}} {
+func {{.EntityName}}SliceFromJSON(data []byte)[]{{.EntityName}} {
     entity := []{{.EntityName}}{}
     if data == nil {
         return entity

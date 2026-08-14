@@ -70,7 +70,7 @@ func {{.EnumName}}SliceToJSON(in []{{.EnumName}}) json.RawMessage {
 	return jr
 }
 
-func JSONTo{{.EnumName}}Slice(in json.RawMessage) []{{.EnumName}} {
+func JSONTo{{.EnumName}}Slice(in []byte) []{{.EnumName}} {
 	res := []int64{}
 	// an absent column (NULL / empty / JSON null) is not a decode failure
 	if len(in) == 0 || string(in) == "null" {

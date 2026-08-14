@@ -22,8 +22,15 @@ func renderRepoYAML(t *testing.T, dbType projecttypes.DatabaseType) string {
 	if err != nil {
 		t.Fatalf("GetTemplateBytes: %v", err)
 	}
+	// Module and EntitiesConfig.Dir are not decoration: the json override's
+	// go_type import is built from them, so a Project without them renders an
+	// import of "//mapper" that still parses as YAML.
 	proj := &projecttypes.Project{
 		Identifier: "testapp",
+		Module:     "github.com/example/testapp",
+		EntitiesConfig: projecttypes.EntitiesConfig{
+			Dir: "entity",
+		},
 		CoreConfig: projecttypes.CoreConfig{
 			RepoConfig: projecttypes.RepoConfig{DatabaseType: dbType},
 		},
@@ -62,7 +69,7 @@ func TestRepoYAML_Overrides_Postgres(t *testing.T) {
 	for _, want := range []string{
 		`db_type: "uuid"`,                // native uuid → string (below)
 		`db_type: "pg_catalog.int4"`,     // int
-		`db_type: "pg_catalog.json"`,     // json → []byte
+		`db_type: "pg_catalog.json"`,     // json → mapper.JSON
 		`db_type: "pg_catalog.timestamp"`,
 		`db_type: "pg_catalog.time"`,
 		`db_type: "pg_catalog.varchar"`,
@@ -105,5 +112,49 @@ func TestRepoYAML_Overrides_MySQL(t *testing.T) {
 		if strings.Contains(out, unwanted) {
 			t.Errorf("mysql sqlc.yaml should not contain %q\n%s", unwanted, out)
 		}
+	}
+}
+
+// TestRepoYAML_JSONColumnsUseMapperJSON pins the type JSON columns map to.
+//
+// It must not be []byte. go-sql-driver/mysql renders a []byte parameter as a
+// _binary'...' literal when the DSN sets interpolateParams=true, and MySQL refuses
+// to cast a binary-charset string to JSON ("Error 3144 (22032): Cannot create a
+// JSON value from a string with CHARACTER SET 'binary'"), so every insert/update
+// of an entity with a JSON column failed on such a DSN. mapper.JSON is a
+// driver.Valuer that hands the driver a string instead.
+//
+// The STATIC type of the params struct field is the only lever: a json.RawMessage
+// assigned into a []byte field is erased back to []byte before the driver sees it.
+// So this is asserted on the override, not on any call site.
+func TestRepoYAML_JSONColumnsUseMapperJSON(t *testing.T) {
+	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
+		t.Run(string(dbType), func(t *testing.T) {
+			out := renderRepoYAML(t, dbType)
+
+			jsonKey := `db_type: "json"`
+			if dbType == projecttypes.POSTGRESQL {
+				jsonKey = `db_type: "pg_catalog.json"`
+			}
+			// Both nullabilities are overridden, so the key appears twice, and each
+			// occurrence must be followed by the mapper.JSON go_type.
+			if got := strings.Count(out, jsonKey); got != 2 {
+				t.Fatalf("expected the json override twice (nullable and not), got %d\n%s", got, out)
+			}
+			for _, want := range []string{
+				`import: "github.com/example/testapp/entity/mapper"`,
+				`package: "mapper"`,
+				`type: "JSON"`,
+			} {
+				if !strings.Contains(out, want) {
+					t.Errorf("json override missing %s\n%s", want, out)
+				}
+			}
+			for _, block := range strings.Split(out, jsonKey)[1:] {
+				if !strings.Contains(block[:min(len(block), 200)], `type: "JSON"`) {
+					t.Errorf("a json override does not map to mapper.JSON\n%s", out)
+				}
+			}
+		})
 	}
 }

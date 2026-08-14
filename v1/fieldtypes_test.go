@@ -176,6 +176,11 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 			{"_bin", nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY, false},
 			{"_unset", nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_INVALID, false},
 			{"_multi", nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_OBJECT_STORE, true},
+			// BINARY wins over allow_multiple — the column is a BLOB, not a JSON
+			// array of urls (sql-gen decides it the same way). The upsert mapper
+			// was missing the IsBinaryFile guard its fetch twin had, so this shape
+			// serialized the bytes into a JSON array against a BLOB column.
+			{"_binmulti", nemgen.FieldTypeFileConfigStorageType_FIELD_TYPE_FILE_CONFIG_STORAGE_TYPE_BINARY, true},
 		} {
 			add(pair(slot.id+shape.suffix, slot.ft, func() *nemgen.FieldTypeConfig {
 				tc := &nemgen.FieldTypeConfig{}
@@ -429,6 +434,16 @@ func allFieldTypesSchema() *nemgen.ProjectVersion {
 			Type: nemgen.IndexType_INDEX_TYPE_INDEX, Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
 			Fields: []*nemgen.IndexField{{FieldUuid: "f-t27_time_req"}},
 		},
+		// A single-column index over a DATETIME column is the one shape that earns
+		// the indexed selects their ORDER BY variants (a TIME column does not — the
+		// rule is DATETIME/DATE). Without it the whole ordering branch of the fetch
+		// module renders away and every OrderBy is rejected. See
+		// assertFetchOrderingShapes.
+		&nemgen.Index{
+			Uuid: "idx-single-datetime", Identifier: "idx_t26_datetime_req",
+			Type: nemgen.IndexType_INDEX_TYPE_INDEX, Status: nemgen.IndexStatus_INDEX_STATUS_ACTIVE,
+			Fields: []*nemgen.IndexField{{FieldUuid: "f-t26_datetime_req"}},
+		},
 		// A FULLTEXT index must NOT produce a select (only INDEX/UNIQUE do).
 		&nemgen.Index{
 			Uuid: "idx-ft", Identifier: "idx_ft_t08_text_req",
@@ -631,6 +646,8 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertStorageAndArrayShapes(t, dir, dbType)
 				assertDependantCardinalityShapes(t, dir)
 				assertFetchByIndexShapes(t, dir, params.ProjectVersion)
+				assertFetchOrderingShapes(t, dir)
+				assertJSONColumnDriverValue(t, dir)
 				assertListQueryDedupeShapes(t, dir)
 				assertArrayElementTypeShapes(t, dir, params.ProjectVersion)
 				assertFilterIdentifierSpelling(t, dir, params.ProjectVersion)
@@ -754,23 +771,38 @@ func assertStorageAndArrayShapes(t *testing.T, dir string, dbType project.Databa
 		{"T18FileUnsetOpt", "null.String", "null.String", "VARCHAR"},
 		{"T20AudioUnsetOpt", "null.String", "null.String", "VARCHAR"},
 		{"T21VideoUnsetOpt", "null.String", "null.String", "VARCHAR"},
-		// An inline blob is []byte on both sides, for both nullabilities.
+		// An inline blob is []byte on both sides, for both nullabilities — and
+		// BINARY storage wins over allow_multiple, so *BinMulti* is a blob too,
+		// not a JSON array of urls.
 		{"T19ImageBinReq", "[]byte", "[]byte", blobType},
 		{"T19ImageBinOpt", "[]byte", "[]byte", blobType},
 		{"T18FileBinOpt", "[]byte", "[]byte", blobType},
+		{"T19ImageBinmultiReq", "[]byte", "[]byte", blobType},
+		{"T18FileBinmultiOpt", "[]byte", "[]byte", blobType},
 		// A list of object-store urls is a JSON array, not a single VARCHAR:
 		// the entity holds []string and the column holds the whole list.
-		{"T19ImageMultiReq", "[]string", "[]byte", "JSON"},
-		{"T19ImageMultiOpt", "[]string", "[]byte", "JSON"},
-		{"T18FileMultiOpt", "[]string", "[]byte", "JSON"},
-		// Arrays are JSON columns read back as []byte by sqlc.
-		{"T24ArrayUnsetReq", "[]string", "[]byte", "JSON"},
-		{"T24ArrayIntegerOpt", "[]int64", "[]byte", "JSON"},
-		{"T24ArrayEnumReq", "[]enums.AllTypesMode", "[]byte", "JSON"},
+		//
+		// Every JSON column is mapper.JSON, NOT []byte: go-sql-driver/mysql
+		// renders a []byte parameter as _binary'...' when the DSN sets
+		// interpolateParams=true, and MySQL refuses to cast a binary-charset
+		// string to JSON (error 3144), so every write to such a column failed.
+		{"T19ImageMultiReq", "[]string", "mapper.JSON", "JSON"},
+		{"T19ImageMultiOpt", "[]string", "mapper.JSON", "JSON"},
+		{"T18FileMultiOpt", "[]string", "mapper.JSON", "JSON"},
+		// Arrays are JSON columns too.
+		{"T24ArrayUnsetReq", "[]string", "mapper.JSON", "JSON"},
+		{"T24ArrayIntegerOpt", "[]int64", "mapper.JSON", "JSON"},
+		{"T24ArrayEnumReq", "[]enums.AllTypesMode", "mapper.JSON", "JSON"},
 	} {
 		assertStructFieldType(t, "entity", entitySrc, c.field, c.entity)
 		assertStructFieldType(t, "repository model", modelSrc, c.field, c.model)
 		assertColumnType(t, schemaSrc, c.field, c.column)
+	}
+
+	// The models reference mapper.JSON, so the sqlc override has to have brought
+	// the import with it. assertMapperImportedWhereUsed only walks core/module.
+	if strings.Contains(modelSrc, "mapper.JSON") && !strings.Contains(modelSrc, "/entity/mapper\"") {
+		t.Error("core/repository/gen/models.go uses mapper.JSON without importing the mapper package")
 	}
 
 	// The array decoder is generated from the same resolver as the slice type,
@@ -949,6 +981,83 @@ func assertFetchByIndexShapes(t *testing.T, dir string, version *nemgen.ProjectV
 	// resolver.
 	if present["fetch_all_types_by_t08_text_req.go"] {
 		t.Error("a FULLTEXT index produced a fetch-by-index function; only INDEX and UNIQUE should")
+	}
+}
+
+// assertJSONColumnDriverValue runs a probe test inside the generated project that
+// pins what a JSON column parameter looks like to the database driver.
+//
+// Nothing else here can see it: the type is right in models.go, the code compiles,
+// and the failure only happens against a real MySQL with interpolateParams=true in
+// the DSN (Error 3144). The probe registers a fake driver and asserts the value
+// arrives as a string rather than a []byte, which is exactly what decides whether
+// the driver writes '{"a":1}' or _binary'{"a":1}'.
+//
+// The probe lives in the mapper package itself, so it needs no module rewriting
+// and pulls in no dependency the generated go.mod has not already tidied.
+func assertJSONColumnDriverValue(t *testing.T, dir string) {
+	t.Helper()
+
+	probe, err := os.ReadFile(filepath.Join("testdata", "json_column_probe.go.txt"))
+	if err != nil {
+		t.Fatalf("read probe source: %v", err)
+	}
+	probePath := filepath.Join(dir, "entity", "mapper", "jsoncolumn_probe_test.go")
+	if err := os.WriteFile(probePath, probe, 0o644); err != nil {
+		t.Fatalf("write probe test: %v", err)
+	}
+	defer os.Remove(probePath)
+
+	cmd := exec.Command("go", "test", "./entity/mapper/")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("JSON column probe failed:\n%s", string(out))
+	}
+}
+
+// assertFetchOrderingShapes pins that a fetch-by-index can actually be ordered.
+//
+// The ordering machinery existed end to end and was switched off in the middle:
+// sql-gen emitted Fetch<Select>OrderedBy<TimeField>ASC/DESC queries and sqlc
+// generated methods for them, but core/repo's select resolver hardcoded
+// SortSupported: false and never populated TimeFields, so the template branch that
+// calls them rendered away. Every non-empty req.OrderBy fell through to
+// errors.New("could not process request"), and the unordered query it fell back to
+// has no ORDER BY at all — so "the last N rows" returned an arbitrary N.
+//
+// The fixture's single-column index on t26_datetime_req is what earns this; the
+// one on t27_time_req deliberately does not (TIME is not DATETIME/DATE).
+//
+// `go build ./...` above is the other half of this assertion: the query names here
+// are minted independently by two resolvers in two repos, so a name that drifts by
+// one character is an undefined method rather than a silent miss.
+func assertFetchOrderingShapes(t *testing.T, dir string) {
+	t.Helper()
+
+	moduleDir := filepath.Join(dir, "core", "module", "all_types")
+	// Any indexed select will do — they all share the entity's time fields.
+	path := filepath.Join(moduleDir, "fetch_all_types_by_"+allTypesIndexLeadingColumn+".go")
+	src := readFile(t, path)
+
+	for _, want := range []string{
+		`OrderedByT26DatetimeReqASC(`,
+		`OrderedByT26DatetimeReqDESC(`,
+		`case "t26_datetime_req":`,
+	} {
+		if !strings.Contains(src, want) {
+			t.Errorf("%s: missing %s — the fetch wrapper cannot order its results", path, want)
+		}
+	}
+
+	// A TIME column is not orderable, so it must not appear as a case.
+	if strings.Contains(src, `OrderedByT27TimeReq`) {
+		t.Errorf("%s: orders by a TIME column, for which sql-gen emits no ordered query", path)
+	}
+
+	// The primary-key fetch takes no OrderBy at all and must not have grown one.
+	pkPath := filepath.Join(moduleDir, "fetch_all_types_by_id.go")
+	if pkSrc, err := os.ReadFile(pkPath); err == nil && strings.Contains(string(pkSrc), "OrderedBy") {
+		t.Errorf("%s: the primary-key fetch has no OrderBy field but calls an ordered query", pkPath)
 	}
 }
 
