@@ -214,6 +214,172 @@ func TestResolveSelectStatements_InactiveIndexMemberDropped(t *testing.T) {
 	}
 }
 
+// datetimeField builds a DATETIME field, the only shape (with DATE) that can
+// become a time field.
+func datetimeField(uuid, identifier string) *nemgen.Field {
+	return &nemgen.Field{
+		Uuid:       uuid,
+		Identifier: identifier,
+		Type:       nemgen.FieldType_FIELD_TYPE_DATETIME,
+		Required:   true,
+		Status:     nemgen.FieldStatus_FIELD_STATUS_ACTIVE,
+		TypeConfig: &nemgen.FieldTypeConfig{},
+	}
+}
+
+// orderableEntity is a source_uuid-indexed entity with a datetime column, the
+// shape behind "give me the last N runs for this source".
+func orderableEntity(indexes ...*nemgen.Index) *nemgen.Entity {
+	return &nemgen.Entity{
+		Uuid:       "e4000000-0000-0000-0000-000000000000",
+		Identifier: "ingest_run",
+		Type:       nemgen.EntityType_ENTITY_TYPE_STANDALONE,
+		Fields: []*nemgen.Field{
+			uuidField("c2000000-0000-0000-0000-000000000000", "id", true),
+			uuidField("c2000000-0000-0000-0000-000000000001", "source_uuid", false),
+			datetimeField("c2000000-0000-0000-0000-000000000002", "created_at"),
+		},
+		TypeConfig: &nemgen.EntityTypeConfig{
+			Standalone: &nemgen.EntityTypeStandaloneConfig{Indexes: indexes},
+		},
+	}
+}
+
+const (
+	sourceIndex   = "d2000000-0000-0000-0000-000000000000"
+	createdIndex  = "d2000000-0000-0000-0000-000000000001"
+	createdIndex2 = "d2000000-0000-0000-0000-000000000002"
+	sourceCol     = "c2000000-0000-0000-0000-000000000001"
+	createdCol    = "c2000000-0000-0000-0000-000000000002"
+)
+
+// A single-column index over a datetime column is what earns a select its ORDER BY
+// variants, because that is exactly when sql-gen emits
+// Fetch<Select>OrderedBy<Field>ASC/DESC. Without this the module layer rejected
+// every OrderBy with "could not process request" and its unordered fallback query
+// had no ORDER BY at all, so "the last N rows" returned an arbitrary N.
+func TestResolveSelectStatements_TimeFieldsFromSingleColumnDatetimeIndex(t *testing.T) {
+	e := orderableEntity(
+		index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+		index(createdIndex, "idx_ingest_run_created_at", nemgen.IndexType_INDEX_TYPE_INDEX, createdCol),
+	)
+
+	stmt, found := findSelect(ResolveSelectStatements(projectFor(e), e), "IngestRunBySourceUUID")
+	if !found {
+		t.Fatal("expected IngestRunBySourceUUID")
+	}
+	if !stmt.SortSupported {
+		t.Fatal("SortSupported is false, so the fetch wrapper renders no ORDER BY branch")
+	}
+	if len(stmt.TimeFields) != 1 {
+		t.Fatalf("expected exactly one time field, got %v", stmt.TimeFields)
+	}
+	// Name is the query-name segment sql-gen minted (strcase.ToCamel), Identifier
+	// is what a caller passes as req.OrderBy.
+	if got := stmt.TimeFields[0]; got.Name != "CreatedAt" || got.Identifier != "created_at" {
+		t.Errorf("time field = %+v, want {Name:CreatedAt Identifier:created_at}", got)
+	}
+	// A datetime column is still not a column you can filter on.
+	if _, found := findSelect(ResolveSelectStatements(projectFor(e), e), "IngestRunByCreatedAt"); found {
+		t.Error("a datetime index minted a fetch-by select; datetime is excluded from WHERE clauses")
+	}
+}
+
+// The primary select takes no Offset/Limit/OrderBy at all, and sql-gen never gives
+// it ORDER BY variants — so claiming sort support for it would call queries that
+// do not exist.
+func TestResolveSelectStatements_PrimarySelectNeverSorts(t *testing.T) {
+	e := orderableEntity(
+		index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+		index(createdIndex, "idx_ingest_run_created_at", nemgen.IndexType_INDEX_TYPE_INDEX, createdCol),
+	)
+
+	stmt, found := findSelect(ResolveSelectStatements(projectFor(e), e), "IngestRunByID")
+	if !found {
+		t.Fatalf("expected the primary select (names: %v)", selectNames(ResolveSelectStatements(projectFor(e), e)))
+	}
+	if stmt.SortSupported || len(stmt.TimeFields) != 0 {
+		t.Errorf("primary select claims sort support: %+v", stmt)
+	}
+}
+
+// Everything that is NOT a single-column INDEX/UNIQUE over an ACTIVE datetime
+// column: sql-gen emits no ORDER BY variant for any of these, so neither may we.
+func TestResolveSelectStatements_TimeFieldExclusions(t *testing.T) {
+	inactive := datetimeField(createdCol, "created_at")
+	inactive.Status = nemgen.FieldStatus_FIELD_STATUS_INACTIVE
+
+	cases := []struct {
+		name   string
+		entity *nemgen.Entity
+	}{{
+		name: "datetime inside a composite index",
+		entity: orderableEntity(
+			index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+			index(createdIndex, "idx_ingest_run_source_created", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol, createdCol),
+		),
+	}, {
+		name: "fulltext index",
+		entity: orderableEntity(
+			index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+			index(createdIndex, "idx_ingest_run_created_ft", nemgen.IndexType_INDEX_TYPE_FULLTEXT, createdCol),
+		),
+	}, {
+		name: "no index on the datetime column",
+		entity: orderableEntity(
+			index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+		),
+	}, {
+		name: "non-datetime single-column index",
+		entity: orderableEntity(
+			index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+			index(createdIndex, "idx_ingest_run_id", nemgen.IndexType_INDEX_TYPE_INDEX, "c2000000-0000-0000-0000-000000000000"),
+		),
+	}}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, s := range ResolveSelectStatements(projectFor(tc.entity), tc.entity) {
+				if s.SortSupported || len(s.TimeFields) != 0 {
+					t.Errorf("select %q claims sort support: %+v", s.Name, s.TimeFields)
+				}
+			}
+		})
+	}
+
+	t.Run("inactive datetime column", func(t *testing.T) {
+		e := orderableEntity(
+			index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+			index(createdIndex, "idx_ingest_run_created_at", nemgen.IndexType_INDEX_TYPE_INDEX, createdCol),
+		)
+		e.Fields[2] = inactive
+		for _, s := range ResolveSelectStatements(projectFor(e), e) {
+			if s.SortSupported || len(s.TimeFields) != 0 {
+				t.Errorf("select %q orders by a column the schema does not emit: %+v", s.Name, s.TimeFields)
+			}
+		}
+	})
+}
+
+// Two indexes over the same datetime column must collapse to one time field: the
+// generated fetch switches on the identifier, and Go rejects a switch with two
+// identical cases.
+func TestResolveSelectStatements_TimeFieldsDeduped(t *testing.T) {
+	e := orderableEntity(
+		index(sourceIndex, "idx_ingest_run_source", nemgen.IndexType_INDEX_TYPE_INDEX, sourceCol),
+		index(createdIndex, "idx_ingest_run_created_at", nemgen.IndexType_INDEX_TYPE_INDEX, createdCol),
+		index(createdIndex2, "uq_ingest_run_created_at", nemgen.IndexType_INDEX_TYPE_UNIQUE, createdCol),
+	)
+
+	stmt, found := findSelect(ResolveSelectStatements(projectFor(e), e), "IngestRunBySourceUUID")
+	if !found {
+		t.Fatal("expected IngestRunBySourceUUID")
+	}
+	if len(stmt.TimeFields) != 1 {
+		t.Errorf("expected the duplicate datetime indexes to collapse to one time field, got %+v", stmt.TimeFields)
+	}
+}
+
 func findSelect(selects []SchemaSelectStatement, name string) (SchemaSelectStatement, bool) {
 	for _, s := range selects {
 		if s.Name == name {

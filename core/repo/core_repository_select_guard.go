@@ -30,9 +30,16 @@ import (
 // names sql-gen does in fact emit.
 //
 // got being a strict superset of want is normal and not an error: sql-gen also
-// emits the synthesized unique indexes, ORDER BY variants of the indexed selects,
-// and combined-index selects. Only the other direction — a name the module layer
-// will call that sql-gen does not emit as a simple select — breaks the build.
+// emits the synthesized unique indexes and combined-index selects. Only the other
+// direction — a name the module layer will call that sql-gen does not emit as a
+// simple select — breaks the build.
+//
+// The ORDER BY variants are checked the same way. They used to be part of the
+// tolerated superset because nothing called them; now that the fetch wrapper
+// switches on the time fields, a drift in the time-field rule or in the camel
+// casing of a column name is once again a name the module layer calls and sql-gen
+// never emitted — so both sides expand their selects into the same
+// <Name>OrderedBy<TimeField>ASC/DESC list before comparing.
 func verifySelectContract(project *projecttypes.Project, consumed *nemgen.ProjectVersion, dbType db.DBType) error {
 	consumedEntities := map[string]*nemgen.Entity{}
 	if consumed != nil {
@@ -51,6 +58,12 @@ func verifySelectContract(project *projecttypes.Project, consumed *nemgen.Projec
 		want := []string{}
 		for _, s := range ResolveSelectStatements(project, e) {
 			want = append(want, s.Name)
+			if !s.SortSupported {
+				continue
+			}
+			for _, tf := range s.TimeFields {
+				want = append(want, orderedNames(s.Name, tf.Name)...)
+			}
 		}
 
 		// select_indexed_combined.sql is not one of the files this generator
@@ -58,8 +71,15 @@ func verifySelectContract(project *projecttypes.Project, consumed *nemgen.Projec
 		got := []string{}
 		if consumedEntity, found := consumedEntities[e.Uuid]; found {
 			for _, s := range tosql.ResolveSelectStatements(consumedEntity, dbType) {
-				if !s.CombinedIndexes {
-					got = append(got, s.Name)
+				if s.CombinedIndexes {
+					continue
+				}
+				got = append(got, s.Name)
+				if !s.SortSupported {
+					continue
+				}
+				for _, tf := range s.TimeFields {
+					got = append(got, orderedNames(s.Name, tf.NameTitle)...)
 				}
 			}
 		}
@@ -81,6 +101,16 @@ func verifySelectContract(project *projecttypes.Project, consumed *nemgen.Projec
 	}
 
 	return nil
+}
+
+// orderedNames is the pair of ORDER BY query names a select gets for one time
+// field, spelled exactly as select_indexed_simple_*.tmpl names them and as
+// core_module_fetch.go.tmpl calls them.
+func orderedNames(selectName, timeFieldName string) []string {
+	return []string{
+		fmt.Sprintf("%sOrderedBy%sASC", selectName, timeFieldName),
+		fmt.Sprintf("%sOrderedBy%sDESC", selectName, timeFieldName),
+	}
 }
 
 // missingNames returns the names in want that do not appear in got, in want's

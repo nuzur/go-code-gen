@@ -181,3 +181,57 @@ func TestVerifySelectContract_RealFixturePasses(t *testing.T) {
 		})
 	}
 }
+
+// The ORDER BY variants are queries the module layer calls, so the guard has to
+// cover them too — a drift in the time-field rule, or in how a column name is
+// camel-cased into a query name, is otherwise invisible here and surfaces as
+// `queries.FetchXOrderedByCreatedAtASC undefined` in the generated app's build.
+func TestVerifySelectContract_OrderedVariantsChecked(t *testing.T) {
+	// A single-column index over a datetime column: the shape that earns ORDER BY.
+	run := func() *nemgen.Entity {
+		fields := []*nemgen.Field{
+			guardKeyField("r0000000-0000-0000-0000-000000000000", "id"),
+			guardField("r0000000-0000-0000-0000-000000000001", "source_uuid", nemgen.FieldType_FIELD_TYPE_UUID),
+			guardField("r0000000-0000-0000-0000-000000000002", "created_at", nemgen.FieldType_FIELD_TYPE_DATETIME),
+		}
+		indexes := []*nemgen.Index{
+			guardIndex("s0000000-0000-0000-0000-000000000000", "idx_ingest_run_source",
+				nemgen.IndexType_INDEX_TYPE_INDEX, "r0000000-0000-0000-0000-000000000001"),
+			guardIndex("s0000000-0000-0000-0000-000000000001", "idx_ingest_run_created_at",
+				nemgen.IndexType_INDEX_TYPE_INDEX, "r0000000-0000-0000-0000-000000000002"),
+		}
+		return guardEntity("e6000000-0000-0000-0000-000000000000", "ingest_run", fields, indexes)
+	}
+
+	modeled := run()
+	stmt, found := findSelect(ResolveSelectStatements(projectFor(modeled), modeled), "IngestRunBySourceUUID")
+	if !found || !stmt.SortSupported {
+		t.Fatal("fixture no longer produces a sortable indexed select")
+	}
+
+	for _, dbType := range []db.DBType{db.MYSQLDBType, db.PGDBType} {
+		t.Run(string(dbType), func(t *testing.T) {
+			consumed := &nemgen.ProjectVersion{Entities: []*nemgen.Entity{run()}}
+			tosql.EnsureUniqueFieldIndexes(consumed)
+
+			// Both resolvers must mint byte-identical ORDER BY query names.
+			if err := verifySelectContract(projectFor(run()), consumed, dbType); err != nil {
+				t.Fatalf("the two resolvers disagree on the ORDER BY variants: %v", err)
+			}
+
+			// And the guard must actually be looking at them: drop the datetime
+			// index on sql-gen's side only, and the ordered names go missing.
+			drifted := run()
+			drifted.TypeConfig.Standalone.Indexes = drifted.TypeConfig.Standalone.Indexes[:1]
+			err := verifySelectContract(projectFor(run()), &nemgen.ProjectVersion{
+				Entities: []*nemgen.Entity{drifted},
+			}, dbType)
+			if err == nil {
+				t.Fatal("expected the missing ORDER BY variants to fail generation")
+			}
+			if !strings.Contains(err.Error(), "OrderedByCreatedAt") {
+				t.Errorf("error must name the missing ordered query, got: %v", err)
+			}
+		})
+	}
+}

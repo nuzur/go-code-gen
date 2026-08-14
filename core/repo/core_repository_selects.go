@@ -36,6 +36,8 @@ func ResolveSelectStatements(project *project.Project, e *nemgen.Entity) []Schem
 	// the name the primary select already owns.
 	seenNames := map[string]bool{}
 
+	timeFields := resolveTimeFields(entityTemplate)
+
 	// A keyless entity gets no fetch-by-key method at all: sql-gen's resolver
 	// guards its primary select on len(primaryKeys) > 0, so for such an entity
 	// the query this wrapper calls was never emitted and the generated app failed
@@ -98,11 +100,60 @@ func ResolveSelectStatements(project *project.Project, e *nemgen.Entity) []Schem
 			EntityIdentifier: e.Identifier,
 			Fields:           indexFields,
 			IsPrimary:        false,
-			SortSupported:    false,
+			TimeFields:       timeFields,
+			SortSupported:    len(timeFields) > 0,
 		})
 	}
 
 	return selects
+}
+
+// resolveTimeFields returns the columns an indexed select can be ordered by.
+//
+// sql-gen emits Fetch<Select>OrderedBy<Field>ASC/DESC for exactly these, and the
+// module layer's fetch wrapper switches on them, so the two must agree: a name
+// resolved here that sql-gen did not emit is a call to a query that does not
+// exist. verifySelectContract checks the resulting names in both directions.
+//
+// LOCKSTEP: this is the twin of the timeFields loop in sql-gen's
+// tosql.ResolveSelectStatements (tosql/select_resolver.go). The rule is: a
+// DATETIME or DATE column that is the SOLE member of an INDEX/UNIQUE index and
+// passes usableIndexMember. A datetime inside a composite index does not qualify
+// (it is dropped from the WHERE clause too), and a FULLTEXT index never does.
+//
+// Ordering is therefore only offered for a column that is really indexed, which
+// is also what keeps ORDER BY ... LIMIT off a filesort.
+func resolveTimeFields(entityTemplate entities.EntityTemplate) []SchemaSelectStatementTimeField {
+	timeFields := []SchemaSelectStatementTimeField{}
+	// Two indexes over the same datetime column would otherwise emit the column
+	// twice, and the generated switch cannot have two cases with the same value.
+	seen := map[string]bool{}
+	for _, index := range entityTemplate.Indexes() {
+		if index == nil || len(index.Fields) != 1 {
+			continue
+		}
+		if index.Type != nemgen.IndexType_INDEX_TYPE_INDEX && index.Type != nemgen.IndexType_INDEX_TYPE_UNIQUE {
+			continue
+		}
+		fieldTemplate := entityTemplate.GetFieldTemplateById(index.Fields[0].FieldUuid)
+		if fieldTemplate == nil || !usableIndexMember(fieldTemplate.Field) {
+			continue
+		}
+		if fieldTemplate.Field.Type != nemgen.FieldType_FIELD_TYPE_DATETIME &&
+			fieldTemplate.Field.Type != nemgen.FieldType_FIELD_TYPE_DATE {
+			continue
+		}
+		if seen[fieldTemplate.Identifier()] {
+			continue
+		}
+		seen[fieldTemplate.Identifier()] = true
+		timeFields = append(timeFields, SchemaSelectStatementTimeField{
+			// strcase.ToCamel, not gcgstrings.ToCamelCase — see the type's doc.
+			Name:       strcase.ToCamel(fieldTemplate.Identifier()),
+			Identifier: fieldTemplate.Identifier(),
+		})
+	}
+	return timeFields
 }
 
 // usableIndexMember reports whether an index member is a column the SQL side

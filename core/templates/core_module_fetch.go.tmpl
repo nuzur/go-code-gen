@@ -180,6 +180,11 @@ func (m *module) Fetch{{.Select.Name}}(
 
     {{$select := .Select}}
     {{$projectIdentifier := .Project.Identifier}}
+    {{/* Inside the range below the dot is the time field, so .Project is not
+         reachable — every root value this branch needs has to be bound here.
+         This whole branch was unreachable until the select resolver started
+         populating TimeFields, which is why the missing binding never showed. */}}
+    {{$monitoringEnabled := .Project.MonitoringConfig.Enabled}}
     switch req.OrderBy {
         {{range $timeField := .Select.TimeFields}}
         case "{{$timeField.Identifier}}":
@@ -194,7 +199,7 @@ func (m *module) Fetch{{.Select.Name}}(
                     },
                 )
                 if err != nil {
-                    {{ if .Project.MonitoringConfig.Enabled }}
+                    {{ if $monitoringEnabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered asc",
@@ -221,7 +226,7 @@ func (m *module) Fetch{{.Select.Name}}(
                     },
                 )
                 if err != nil {
-                    {{ if .Project.MonitoringConfig.Enabled }}
+                    {{ if $monitoringEnabled }}
                     m.monitoring.Emit(monitoring.EmitRequest{
                         ActionIdentifier: "fetch_{{$select.Identifier}}",
                         Message: "error in Fetch{{$select.Name}} - ordered desc",

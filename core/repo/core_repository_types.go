@@ -45,8 +45,23 @@ type SchemaSelectStatement struct {
 	EntityIdentifier string
 	Fields           []SchemaSelectStatementField
 	IsPrimary        bool
-	TimeFields       []entities.FieldTemplate
+	TimeFields       []SchemaSelectStatementTimeField
 	SortSupported    bool
+}
+
+// SchemaSelectStatementTimeField is a column an indexed select can be ordered by,
+// i.e. one for which sql-gen emits Fetch<Select>OrderedBy<Name>ASC/DESC.
+//
+// Name is the query-name segment and MUST be minted the way sql-gen mints it —
+// strcase.ToCamel over the identifier (tosql.mapField) — and NOT with
+// gcgstrings.ToCamelCase, whose initialism folding (ID/UUID/JSON/URL) would name a
+// query sqlc never emitted. That is why this carries its own Name rather than
+// reusing entities.FieldTemplate.
+type SchemaSelectStatementTimeField struct {
+	// Name is the query-name segment: "CreatedAt" in FetchXOrderedByCreatedAtASC.
+	Name string
+	// Identifier is the column name, and so the value callers pass as req.OrderBy.
+	Identifier string
 }
 
 type SchemaSelectStatementField struct {
