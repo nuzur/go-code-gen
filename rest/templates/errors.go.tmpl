@@ -40,6 +40,20 @@ func writeProblem(w http.ResponseWriter, status int, err error) {
 	if err != nil {
 		detail = err.Error()
 	}
+	// A 5xx means the ENGINE or the server failed, and its message is a
+	// diagnostic — a driver error quoting the offending SQL, a constraint name, a
+	// column type. None of that is actionable for the caller, and handing it back
+	// is what makes injection and probing attacks practical: the attacker reads
+	// the parser's complaint to learn the schema and to shape the next payload.
+	// So 5xx answers with the status text alone.
+	//
+	// 4xx keeps its detail: those are caused by what the caller sent (an
+	// unparseable filter, a bad page token) and the caller needs to know which.
+	// This lives inside writeProblem rather than at the call sites so every
+	// handler — present and future — inherits it.
+	if status >= http.StatusInternalServerError {
+		detail = title
+	}
 
 	p := Problem{
 		Type:   "about:blank",

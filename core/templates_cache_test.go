@@ -66,6 +66,13 @@ func TestWriteTemplatesInvalidateTheCache(t *testing.T) {
 // <entity>Declarations(). No two keys could ever match, so the list cache only
 // ever grew and the singleflight group never collapsed anything. The built query
 // already encodes filter, ordering, projection and page.
+//
+// It no longer encodes the filter VALUES, though: those are now bound as
+// arguments instead of being interpolated into the SQL text, so two requests that
+// differ only in what they filter FOR build byte-identical queries. Keying on the
+// text alone would therefore serve one caller the other's rows — and since the
+// singleflight group shares this key, it would do so without even a cache hit.
+// Hence list.CacheKey(prefix, query, args), which folds the arguments in.
 func TestListCacheKeyIsStableAcrossRequests(t *testing.T) {
 	body := readTemplates(t)["core_module_list.go.tmpl"]
 	if body == "" {
@@ -75,7 +82,20 @@ func TestListCacheKeyIsStableAcrossRequests(t *testing.T) {
 		t.Error("core_module_list.go.tmpl keys the cache on the formatted request, which contains " +
 			"a per-request pointer; the key must be derived from the built query")
 	}
-	if !strings.Contains(body, `cacheKey := "List{{.EntityName}}:" + query`) {
-		t.Error("core_module_list.go.tmpl: the list cache key must be derived from the built query")
+	if strings.Contains(body, `cacheKey := "List{{.EntityName}}:" + query`) {
+		t.Error("core_module_list.go.tmpl keys the cache on the query TEXT alone; the bound filter " +
+			"values are no longer in that text, so two different filters would share a cache entry")
+	}
+	if !strings.Contains(body, `cacheKey := list.CacheKey("List{{.EntityName}}", query, args)`) {
+		t.Error("core_module_list.go.tmpl: the list cache key must be derived from the built query " +
+			"AND the arguments bound into it")
+	}
+	// The args are built and folded into the cache key; if they are not also
+	// handed to the driver, the placeholders in the query have nothing to bind to
+	// and every list request fails — silently correct-looking code, since it
+	// compiles either way.
+	if !strings.Contains(body, `querier.QueryContext(ctx, query, args...)`) {
+		t.Error("core_module_list.go.tmpl builds bind arguments but does not pass them to " +
+			"QueryContext; the query's placeholders would have no values")
 	}
 }

@@ -99,6 +99,7 @@ func TestListFields_PostgresConstructs(t *testing.T) {
 		"::jsonb @> ",           // array-of-scalars containment
 		" ->> ",                 // scalar extraction
 		"CAST(%s AS %s)",        // cast
+		`"$%d"`,                 // numbered bind placeholder
 		`"integer"`,             // Postgres type names
 		`"double precision"`,
 		`"timestamp"`,
@@ -116,6 +117,13 @@ func TestListFields_PostgresConstructs(t *testing.T) {
 // deliberately and are pinned separately by TestListFields_MultiValueSemantics:
 // `!=` on a multi-valued field behaved as `=`, and a multi-value string filter
 // compared an array to a scalar (false for every row).
+//
+// "Byte-identical" no longer holds for the two JSON_CONTAINS forms: the JSON
+// operand used to be a literal spliced into the statement text (`'%s'`) and is
+// now a bound argument cast back to JSON (`CAST(%s AS JSON)`) — that is the
+// injection fix, and the operand is a bound STRING because the driver renders a
+// []byte as _binary'...', which MySQL rejects with Error 3144. Everything else
+// about the dialect is unchanged and still pinned here.
 func TestListFields_MySQLUnchanged(t *testing.T) {
 	out := stripComments(t, renderRepoListFields(t, projecttypes.MYSQL))
 	for _, want := range []string{
@@ -126,8 +134,7 @@ func TestListFields_MySQLUnchanged(t *testing.T) {
 		// unchanged.
 		`JSON_EXTRACT(%s, '$[*].%s')`,
 		`JSON_EXTRACT(%s, '$.%s')`,
-		`JSON_CONTAINS(%s,'%s','$')`,   // array containment
-		`JSON_CONTAINS(%s, '%s', '$')`, // member equality
+		`JSON_CONTAINS(%s, CAST(%s AS JSON), '$')`, // array containment AND member equality
 		`convert(%s, %s)`,
 		// Values only: printer.Fprint normalizes const-block alignment.
 		`sqlTypeInt`, `"INT"`,
@@ -208,6 +215,78 @@ func TestListFields_EnumValueResolution(t *testing.T) {
 		// panicked the request goroutine on a typo'd filter.
 		if strings.Contains(out, ".ByName(protoreflect.Name(value)).Number()") {
 			t.Errorf("%s: enum resolution still dereferences the result of ByName unguarded", dbType)
+		}
+	}
+}
+
+// TestListFields_NoValueIsInterpolated is the guard that keeps the SQL injection
+// class from coming back.
+//
+// The clause builders used to splice the caller's filter VALUE straight into the
+// statement text — `fmt.Sprintf("%s %s '%s'", left, op, value)` — and the query
+// then ran with zero arguments. A value containing a single quote closed the
+// literal and continued the statement. Every value is now appended to the query's
+// binder and referenced by a placeholder, so the only way to regress is to write
+// one of these quoted formats again.
+//
+// The scan is per clause-builder body rather than over the whole file because
+// `'%s'` also spells a JSON PATH — `->> '%s'`, `'$.%s'` — whose operand is a
+// dependant field identifier the builder has already checked against the entity's
+// schema, never caller-supplied text.
+func TestListFields_NoValueIsInterpolated(t *testing.T) {
+	clauseBuilders := []string{
+		"func buildStringClause",
+		"func buildEnumClause",
+		"func buildIntClause",
+		"func buildFloatClause",
+		"func buildBooleanClause",
+		"func buildTimestampClause",
+		"func buildArrayClause",
+	}
+	// A clause builder either binds the value itself, or hands it to one of the
+	// dialect helpers that binds (they take the whole request precisely so they
+	// can reach the binder).
+	bindingMarkers := []string{
+		"req.args.bind(",
+		"jsonArrayContains(req,",
+		"jsonMemberEquals(req,",
+		"jsonMemberStringEquals(req,",
+		"jsonMemberStringLike(req,",
+	}
+
+	for _, dbType := range []projecttypes.DatabaseType{projecttypes.MYSQL, projecttypes.POSTGRESQL} {
+		out := stripComments(t, renderRepoListFields(t, dbType))
+
+		// These two are never a path or an identifier — they only ever wrapped a
+		// value — so they must not appear anywhere in the file.
+		for _, banned := range []string{`'%%%s%%'`, `\"%s\"`} {
+			if strings.Contains(out, banned) {
+				t.Errorf("%s: list_fields.go interpolates a value into the SQL text (%s); "+
+					"filter values must be bound, not spliced", dbType, banned)
+			}
+		}
+
+		for _, header := range clauseBuilders {
+			body := extractFunc(out, header)
+			if strings.HasPrefix(body, "(") {
+				t.Errorf("%s: %s not found in rendered output", dbType, header)
+				continue
+			}
+			if strings.Contains(body, `'%s'`) {
+				t.Errorf("%s: %s interpolates a quoted value into the SQL text; it must bind it\n%s",
+					dbType, header, body)
+			}
+			bound := false
+			for _, marker := range bindingMarkers {
+				if strings.Contains(body, marker) {
+					bound = true
+					break
+				}
+			}
+			if !bound {
+				t.Errorf("%s: %s never reaches the query binder — its value ends up in the "+
+					"statement text\n%s", dbType, header, body)
+			}
 		}
 	}
 }

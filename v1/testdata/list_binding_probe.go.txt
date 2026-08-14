@@ -1,0 +1,410 @@
+package list
+
+// This file is copied into a generated project by v1.assertListBindingProbe and
+// run there as core/repository/list/list_binding_probe_test.go, with __MODULE__
+// replaced by the generated module path.
+//
+// It exists because `?q=O'Brien` returned 502 in production. The list query
+// builder used to write every filter VALUE into the statement text, so the
+// apostrophe closed the SQL string literal and the remainder of the value became
+// syntax the engine rejected. A name is not an attack; the same hole answers to
+// `'; DROP TABLE ...; --`.
+//
+// The contract pinned here is one sentence: no byte a caller sends ever reaches
+// the SQL TEXT. Every filter value is bound and referenced by a placeholder, the
+// placeholders agree with the argument list in count and in order, and the value
+// arrives at the driver with its type and its bytes intact.
+//
+// The probe lives in the list package itself so it can call the unexported
+// placeholder() and derive the dialect's bind marker rather than hardcoding one
+// — the same source runs unchanged against the MySQL and the PostgreSQL flavour
+// of the generated builder.
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
+
+	"go.einride.tech/aip/filtering"
+	"go.einride.tech/aip/ordering"
+
+	main_entity "__MODULE__/entity/all_types"
+)
+
+// probeRequest is the smallest thing satisfying ListRequest: a parsed filter,
+// its declarations, and a fixed page. No order-by and no joins — neither binds
+// anything, and both would only add text this probe would have to look past.
+type probeRequest struct {
+	filter       filtering.Filter
+	declarations *filtering.Declarations
+}
+
+func (r probeRequest) GetFilter() filtering.Filter                       { return r.filter }
+func (r probeRequest) GetFilteringDeclarations() *filtering.Declarations { return r.declarations }
+func (r probeRequest) GetEnumValues() map[string]map[string]int64        { return nil }
+func (r probeRequest) GetOrderBy() ordering.OrderBy                      { return ordering.OrderBy{} }
+func (r probeRequest) GetPageSize() int32                                { return 10 }
+func (r probeRequest) GetOffset() int64                                  { return 0 }
+func (r probeRequest) GetJoinParams() *JoinParams                        { return nil }
+func (r probeRequest) GetIncludeFields() []string                        { return nil }
+func (r probeRequest) GetExcludeFields() []string                        { return nil }
+
+// filterString carries the raw filter expression into filtering.ParseFilter,
+// which is what a transport's list params type does.
+type filterString string
+
+func (f filterString) GetFilter() string { return string(f) }
+
+// probeDeclarations declares the four fields these assertions filter on, in the
+// same style rest/templates/handler_list_entity.go.tmpl emits: the standard
+// functions, the true/false idents, and one DeclareIdent per field with the
+// aip type its field type maps to.
+func probeDeclarations(t *testing.T) *filtering.Declarations {
+	t.Helper()
+	declarations, err := filtering.NewDeclarations(
+		filtering.DeclareStandardFunctions(),
+		filtering.DeclareIdent("true", filtering.TypeBool),
+		filtering.DeclareIdent("false", filtering.TypeBool),
+		filtering.DeclareIdent("t07_varchar_req", filtering.TypeString),
+		filtering.DeclareIdent("t02_integer_req", filtering.TypeInt),
+		filtering.DeclareIdent("t03_float_req", filtering.TypeFloat),
+		filtering.DeclareIdent("t26_datetime_req", filtering.TypeTimestamp),
+	)
+	if err != nil {
+		t.Fatalf("building filter declarations: %v", err)
+	}
+	return declarations
+}
+
+// parseListRequest builds a ListRequest the way a transport does: through
+// filtering.ParseFilter, so the value passes the real lexer, parser and type
+// checker before it reaches the query builder. A hand-built AST would skip
+// exactly the layers that have to carry an apostrophe intact.
+func parseListRequest(t *testing.T, filter string) ListRequest {
+	t.Helper()
+	declarations := probeDeclarations(t)
+	parsed, err := filtering.ParseFilter(filterString(filter), declarations)
+	if err != nil {
+		t.Fatalf("ParseFilter(%q): %v", filter, err)
+	}
+	return probeRequest{filter: parsed, declarations: declarations}
+}
+
+// buildProbeQuery builds the list query for a filter, failing the test if the
+// builder rejects it.
+func buildProbeQuery(t *testing.T, filter string, onlyCount bool) (string, []any) {
+	t.Helper()
+	query, args, err := New().BuildListEntityQuery(
+		context.Background(),
+		parseListRequest(t, filter),
+		main_entity.AllTypes{},
+		onlyCount,
+	)
+	if err != nil {
+		t.Fatalf("BuildListEntityQuery(%q): %v", filter, err)
+	}
+	return query, args
+}
+
+// countPlaceholders counts the bind markers in a built query. MySQL's markers
+// are all identical, so occurrences are the count; Postgres numbers them, so the
+// count is how many consecutive ordinals appear. (No query here binds ten or
+// more values, so "$1" cannot be matched as a prefix of "$10".)
+func countPlaceholders(query string) int {
+	if placeholder(1) == placeholder(2) {
+		return strings.Count(query, placeholder(1))
+	}
+	n := 0
+	for i := 1; strings.Contains(query, placeholder(i)); i++ {
+		n++
+	}
+	return n
+}
+
+// ordinalPlaceholders reports whether the dialect numbers its markers, i.e.
+// whether the ORDER the builder binds in is observable in the text.
+func ordinalPlaceholders() bool { return placeholder(1) != placeholder(2) }
+
+// probeFilters is every filter this file builds a query from. TestNoByteSlice
+// Arguments sweeps the whole set, so anything added below belongs here too.
+var probeFilters = []string{
+	`t07_varchar_req = "O'Brien"`,
+	`t07_varchar_req : "O'Brien"`,
+	`t07_varchar_req = "'; DROP TABLE all_types; --"`,
+	`t07_varchar_req : "' OR '1'='1"`,
+	`t07_varchar_req = "x" AND (t02_integer_req = 3 OR t07_varchar_req = "z")`,
+	`t26_datetime_req > timestamp("2024-01-01T00:00:00Z")`,
+	`t26_datetime_req > "2024-01-01T00:00:00Z"`,
+	`t07_varchar_req : "50%"`,
+	`t03_float_req > 0.000000123`,
+	`t03_float_req > 3`,
+}
+
+// TestApostropheInFilterValueIsBound is the direct regression test for the
+// reported failure: `?q=O'Brien` reached the SQL text and closed the string
+// literal, and the endpoint answered 502.
+func TestApostropheInFilterValueIsBound(t *testing.T) {
+	const value = "O'Brien"
+	query, args := buildProbeQuery(t, `t07_varchar_req = "`+value+`"`, false)
+
+	if strings.Contains(query, value) {
+		t.Errorf("the filter value is in the SQL text:\n%s", query)
+	}
+	// An odd number of single quotes is the signature of the bug: the value's
+	// apostrophe leaves one literal open and everything after it is parsed as
+	// SQL. Zero is what a fully bound query has.
+	if n := strings.Count(query, "'"); n%2 != 0 {
+		t.Errorf("SQL carries %d single quotes (odd — a string literal is left open):\n%s", n, query)
+	}
+	if len(args) != 1 {
+		t.Fatalf("got %d arguments, want 1: %#v", len(args), args)
+	}
+	if got, ok := args[0].(string); !ok || got != value {
+		t.Errorf("argument is %#v, want the string %q", args[0], value)
+	}
+}
+
+// TestHostileFilterValuesAreNeverInSQL sweeps the values that break a builder
+// which formats instead of binds — quotes and backslashes break the literal,
+// whitespace runs used to be eaten by squash(), and non-ASCII proves nothing
+// re-encodes the value on the way through.
+//
+// The primary assertion is that the SQL text is IDENTICAL to the text built for
+// a benign value: the query must not vary with the value at all. That holds even
+// for a value like `"` which is itself SQL punctuation (Postgres quotes its
+// identifiers with it), where a substring search would be meaningless.
+func TestHostileFilterValuesAreNeverInSQL(t *testing.T) {
+	values := []string{
+		"O'Brien",
+		`'; DROP TABLE all_types; --`,
+		`\`,
+		`"`,
+		"a\tb",
+		"a   b",
+		"ünïcode",
+		`' OR '1'='1`,
+	}
+
+	for _, op := range []string{"=", ":"} {
+		// The reference query: same shape, a value with nothing interesting in it.
+		reference, _ := buildProbeQuery(t, fmt.Sprintf("t07_varchar_req %s %q", op, "benign"), false)
+
+		for _, value := range values {
+			t.Run(fmt.Sprintf("%s/%q", op, value), func(t *testing.T) {
+				// strconv.Quote spells the value as a filter string literal; the
+				// aip lexer unescapes it back to these exact bytes.
+				query, args := buildProbeQuery(t, fmt.Sprintf("t07_varchar_req %s %s", op, strconv.Quote(value)), false)
+
+				if query != reference {
+					t.Errorf("the SQL text depends on the filter VALUE — some part of it was spliced in.\n got: %s\nwant: %s", query, reference)
+				}
+				// A one-character value is skipped here only because a lone `"` or
+				// `\` can legitimately occur in the query's own syntax; the
+				// text-identity check above already covers it.
+				if len([]rune(value)) > 1 && strings.Contains(query, value) {
+					t.Errorf("the filter value %q is in the SQL text:\n%s", value, query)
+				}
+				if n := strings.Count(query, "'"); n%2 != 0 {
+					t.Errorf("SQL carries an odd number of single quotes (a literal is left open):\n%s", query)
+				}
+
+				if len(args) != 1 {
+					t.Fatalf("got %d arguments, want 1: %#v", len(args), args)
+				}
+				want := value
+				if op == ":" {
+					want = "%" + value + "%"
+				}
+				if got, ok := args[0].(string); !ok || got != want {
+					t.Errorf("argument is %#v, want the string %q", args[0], want)
+				}
+			})
+		}
+	}
+}
+
+// TestPlaceholdersAgreeWithArguments pins the invariant that makes binding safe
+// in the first place: one marker per argument, in the order the arguments are
+// listed. The clause walker emits text and binds values in the same traversal,
+// which is the only reason the numbering can be right on Postgres — a builder
+// that emitted a fragment before binding its value would silently shift every
+// later ordinal onto the wrong argument.
+func TestPlaceholdersAgreeWithArguments(t *testing.T) {
+	const filter = `t07_varchar_req = "x" AND (t02_integer_req = 3 OR t07_varchar_req = "z")`
+	query, args := buildProbeQuery(t, filter, false)
+
+	if got := countPlaceholders(query); got != len(args) || got != 3 {
+		t.Fatalf("%d placeholders for %d arguments (want 3 of each):\n%s\n%#v", got, len(args), query, args)
+	}
+
+	if got, ok := args[0].(string); !ok || got != "x" {
+		t.Errorf("args[0] = %#v, want the string \"x\"", args[0])
+	}
+	if got, ok := args[1].(int64); !ok || got != 3 {
+		t.Errorf("args[1] = %#v, want int64(3)", args[1])
+	}
+	if got, ok := args[2].(string); !ok || got != "z" {
+		t.Errorf("args[2] = %#v, want the string \"z\"", args[2])
+	}
+
+	if ordinalPlaceholders() {
+		// Numbered markers must appear once each and in ascending order, which
+		// is what proves the ordinals were assigned in emission order.
+		previous := -1
+		for i := 1; i <= len(args); i++ {
+			marker := placeholder(i)
+			if n := strings.Count(query, marker); n != 1 {
+				t.Fatalf("marker %s appears %d times, want once:\n%s", marker, n, query)
+			}
+			at := strings.Index(query, marker)
+			if at < previous {
+				t.Errorf("marker %s appears before %s — the ordinals do not follow the argument order:\n%s", marker, placeholder(i-1), query)
+			}
+			previous = at
+		}
+	}
+}
+
+// TestTimestampFilterBindsATime covers both spellings a timestamp comparison
+// arrives in, and pins that the bound value is a time.Time rather than text: a
+// driver renders a time.Time in the form the engine expects, while an RFC3339
+// string is rejected outright by MySQL's literal parser.
+func TestTimestampFilterBindsATime(t *testing.T) {
+	want := time.Date(2024, time.January, 1, 0, 0, 0, 0, time.UTC)
+
+	for _, filter := range []string{
+		// The conversion call: a CallExpr, so reading the constant off it
+		// directly yields "" and the comparison became `> ''`.
+		`t26_datetime_req > timestamp("2024-01-01T00:00:00Z")`,
+		// The bare string: a constant, which the standard declarations accept
+		// against a timestamp field through the _timestamp_string overloads.
+		`t26_datetime_req > "2024-01-01T00:00:00Z"`,
+	} {
+		query, args := buildProbeQuery(t, filter, false)
+		if len(args) != 1 {
+			t.Fatalf("%s: got %d arguments, want 1: %#v", filter, len(args), args)
+		}
+		got, ok := args[0].(time.Time)
+		if !ok {
+			t.Fatalf("%s: argument is %#v, want a time.Time", filter, args[0])
+		}
+		if !got.Equal(want) {
+			t.Errorf("%s: bound %v, want %v", filter, got, want)
+		}
+		if strings.Contains(query, "2024") {
+			t.Errorf("%s: the timestamp text is in the SQL:\n%s", filter, query)
+		}
+	}
+}
+
+// TestInvalidTimestampIsRejectedBeforeSQL records where a malformed timestamp is
+// caught: aip's own type checker rejects it inside ParseFilter ("check call
+// expr: invalid timestamp. Should be in RFC3339 format"), so it never reaches
+// the query builder. That is the right layer — a filter the caller mis-spelled
+// is a 400 from the transport's ParseFilter branch — and this assertion exists so
+// that a change moving the check (or removing it) is noticed rather than silently
+// letting an unparseable value through to the builder.
+func TestInvalidTimestampIsRejectedBeforeSQL(t *testing.T) {
+	const filter = `t26_datetime_req > "not-a-time"`
+	parsed, err := filtering.ParseFilter(filterString(filter), probeDeclarations(t))
+	if err != nil {
+		return // rejected at parse time, as expected
+	}
+
+	// If aip ever accepts it, the builder must reject it — an unparseable
+	// timestamp must never become part of a query.
+	query, args, err := New().BuildListEntityQuery(
+		context.Background(),
+		probeRequest{filter: parsed, declarations: probeDeclarations(t)},
+		main_entity.AllTypes{},
+		false,
+	)
+	if err == nil {
+		t.Errorf("%s was accepted by both the checker and the builder:\n%s\n%#v", filter, query, args)
+	}
+}
+
+// TestLikeWildcardsPassThrough records today's contract for the `:` operator
+// rather than an aspiration: `%` and `_` inside the caller's value stay
+// WILDCARDS. Escaping them changes match semantics and was deliberately left out
+// of the binding fix (it is a recorded follow-up); this assertion is what will
+// fail, loudly and in one place, when that follow-up lands.
+func TestLikeWildcardsPassThrough(t *testing.T) {
+	_, args := buildProbeQuery(t, `t07_varchar_req : "50%"`, false)
+	if len(args) != 1 {
+		t.Fatalf("got %d arguments, want 1: %#v", len(args), args)
+	}
+	if got, ok := args[0].(string); !ok || got != "%50%%" {
+		t.Errorf("argument is %#v, want %q — the value's own %% is not escaped", args[0], "%50%%")
+	}
+}
+
+// TestNumericFiltersKeepTheirValue covers the two ways a float comparison used to
+// lose its value: %f formatting rounded it to six decimals, and an int-spelled
+// float was read with GetDoubleValue(), which returns 0 for an Int64 constant.
+func TestNumericFiltersKeepTheirValue(t *testing.T) {
+	_, args := buildProbeQuery(t, `t03_float_req > 0.000000123`, false)
+	if len(args) != 1 {
+		t.Fatalf("got %d arguments, want 1: %#v", len(args), args)
+	}
+	if got, ok := args[0].(float64); !ok || got != 0.000000123 {
+		t.Errorf("argument is %#v, want float64(0.000000123) — %%f rendered this as 0.000000", args[0])
+	}
+
+	// `> 3` against a float field: an Int64 constant that has to survive as 3.
+	_, args = buildProbeQuery(t, `t03_float_req > 3`, false)
+	if len(args) != 1 {
+		t.Fatalf("got %d arguments, want 1: %#v", len(args), args)
+	}
+	if got, ok := args[0].(float64); !ok || got != 3 {
+		t.Errorf("argument is %#v, want float64(3) — an int-spelled float used to become 0", args[0])
+	}
+}
+
+// TestNoByteSliceArguments sweeps every query this file builds. A []byte
+// argument is rendered by go-sql-driver/mysql as _binary'...', which the server
+// rejects for a JSON column with Error 3144 — so a builder that binds a JSON
+// document must bind it as a string.
+func TestNoByteSliceArguments(t *testing.T) {
+	for _, filter := range probeFilters {
+		for _, onlyCount := range []bool{false, true} {
+			_, args := buildProbeQuery(t, filter, onlyCount)
+			for i, a := range args {
+				if _, isBytes := a.([]byte); isBytes {
+					t.Errorf("%s (onlyCount=%v): args[%d] is a []byte; MySQL renders it as _binary'...' and rejects it (Error 3144)", filter, onlyCount, i)
+				}
+			}
+		}
+	}
+}
+
+// TestCountQuerySharesTheArguments pins that the count query built for a request
+// carries the SAME arguments in the same order as its list query. They are built
+// from one WHERE clause, and the count path returns early — so a value bound
+// after that point would leave the count with fewer arguments than placeholders
+// and fail at execution, not at build.
+func TestCountQuerySharesTheArguments(t *testing.T) {
+	for _, filter := range probeFilters {
+		listQuery, listArgs := buildProbeQuery(t, filter, false)
+		countQuery, countArgs := buildProbeQuery(t, filter, true)
+
+		if len(countArgs) != len(listArgs) {
+			t.Errorf("%s: count query has %d arguments, list query has %d", filter, len(countArgs), len(listArgs))
+			continue
+		}
+		for i := range listArgs {
+			if fmt.Sprintf("%T %v", countArgs[i], countArgs[i]) != fmt.Sprintf("%T %v", listArgs[i], listArgs[i]) {
+				t.Errorf("%s: count args[%d] = %#v, list args[%d] = %#v", filter, i, countArgs[i], i, listArgs[i])
+			}
+		}
+		if got := countPlaceholders(countQuery); got != len(countArgs) {
+			t.Errorf("%s: count query has %d placeholders for %d arguments:\n%s", filter, got, len(countArgs), countQuery)
+		}
+		if got := countPlaceholders(listQuery); got != len(listArgs) {
+			t.Errorf("%s: list query has %d placeholders for %d arguments:\n%s", filter, got, len(listArgs), listQuery)
+		}
+	}
+}

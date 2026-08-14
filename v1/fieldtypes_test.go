@@ -648,6 +648,7 @@ func TestAllFieldTypesGenerate(t *testing.T) {
 				assertFetchByIndexShapes(t, dir, params.ProjectVersion)
 				assertFetchOrderingShapes(t, dir)
 				assertJSONColumnDriverValue(t, dir)
+				assertListBindingProbe(t, dir, params.Module)
 				assertListQueryDedupeShapes(t, dir)
 				assertArrayElementTypeShapes(t, dir, params.ProjectVersion)
 				assertFilterIdentifierSpelling(t, dir, params.ProjectVersion)
@@ -1012,6 +1013,51 @@ func assertJSONColumnDriverValue(t *testing.T, dir string) {
 	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Errorf("JSON column probe failed:\n%s", string(out))
+	}
+}
+
+// assertListBindingProbe runs a probe test inside the generated project that pins
+// how a list filter's VALUES reach the database.
+//
+// It exists because `?q=O'Brien` answered 502 in production: the builder wrote
+// every filter value into the statement TEXT, so the apostrophe closed the SQL
+// string literal and the rest of the value became syntax. The same hole answers
+// to `'; DROP TABLE ...; --`. The probe builds filters through the real
+// filtering.ParseFilter path — the layer that has to carry the apostrophe
+// intact — and asserts that no caller byte appears in the query, that the
+// placeholders agree with the arguments in count and order, and that each value
+// keeps its Go type (a time.Time for a timestamp, an exact float64, never a
+// []byte).
+//
+// Nothing outside the generated project can check this: the query is assembled
+// with fmt.Sprintf at runtime, so a value spliced back into the text compiles
+// perfectly. And it must run for EVERY dialect, because the part that has to be
+// right differs per engine — MySQL's markers are all `?` while Postgres numbers
+// its own, and the numbering is only correct as long as the clause walker binds
+// in the same order it emits text.
+//
+// The probe lives in the list package (it calls the unexported placeholder() to
+// derive the dialect's marker), so __MODULE__ is rewritten for the one import it
+// needs: the generated entity that implements ListEntity. It pulls in no
+// dependency the generated go.mod has not already tidied.
+func assertListBindingProbe(t *testing.T, dir string, module string) {
+	t.Helper()
+
+	probe, err := os.ReadFile(filepath.Join("testdata", "list_binding_probe.go.txt"))
+	if err != nil {
+		t.Fatalf("read probe source: %v", err)
+	}
+	src := strings.ReplaceAll(string(probe), "__MODULE__", module)
+	probePath := filepath.Join(dir, "core", "repository", "list", "list_binding_probe_test.go")
+	if err := os.WriteFile(probePath, []byte(src), 0o644); err != nil {
+		t.Fatalf("write probe test: %v", err)
+	}
+	defer os.Remove(probePath)
+
+	cmd := exec.Command("go", "test", "./core/repository/list/")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Errorf("list filter binding probe failed:\n%s", string(out))
 	}
 }
 
