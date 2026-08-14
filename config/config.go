@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"os"
 	"path"
 
 	"github.com/nuzur/filetools"
@@ -23,11 +22,16 @@ func GenerateConfig(ctx context.Context, project *project.Project) error {
 	projectDir := project.Dir()
 	configDir := path.Join(projectDir, "config")
 
-	// remove existing
-	err := os.RemoveAll(configDir)
-	if err != nil {
-		if project.OnStatusChange != nil {
-			project.OnStatusChange(fmt.Sprintf("ERROR: Deleting config directory: %v", err))
+	// Remove only the files this generator owns — never the directory. config/
+	// is where operators keep environment YAMLs next to the generated base.yaml
+	// (the generated loader reads caller-supplied paths from CONFIG, so example
+	// and local configs naturally live here), and the os.RemoveAll this replaces
+	// deleted those user files on every regeneration.
+	for _, f := range []string{"config.go", "base.yaml", "cli.yaml"} {
+		if err := files.DeleteFileIfExists(path.Join(configDir, f)); err != nil {
+			if project.OnStatusChange != nil {
+				project.OnStatusChange(fmt.Sprintf("ERROR: Deleting generated config file %s: %v", f, err))
+			}
 		}
 	}
 
