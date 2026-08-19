@@ -46,6 +46,15 @@ aws:
   key_id: << S3 Access Key ID Here >>
   secret: << S3 Secret Access Key Here >>
   bucket: << S3 Bucket Here >>
+  # Leave blank for AWS S3 — the SDK resolves the regional endpoint from the
+  # region above. Set it to the account endpoint of another S3-compatible
+  # store to use that instead, e.g. Cloudflare R2:
+  #   endpoint: "https://<account-id>.r2.cloudflarestorage.com"
+  # Blank (not a << ... >> placeholder) is the default on purpose: an overlay
+  # config (prod.yaml) that sets the other aws: keys but not this one leaves
+  # this value in force, and a placeholder here would be sent to the SDK as a
+  # real endpoint and break every upload.
+  endpoint: ""
 {{end}}
 
 monitoring:

@@ -170,3 +170,77 @@ func TestGenerateStorageDisabled(t *testing.T) {
 		t.Fatal("base.yaml must not contain an aws: block when disabled")
 	}
 }
+
+// storageRoundTripTest is compiled INTO the generated app's storage package by
+// TestGeneratedObjectURLKeyRoundTrip below. It pins the invariant the /sign
+// endpoint depends on: the URL Upload returns (objectURL) must feed back through
+// keyFromURL to the exact key that was uploaded — for AWS S3 and for any
+// S3-compatible store reached through a configured endpoint (e.g. Cloudflare
+// R2). It fails if objectURL ever emits a path-style URL for a custom endpoint,
+// which would make keyFromURL recover "<bucket>/<key>" and every sign miss.
+const storageRoundTripTest = `package storage
+
+import "testing"
+
+func TestObjectURLKeyRoundTrip(t *testing.T) {
+	const key = "photos/a.png"
+	cases := []struct{ name, endpoint, wantURL string }{
+		{"aws_s3", "", "https://mybucket.s3.us-east-1.amazonaws.com/photos/a.png"},
+		{"r2", "https://abc123.r2.cloudflarestorage.com", "https://mybucket.abc123.r2.cloudflarestorage.com/photos/a.png"},
+		{"r2_trailing_slash", "https://abc123.r2.cloudflarestorage.com/", "https://mybucket.abc123.r2.cloudflarestorage.com/photos/a.png"},
+		{"r2_no_scheme", "abc123.r2.cloudflarestorage.com", "https://mybucket.abc123.r2.cloudflarestorage.com/photos/a.png"},
+		{"http_with_port", "http://localhost:9000", "http://mybucket.localhost:9000/photos/a.png"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &Client{bucket: "mybucket", region: "us-east-1", endpoint: tc.endpoint}
+			got := c.objectURL(key)
+			if got != tc.wantURL {
+				t.Fatalf("objectURL = %q, want %q", got, tc.wantURL)
+			}
+			if back := keyFromURL(got); back != key {
+				t.Fatalf("keyFromURL(%q) = %q, want %q (path-style url?)", got, back, key)
+			}
+		})
+	}
+}
+`
+
+// TestGeneratedObjectURLKeyRoundTrip generates the storage zone and runs
+// storageRoundTripTest inside the generated module, so the upload -> stored url
+// -> sign round trip is exercised as real compiled code rather than asserted
+// against template text. REST-only shape: no protoc needed.
+func TestGeneratedObjectURLKeyRoundTrip(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping generated storage round trip in -short mode")
+	}
+
+	id := "cfg_storage_roundtrip"
+	root := t.TempDir()
+	params := &project.ProjectParams{
+		Project:        &nemgen.Project{Name: "ConfigMatrix"},
+		ProjectVersion: configurationsSchema(),
+		RootPath:       root,
+		Identifier:     id,
+		Module:         "github.com/mklfarha/" + id,
+		EntitiesConfig: project.EntitiesConfig{Enabled: true, Dir: "entity", IncludeListInterface: true},
+		CoreConfig:     project.CoreConfig{Enabled: true, CoreDir: "core", RepoConfig: project.RepoConfig{DatabaseType: project.MYSQL}},
+		RESTConfig:     project.RESTConfig{Enabled: true, OpenAPI: true},
+		StorageConfig:  project.StorageConfig{Enabled: true},
+		OnStatusChange: func(status string) { t.Logf("[gen] %s", status) },
+	}
+	if err := Generate(context.Background(), params); err != nil {
+		t.Fatalf("Generate failed: %v", err)
+	}
+
+	dir := filepath.Join(root, id)
+	if err := os.WriteFile(filepath.Join(dir, "storage", "roundtrip_test.go"), []byte(storageRoundTripTest), 0o644); err != nil {
+		t.Fatalf("writing round-trip test: %v", err)
+	}
+
+	cmd := exec.Command("go", "test", "./storage/")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("generated storage round trip failed:\n%s", string(out))
+	}
+}

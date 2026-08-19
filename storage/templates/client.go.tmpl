@@ -8,28 +8,40 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// Client is a small, self-contained S3 wrapper: it uploads objects and issues
-// presigned GET URLs. Credentials come from the app's `aws:` config block.
+// Client is a small, self-contained S3-compatible object-store wrapper: it
+// uploads objects and issues presigned GET URLs. Credentials come from the
+// app's `aws:` config block. It talks to AWS S3 by default, or to any other
+// S3-compatible store (e.g. Cloudflare R2) when an endpoint is configured.
 type Client struct {
 	uploader *manager.Uploader
 	presign  *s3.PresignClient
 	bucket   string
 	region   string
+	endpoint string
 }
 
-// NewClient builds an S3 client from static credentials. It returns an error
-// when the bucket is not configured, so callers can degrade to a 503 until the
-// `aws:` config is filled in (e.g. at deploy time).
-func NewClient(ctx context.Context, region, keyID, secret, bucket string) (*Client, error) {
+// NewClient builds an S3-compatible client from static credentials. It returns
+// an error when the bucket is not configured, so callers can degrade to a 503
+// until the `aws:` config is filled in (e.g. at deploy time).
+//
+// endpoint selects the service: empty means AWS S3, and the SDK resolves the
+// regional endpoint from region. A non-empty endpoint points the client at
+// another S3-compatible store — Cloudflare R2's
+// https://<account-id>.r2.cloudflarestorage.com, for instance. Addressing stays
+// virtual-hosted (UsePathStyle is left false), which is what R2 expects and
+// what objectURL below mirrors.
+func NewClient(ctx context.Context, region, keyID, secret, bucket, endpoint string) (*Client, error) {
 	if strings.TrimSpace(bucket) == "" {
 		return nil, fmt.Errorf("storage: bucket is not configured")
 	}
+	endpoint = strings.TrimSpace(endpoint)
 	cfg, err := awsconfig.LoadDefaultConfig(ctx,
 		awsconfig.WithRegion(region),
 		awsconfig.WithCredentialsProvider(
@@ -39,12 +51,20 @@ func NewClient(ctx context.Context, region, keyID, secret, bucket string) (*Clie
 	if err != nil {
 		return nil, err
 	}
-	c := s3.NewFromConfig(cfg)
+	var c *s3.Client
+	if endpoint == "" {
+		c = s3.NewFromConfig(cfg)
+	} else {
+		c = s3.NewFromConfig(cfg, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(endpoint)
+		})
+	}
 	return &Client{
 		uploader: manager.NewUploader(c),
 		presign:  s3.NewPresignClient(c),
 		bucket:   bucket,
 		region:   region,
+		endpoint: endpoint,
 	}, nil
 }
 
@@ -77,8 +97,40 @@ func (c *Client) SignURL(ctx context.Context, key string, expiry time.Duration) 
 }
 
 // objectURL builds the virtual-hosted-style URL for a key.
+//
+// It must stay virtual-hosted (bucket in the HOST) for every provider, not just
+// AWS: this URL is what Upload returns, what the caller stores on the record,
+// and what comes back to /sign, where keyFromURL recovers the key as the URL
+// path minus its leading slash. A path-style URL (https://host/bucket/key)
+// would make keyFromURL return "bucket/key" and every later sign would miss the
+// object.
 func (c *Client) objectURL(key string) string {
-	return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucket, c.region, key)
+	if c.endpoint == "" {
+		return fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", c.bucket, c.region, key)
+	}
+	scheme, host := endpointSchemeHost(c.endpoint)
+	return fmt.Sprintf("%s://%s.%s/%s", scheme, c.bucket, host, key)
+}
+
+// endpointSchemeHost splits a configured endpoint into its scheme and host. The
+// endpoint may be written with or without a scheme and with or without a
+// trailing slash ("https://acct.r2.cloudflarestorage.com/", "acct.r2.
+// cloudflarestorage.com"); https is assumed when no scheme is given.
+func endpointSchemeHost(endpoint string) (scheme, host string) {
+	raw := strings.TrimRight(strings.TrimSpace(endpoint), "/")
+	if u, err := url.Parse(raw); err == nil && u.Host != "" {
+		scheme = u.Scheme
+		if scheme == "" {
+			scheme = "https"
+		}
+		return scheme, u.Host
+	}
+	// No scheme: url.Parse puts the whole value in Path (or Opaque), so take
+	// everything up to the first path separator as the host.
+	if i := strings.Index(raw, "/"); i >= 0 {
+		raw = raw[:i]
+	}
+	return "https", raw
 }
 
 // keyFromURL extracts the object key from a URL previously returned by Upload

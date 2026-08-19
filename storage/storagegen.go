@@ -20,7 +20,8 @@ type storageTemplateData struct {
 }
 
 // GenerateStorage emits a `storage` package that exposes two generic,
-// non-entity-scoped HTTP endpoints backed by S3:
+// non-entity-scoped HTTP endpoints backed by S3-compatible object storage
+// (AWS S3, Cloudflare R2):
 //
 //	POST /upload  (multipart 'file') -> {url, key}
 //	POST /sign    ({key|url, expiry_seconds?}) -> {url}
@@ -30,8 +31,9 @@ type storageTemplateData struct {
 // these paths, and the gRPC-only httpServer serves the default mux directly.
 //
 // Opt-in: only generated when StorageConfig.Enabled and the app has a core
-// layer (it needs a running server). Credentials are runtime config read from
-// the app's `aws:` block — the generator never handles secrets.
+// layer (it needs a running server). Credentials — and the optional endpoint
+// that selects a non-AWS store — are runtime config read from the app's `aws:`
+// block; the generator never handles secrets.
 func GenerateStorage(ctx context.Context, params *project.ProjectParams) error {
 	proj, err := project.New(params)
 	if err != nil {
@@ -41,7 +43,7 @@ func GenerateStorage(ctx context.Context, params *project.ProjectParams) error {
 		return nil
 	}
 	if proj.OnStatusChange != nil {
-		proj.OnStatusChange("Generating storage (S3) package")
+		proj.OnStatusChange("Generating storage (S3-compatible) package")
 	}
 
 	data := storageTemplateData{

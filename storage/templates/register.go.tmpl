@@ -10,15 +10,19 @@ import (
 	{{.Identifier}}config "{{.Module}}/config"
 )
 
-// Register builds the S3 client from the app's `aws:` config and mounts the
-// storage endpoints on the default mux:
+// Register builds the object-store client from the app's `aws:` config and
+// mounts the storage endpoints on the default mux:
 //
 //	POST /upload  (multipart 'file') -> {url, key}
 //	POST /sign    ({key|url, expiry_seconds?}) -> {url}
 //
+// The config targets AWS S3 by default; setting `aws.endpoint` points the same
+// client at another S3-compatible store (e.g. Cloudflare R2).
+//
 // The gRPC-only httpServer serves the default mux directly; the REST server
-// forwards these paths to it. If S3 is not yet configured (empty bucket), the
-// endpoints respond 503 until the `aws:` config is set (e.g. at deploy time).
+// forwards these paths to it. If object storage is not yet configured (empty
+// bucket), the endpoints respond 503 until the `aws:` config is set (e.g. at
+// deploy time).
 //
 // It is wired via fx.Invoke in main.go when StorageConfig.Enabled.
 func Register(cfg config.Provider, logger *zap.Logger) {
@@ -29,9 +33,9 @@ func Register(cfg config.Provider, logger *zap.Logger) {
 	var awsCfg {{.Identifier}}config.AWS
 	_ = cfg.Get("aws").Populate(&awsCfg)
 
-	client, err := NewClient(context.Background(), awsCfg.Region, awsCfg.KeyID, awsCfg.Secret, awsCfg.Bucket)
+	client, err := NewClient(context.Background(), awsCfg.Region, awsCfg.KeyID, awsCfg.Secret, awsCfg.Bucket, awsCfg.Endpoint)
 	if err != nil {
-		logger.Warn("storage: S3 not configured; /upload and /sign will return 503 until 'aws:' config is set", zap.Error(err))
+		logger.Warn("storage: object storage not configured; /upload and /sign will return 503 until 'aws:' config is set", zap.Error(err))
 		http.HandleFunc("/upload", unconfigured)
 		http.HandleFunc("/sign", unconfigured)
 		return
